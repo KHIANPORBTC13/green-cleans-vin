@@ -209,6 +209,24 @@ function extractVinFromText(text){
   return null;
 }
 function vin6of(v){ return v ? v.slice(-6) : ""; }
+// Digito verificador ISO 3779 (mod-11). Algunos VIN JDM/europeos importados NO lo cumplen (no es
+// universal fuera del estandar NHTSA), asi que se usa solo como señal de puntaje para desempatar
+// entre varios candidatos leidos, NUNCA como filtro que descarte un VIN real.
+const VIN_TRANSLIT = { A:1,B:2,C:3,D:4,E:5,F:6,G:7,H:8, J:1,K:2,L:3,M:4,N:5, P:7, R:9,
+  S:2,T:3,U:4,V:5,W:6,X:7,Y:8,Z:9, 0:0,1:1,2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:9 };
+const VIN_WEIGHTS = [8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2];
+function vinChecksumOk(vin){
+  if (!/^[0-9A-HJ-NPR-Z]{17}$/.test(vin)) return false;
+  let sum = 0;
+  for (let i = 0; i < 17; i++) {
+    const val = VIN_TRANSLIT[vin[i]];
+    if (val === undefined) return false;
+    sum += val * VIN_WEIGHTS[i];
+  }
+  const rem = sum % 11;
+  const expected = rem === 10 ? "X" : String(rem);
+  return vin[8] === expected;
+}
 const KNOWN_MAKES = ["TOYOTA","MAZDA","MITSUBISHI","SUBARU","HONDA","NISSAN","FORD","HOLDEN","HYUNDAI","KIA","VOLKSWAGEN","BMW","MERCEDES","AUDI","SUZUKI","ISUZU","JEEP","LDV","MG","GWM","HAVAL"];
 function capWord(s){ return s.charAt(0) + s.slice(1).toLowerCase(); }
 function guessMakeModel(text){
@@ -224,13 +242,19 @@ function guessMakeModel(text){
 }
 
 /* ===================== Imagen ===================== */
+// FIX critico: version anterior compartia UN solo factor de escala entre ancho y alto, y el tope de
+// ancho maximo podia pisar silenciosamente el piso de altura minima -- en un recorte ANCHO y BAJO
+// (tipico de encuadrar una placa VIN completa de lado a lado, como las 3 fotos reales que fallaron)
+// el resultado quedaba muy por debajo de los ~30-40px de alto por caracter que Tesseract necesita.
+// Ahora el alto SIEMPRE gana: el ancho solo se topa como salvaguarda de memoria, nunca reduce el alto.
 function cropOutputSize(nw, nh){
-  const MIN_H = 260, MAX_DIM = 1400;
-  let scale = 1;
-  if (nh < MIN_H) scale = Math.min(3, MIN_H / nh);
-  const longSide = Math.max(nw, nh) * scale;
-  if (longSide > MAX_DIM) scale *= MAX_DIM / longSide;
-  return { w: Math.max(1, Math.round(nw * scale)), h: Math.max(1, Math.round(nh * scale)) };
+  const TARGET_H = 260, MAX_W = 3000, MAX_H = 1600;
+  let scale = Math.max(1, TARGET_H / nh);
+  let h = nh * scale;
+  if (h > MAX_H) scale *= MAX_H / h;
+  const w = Math.min(MAX_W, Math.round(nw * scale));
+  h = Math.round(nh * scale);
+  return { w: Math.max(1, w), h: Math.max(1, h) };
 }
 function resizeRectFromCorner(startRect, corner, dx, dy){
   let { x, y, w, h } = startRect;
@@ -249,6 +273,83 @@ function clampRectTo(rect, boundsW, boundsH){
   x = Math.max(0, Math.min(x, boundsW - w));
   y = Math.max(0, Math.min(y, boundsH - h));
   return { x, y, w, h };
+}
+
+/* ===================== Preprocesamiento antes del OCR ===================== */
+// Fotos reales de celular traen iluminacion despareja y reflejos (metal/vidrio) que un umbral GLOBAL
+// (tipo Otsu clasico) no puede separar bien de la placa completa. Bradley-Roth usa el promedio LOCAL
+// de cada zona (via imagen integral, rapido) en vez de un solo promedio para toda la imagen.
+function toGrayscale(ctx, w, h){
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const y = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    d[i] = d[i + 1] = d[i + 2] = y;
+  }
+  ctx.putImageData(img, 0, 0);
+  return img;
+}
+function contrastStretch(imgData, lowPct, highPct){
+  const d = imgData.data, hist = new Uint32Array(256), n = d.length / 4;
+  for (let i = 0; i < d.length; i += 4) hist[d[i]]++;
+  let cum = 0, lo = 0, hi = 255;
+  const loTarget = n * (lowPct / 100);
+  for (let v = 0; v < 256; v++) { cum += hist[v]; if (cum >= loTarget) { lo = v; break; } }
+  cum = 0;
+  for (let v = 255; v >= 0; v--) { cum += hist[v]; if (cum >= n * (1 - highPct / 100)) { hi = v; break; } }
+  if (hi <= lo) return imgData;
+  const scale = 255 / (hi - lo);
+  for (let i = 0; i < d.length; i += 4) {
+    let v = (d[i] - lo) * scale; v = v < 0 ? 0 : v > 255 ? 255 : v;
+    d[i] = d[i + 1] = d[i + 2] = v;
+  }
+  return imgData;
+}
+function integralImageOf(d, w, h){
+  const intg = new Float64Array((w + 1) * (h + 1));
+  for (let y = 0; y < h; y++) {
+    let rowSum = 0;
+    for (let x = 0; x < w; x++) {
+      rowSum += d[(y * w + x) * 4];
+      intg[(y + 1) * (w + 1) + (x + 1)] = intg[y * (w + 1) + (x + 1)] + rowSum;
+    }
+  }
+  return intg;
+}
+function bradleyRothBinarize(imgData, w, h, windowFrac, tPct){
+  const d = imgData.data;
+  const intg = integralImageOf(d, w, h);
+  const S = Math.max(15, Math.round(Math.min(w, h) * windowFrac)) | 1;
+  const half = S >> 1;
+  const out = new Uint8ClampedArray(w * h);
+  for (let y = 0; y < h; y++) {
+    const y0 = Math.max(0, y - half), y1 = Math.min(h - 1, y + half);
+    for (let x = 0; x < w; x++) {
+      const x0 = Math.max(0, x - half), x1 = Math.min(w - 1, x + half);
+      const area = (x1 - x0 + 1) * (y1 - y0 + 1);
+      const sum = intg[(y1 + 1) * (w + 1) + (x1 + 1)] - intg[y0 * (w + 1) + (x1 + 1)] - intg[(y1 + 1) * (w + 1) + x0] + intg[y0 * (w + 1) + x0];
+      const mean = sum / area;
+      out[y * w + x] = d[(y * w + x) * 4] < mean * (1 - tPct) ? 0 : 255;
+    }
+  }
+  for (let i = 0; i < w * h; i++) { d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = out[i]; }
+  return imgData;
+}
+function buildOcrVariants(cropCanvas){
+  const w = cropCanvas.width, h = cropCanvas.height;
+  // Variante A: gris + estiramiento de contraste (conserva tonos, buena en foto ya pareja)
+  const cvA = document.createElement("canvas"); cvA.width = w; cvA.height = h;
+  const ctxA = cvA.getContext("2d"); ctxA.drawImage(cropCanvas, 0, 0);
+  const imgA = toGrayscale(ctxA, w, h);
+  contrastStretch(imgA, 1, 1);
+  ctxA.putImageData(imgA, 0, 0);
+  // Variante B: gris + binarizado adaptativo (para iluminacion dispareja / reflejos en metal o vidrio)
+  const cvB = document.createElement("canvas"); cvB.width = w; cvB.height = h;
+  const ctxB = cvB.getContext("2d"); ctxB.drawImage(cropCanvas, 0, 0);
+  const imgB = toGrayscale(ctxB, w, h);
+  bradleyRothBinarize(imgB, w, h, 0.25, 0.15);
+  ctxB.putImageData(imgB, 0, 0);
+  return [cvA, cvB];
 }
 
 /* ===================== Utilidades ===================== */
@@ -385,10 +486,9 @@ function confirmCrop(){
   const out = document.createElement("canvas"); out.width = outW; out.height = outH;
   const octx = out.getContext("2d"); octx.imageSmoothingEnabled = true; octx.imageSmoothingQuality = "high";
   octx.drawImage(cropWork, nx, ny, nw, nh, 0, 0, outW, outH);
-  const dataUrl = out.toDataURL("image/jpeg", 0.92);
   closeCropEditor();
   document.getElementById("ocrStatus").textContent = "🔎 Leyendo VIN…";
-  runOcr(dataUrl);
+  runOcr(out);
 }
 
 /* ===================== OCR (sobre el recorte ya encuadrado) ===================== */
@@ -400,28 +500,49 @@ function ensureTesseract(){
     document.head.appendChild(sc);
   });
 }
-async function runOcr(dataUrl){
+const TESS_BASE_PARAMS = {
+  tessedit_ocr_engine_mode: "1",
+  tessedit_char_whitelist: "0123456789ABCDEFGHJKLMNPRSTUVWXYZ",
+  user_defined_dpi: "300",
+  load_system_dawg: "0", load_freq_dawg: "0", load_punc_dawg: "0",
+  load_number_dawg: "0", load_unambig_dawg: "0", load_bigram_dawg_file: "0",
+  preserve_interword_spaces: "0",
+};
+async function runOcr(cropCanvas){
   const statusEl = document.getElementById("ocrStatus");
+  const storeDataUrl = cropCanvas.toDataURL("image/jpeg", 0.92);
   try {
     await ensureTesseract();
+    console.debug("[VIN OCR] recorte", cropCanvas.width + "x" + cropCanvas.height);
+    const variants = buildOcrVariants(cropCanvas);
     const worker = await Tesseract.createWorker("eng");
-    let vinFull = null, ocrText = "";
+    let best = null, lastRawText = "";
     try {
-      await worker.setParameters({ tessedit_pageseg_mode: "7" });
-      let { data } = await worker.recognize(dataUrl);
-      ocrText = data.text || ""; vinFull = extractVinFromText(ocrText);
-      if (!vinFull) {
-        await worker.setParameters({ tessedit_pageseg_mode: "6" });
-        ({ data } = await worker.recognize(dataUrl));
-        if (data.text) { ocrText += "\n" + data.text; vinFull = extractVinFromText(data.text); }
+      const attempts = [];
+      variants.forEach((cv, vi) => { ["7", "8"].forEach(psm => attempts.push({ cv, vi, psm })); });
+      attempts.push({ cv: variants[0], vi: 0, psm: "6" }); // ultimo recurso: bloque uniforme
+      for (const at of attempts) {
+        await worker.setParameters({ ...TESS_BASE_PARAMS, tessedit_pageseg_mode: at.psm });
+        const { data } = await worker.recognize(at.cv);
+        console.debug("[VIN OCR] variante", at.vi, "psm", at.psm, "confianza", data.confidence, "texto", JSON.stringify(data.text));
+        if (data.text) lastRawText = data.text;
+        const candidate = extractVinFromText(data.text || "");
+        if (candidate) {
+          const checksum = vinChecksumOk(candidate);
+          const score = (checksum ? 1000 : 0) + (data.confidence || 0);
+          if (!best || score > best.score) best = { vin: candidate, confidence: data.confidence || 0, checksum, score };
+          if (checksum) break; // ya encontramos un candidato que pasa el digito verificador, no hace falta seguir
+        }
       }
     } finally { await worker.terminate(); }
     statusEl.textContent = "";
-    openReview({ photo: dataUrl, vinFull: vinFull || "", vin6: vin6of(vinFull), makeModel: guessMakeModel(ocrText) });
+    const vinFull = best ? best.vin : null;
+    openReview({ photo: storeDataUrl, vinFull: vinFull || "", vin6: vin6of(vinFull), makeModel: guessMakeModel(lastRawText), rawText: vinFull ? "" : lastRawText, checksum: best ? best.checksum : false });
   } catch (e) {
+    console.error("[VIN OCR] error", e);
     statusEl.textContent = "";
     toast("⚠︎ No se pudo leer automáticamente. Escribe el VIN a mano.");
-    openReview({ photo: dataUrl, vinFull: "", vin6: "", makeModel: "" });
+    openReview({ photo: storeDataUrl, vinFull: "", vin6: "", makeModel: "", rawText: "" });
   }
 }
 function openReview(data){
@@ -433,9 +554,17 @@ function openReview(data){
   document.getElementById("rev_makeModel").value = data.makeModel || "";
   document.getElementById("rev_worker").value = getWorkerName();
   document.getElementById("rev_when").value = toLocalInputValue(new Date());
-  document.getElementById("rev_ocrHint").textContent = data.vinFull
-    ? "✓ VIN detectado automáticamente — revisa que esté correcto."
-    : "⚠︎ No se detectó el VIN automáticamente. Escribe los últimos dígitos a mano.";
+  let hint;
+  if (data.vinFull) {
+    hint = data.checksum
+      ? "✓ VIN detectado y verificado — revisa que esté correcto."
+      : "✓ VIN detectado automáticamente — revisa que esté correcto (no se pudo verificar el dígito de control, puede pasar con autos importados).";
+  } else if (data.rawText && data.rawText.trim()) {
+    hint = "⚠︎ No se detectó el VIN automáticamente. La cámara leyó esto, puede ayudarte a escribirlo a mano: \"" + data.rawText.trim().replace(/\s+/g, " ").slice(0, 80) + "\"";
+  } else {
+    hint = "⚠︎ No se detectó texto legible. Escribe los últimos dígitos a mano.";
+  }
+  document.getElementById("rev_ocrHint").textContent = hint;
   const sc = document.getElementById("reviewScrim"); sc.classList.add("open");
 }
 function closeReview(){ document.getElementById("reviewScrim").classList.remove("open"); pendingReview = null; }
