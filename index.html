@@ -107,8 +107,8 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
   </section>
 
   <section id="tab-ajustes" hidden>
-    <label class="f">Tu nombre (para firmar tus registros)<input class="inp" id="set_worker" placeholder="ej. Raúl"></label>
-    <button class="primary" id="set_workerSave" type="button">Guardar</button>
+    <label class="f">Tu nombre (supervisor/gerente que sube las fotos desde este teléfono)<input class="inp" id="set_supervisor" placeholder="ej. Raúl"></label>
+    <button class="primary" id="set_supervisorSave" type="button">Guardar</button>
     <p class="hint" style="margin-top:18px">Los registros se sincronizan automáticamente entre los teléfonos del equipo. Si no hay señal, se guardan en el teléfono y se suben solos apenas vuelva la conexión.</p>
   </section>
 </main>
@@ -124,10 +124,13 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
     <h3>Confirmar registro</h3>
     <img id="rev_photo" hidden>
     <div id="rev_ocrHint" class="hint"></div>
-    <label class="f">Últimos 6 dígitos del VIN *<input class="inp" id="rev_vin6" maxlength="8" autocapitalize="characters"></label>
-    <label class="f">VIN completo (si se detectó)<input class="inp" id="rev_vinFull" autocapitalize="characters"></label>
-    <label class="f">Marca / Modelo<input class="inp" id="rev_makeModel" placeholder="ej. Mazda CX-5"></label>
-    <label class="f">Trabajador *<input class="inp" id="rev_worker" placeholder="Tu nombre"></label>
+    <label class="f">Últimos 6 dígitos del VIN (opc.)<input class="inp" id="rev_vin6" maxlength="8" autocapitalize="characters"></label>
+    <label class="f">VIN completo (opc.)<input class="inp" id="rev_vinFull" autocapitalize="characters"></label>
+    <label class="f">Marca (opc.)<input class="inp" id="rev_make" placeholder="ej. Mazda"></label>
+    <label class="f">Modelo (opc.)<input class="inp" id="rev_model" placeholder="ej. CX-5"></label>
+    <label class="f">Color (opc.)<input class="inp" id="rev_color" placeholder="ej. Blanco"></label>
+    <label class="f">Trabajador *<input class="inp" id="rev_worker" placeholder="Quién lavó el auto"></label>
+    <label class="f">Supervisor *<input class="inp" id="rev_supervisor" placeholder="Quién sube esta foto"></label>
     <label class="f">Fecha y hora<input class="inp" type="datetime-local" id="rev_when"></label>
     <button class="primary" id="rev_save" type="button">Guardar</button>
     <button class="secondary" id="rev_cancel" type="button">Cancelar</button>
@@ -158,7 +161,8 @@ const CLOUD = {
   url: "https://orajysldssgztignuist.supabase.co",
   key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9yYWp5c2xkc3NnenRpZ251aXN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwMjAxNDYsImV4cCI6MjEwMDU5NjE0Nn0.PwFvcUD8-Kj1nw8OKrcZ2oSqY9WYNN4qcssHkqYHQO8"
 };
-const LSKEY_WORKER = "vinlog_worker_name";
+const LSKEY_SUPERVISOR = "vinlog_supervisor_name";
+const LSKEY_LASTWORKER = "vinlog_last_worker_name";
 const LSKEY_QUEUE = "vinlog_pending_queue_v1";
 
 /* ===================== Conexión ===================== */
@@ -179,9 +183,12 @@ function extractVinFromText(text){
   const lines = upper.split(/\n/);
   const anchored = [];
   lines.forEach((line, li) => {
-    const vinIdx = line.indexOf("VIN");
-    if (vinIdx === -1) return;
-    const tail = line.slice(vinIdx + 3) + " " + (lines[li + 1] || "");
+    // "VIN" tolerando que el OCR pierda la I (muy comun: "VIN"->"VN") o la lea como 1/L, y SIN exigir
+    // borde de palabra porque el OCR a veces pega la etiqueta directo al codigo sin espacio (caso real:
+    // "VNMRHRU5830MP063738" en vez de "VIN MRHRU5830MP063738").
+    const m = line.match(/V[I1L]?N/);
+    if (!m) return;
+    const tail = line.slice(m.index + m[0].length) + " " + (lines[li + 1] || "");
     (tail.match(/[A-Z0-9]+/g) || []).forEach(t => anchored.push(t));
   });
   // Con ancla "VIN": se tolera una ventana deslizante (el OCR pudo pegar 1-5 caracteres extra al codigo),
@@ -238,10 +245,10 @@ function guessMakeModel(text){
     if (upper.includes(mk)) {
       const re = new RegExp(mk + "\\s+([A-Z0-9\\-]+)");
       const m = upper.match(re);
-      return m ? (capWord(mk) + " " + m[1]) : capWord(mk);
+      return { make: capWord(mk), model: m ? capWord(m[1]) : "" };
     }
   }
-  return "";
+  return { make: "", model: "" };
 }
 
 /* ===================== Imagen ===================== */
@@ -358,8 +365,10 @@ function buildOcrVariants(cropCanvas){
 /* ===================== Utilidades ===================== */
 function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 let tT; function toast(m){ const t = document.getElementById("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(tT); tT = setTimeout(() => t.classList.remove("show"), 2400); }
-function getWorkerName(){ try { return localStorage.getItem(LSKEY_WORKER) || ""; } catch (e) { return ""; } }
-function setWorkerName(n){ try { localStorage.setItem(LSKEY_WORKER, n); } catch (e) {} }
+function getSupervisorName(){ try { return localStorage.getItem(LSKEY_SUPERVISOR) || ""; } catch (e) { return ""; } }
+function setSupervisorName(n){ try { localStorage.setItem(LSKEY_SUPERVISOR, n); } catch (e) {} }
+function getLastWorkerName(){ try { return localStorage.getItem(LSKEY_LASTWORKER) || ""; } catch (e) { return ""; } }
+function setLastWorkerName(n){ try { localStorage.setItem(LSKEY_LASTWORKER, n); } catch (e) {} }
 function toLocalInputValue(d){ const p = n => String(n).padStart(2, "0"); return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":" + p(d.getMinutes()); }
 function startOfDay(d){ const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 function endOfDayExclusive(d){ const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() + 1); return x; }
@@ -580,12 +589,13 @@ async function runOcr(cropCanvas){
     } finally { await worker.terminate(); }
     statusEl.textContent = "";
     const vinFull = best ? best.vin : null;
-    openReview({ photo: storeDataUrl, vinFull: vinFull || "", vin6: vin6of(vinFull), makeModel: guessMakeModel(lastRawText), rawText: vinFull ? "" : lastRawText, checksum: best ? best.checksum : false });
+    const guess = guessMakeModel(lastRawText);
+    openReview({ photo: storeDataUrl, vinFull: vinFull || "", vin6: vin6of(vinFull), make: guess.make, model: guess.model, rawText: vinFull ? "" : lastRawText, checksum: best ? best.checksum : false });
   } catch (e) {
     console.error("[VIN OCR] error", e);
     statusEl.textContent = "";
     toast("⚠︎ No se pudo leer automáticamente. Escribe el VIN a mano.");
-    openReview({ photo: storeDataUrl, vinFull: "", vin6: "", makeModel: "", rawText: "" });
+    openReview({ photo: storeDataUrl, vinFull: "", vin6: "", make: "", model: "", rawText: "" });
   }
 }
 function openReview(data){
@@ -594,8 +604,11 @@ function openReview(data){
   if (data.photo) { img.src = data.photo; img.hidden = false; } else { img.hidden = true; }
   document.getElementById("rev_vinFull").value = data.vinFull || "";
   document.getElementById("rev_vin6").value = data.vin6 || "";
-  document.getElementById("rev_makeModel").value = data.makeModel || "";
-  document.getElementById("rev_worker").value = getWorkerName();
+  document.getElementById("rev_make").value = data.make || "";
+  document.getElementById("rev_model").value = data.model || "";
+  document.getElementById("rev_color").value = "";
+  document.getElementById("rev_worker").value = getLastWorkerName();
+  document.getElementById("rev_supervisor").value = getSupervisorName();
   document.getElementById("rev_when").value = toLocalInputValue(new Date());
   let hint;
   if (data.vinFull) {
@@ -605,28 +618,32 @@ function openReview(data){
   } else if (data.rawText && data.rawText.trim()) {
     hint = "⚠︎ No se detectó el VIN automáticamente. La cámara leyó esto, puede ayudarte a escribirlo a mano: \"" + data.rawText.trim().replace(/\s+/g, " ").slice(0, 80) + "\"";
   } else {
-    hint = "⚠︎ No se detectó texto legible. Escribe los últimos dígitos a mano.";
+    hint = "⚠︎ No se detectó texto legible. El VIN es opcional: puedes guardar igual con la foto de respaldo y completarlo después.";
   }
   document.getElementById("rev_ocrHint").textContent = hint;
   const sc = document.getElementById("reviewScrim"); sc.classList.add("open");
 }
 function closeReview(){ document.getElementById("reviewScrim").classList.remove("open"); pendingReview = null; }
 async function saveReview(){
-  const vin6 = document.getElementById("rev_vin6").value.trim().toUpperCase();
   const worker = document.getElementById("rev_worker").value.trim();
-  if (!vin6 || vin6.length < 3) { toast("⚠︎ Escribe al menos los últimos dígitos del VIN"); return; }
-  if (!worker) { toast("⚠︎ Falta el nombre de quién registra"); return; }
-  setWorkerName(worker);
+  const supervisor = document.getElementById("rev_supervisor").value.trim();
+  if (!worker) { toast("⚠︎ Falta el nombre del trabajador"); return; }
+  if (!supervisor) { toast("⚠︎ Falta el nombre del supervisor"); return; }
+  setLastWorkerName(worker);
+  setSupervisorName(supervisor);
+  const vin6 = document.getElementById("rev_vin6").value.trim().toUpperCase();
   const vinFull = document.getElementById("rev_vinFull").value.trim().toUpperCase();
-  const makeModel = document.getElementById("rev_makeModel").value.trim();
+  const make = document.getElementById("rev_make").value.trim();
+  const model = document.getElementById("rev_model").value.trim();
+  const color = document.getElementById("rev_color").value.trim();
   const whenLocal = document.getElementById("rev_when").value;
   const clientAt = whenLocal ? new Date(whenLocal).toISOString() : new Date().toISOString();
   const photo = pendingReview ? pendingReview.photo : null;
-  const params = { p_vin_full: vinFull || null, p_vin6: vin6, p_make_model: makeModel || null, p_worker_name: worker, p_client_at: clientAt, p_photo_data: photo };
+  const params = { p_vin_full: vinFull || null, p_vin6: vin6 || null, p_make: make || null, p_model: model || null, p_color: color || null, p_worker_name: worker, p_supervisor_name: supervisor, p_client_at: clientAt, p_photo_data: photo };
   const btn = document.getElementById("rev_save"); btn.disabled = true; btn.textContent = "Guardando…";
   try {
     await rpc("vin_log_insert", params);
-    toast("✓ VIN registrado"); closeReview(); loadToday();
+    toast("✓ Registrado"); closeReview(); loadToday();
   } catch (e) {
     queueOffline(params); toast("📶 Sin conexión — guardado en el teléfono, se sube solo"); closeReview(); renderQueueBadge();
   } finally { btn.disabled = false; btn.textContent = "Guardar"; }
@@ -641,16 +658,17 @@ async function loadToday(){
   } catch (e) { document.getElementById("todayList").innerHTML = '<p class="hint">⚠︎ No se pudo cargar (revisa tu conexión).</p>'; }
 }
 function renderTodayList(rows){
-  const pend = getQueue().map(q => ({ vin6: q.p_vin6, make_model: q.p_make_model, worker_name: q.p_worker_name, client_at: q.p_client_at, _pending: true }));
+  const pend = getQueue().map(q => ({ vin6: q.p_vin6, make: q.p_make, model: q.p_model, worker_name: q.p_worker_name, client_at: q.p_client_at, _pending: true }));
   const list = pend.concat(rows);
   document.getElementById("todayCount").textContent = list.length;
   document.getElementById("todayList").innerHTML = list.length ? list.map(rowHTML).join("") : '<p class="hint">Sin registros hoy todavía.</p>';
 }
 function rowHTML(r){
   const time = new Date(r.client_at).toLocaleTimeString("es-AU", { hour: "2-digit", minute: "2-digit" });
+  const makeModel = [r.make, r.model].filter(Boolean).join(" ");
   return '<div class="vrow ' + (r._pending ? "pending" : "") + '">' +
-    '<div class="vrow-vin">' + esc(r.vin6) + '</div>' +
-    '<div class="vrow-meta"><b>' + esc(r.make_model || "—") + '</b><span>' + esc(r.worker_name) + ' · ' + time + (r._pending ? " · ⏳ pendiente" : "") + '</span></div></div>';
+    '<div class="vrow-vin">' + esc(r.vin6 || "—") + '</div>' +
+    '<div class="vrow-meta"><b>' + esc(makeModel || "—") + '</b><span>' + esc(r.worker_name) + ' · ' + time + (r._pending ? " · ⏳ pendiente" : "") + '</span></div></div>';
 }
 
 /* ===================== Reportes ===================== */
@@ -687,15 +705,15 @@ function renderReport(){
   document.getElementById("rep_byWorker").innerHTML = Object.entries(byWorker).sort((a, b) => b[1] - a[1]).map(([w, n]) => '<span class="chip">' + esc(w) + ': ' + n + '</span>').join("") || '<span class="hint">—</span>';
   const box = document.getElementById("rep_table");
   if (!repRows.length) { box.innerHTML = '<p class="hint">Sin registros en este período.</p>'; return; }
-  box.innerHTML = '<table class="reptable"><thead><tr><th>Fecha</th><th>VIN (6)</th><th>VIN completo</th><th>Marca/Modelo</th><th>Trabajador</th><th></th></tr></thead><tbody>' +
+  box.innerHTML = '<table class="reptable"><thead><tr><th>Fecha</th><th>VIN (6)</th><th>VIN completo</th><th>Marca</th><th>Modelo</th><th>Color</th><th>Trabajador</th><th>Supervisor</th><th></th></tr></thead><tbody>' +
     repRows.map(r => '<tr><td>' + new Date(r.client_at).toLocaleString("es-AU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) +
-      '</td><td><b>' + esc(r.vin6) + '</b></td><td>' + esc(r.vin_full || "—") + '</td><td>' + esc(r.make_model || "—") + '</td><td>' + esc(r.worker_name) + '</td><td>' +
+      '</td><td><b>' + esc(r.vin6 || "—") + '</b></td><td>' + esc(r.vin_full || "—") + '</td><td>' + esc(r.make || "—") + '</td><td>' + esc(r.model || "—") + '</td><td>' + esc(r.color || "—") + '</td><td>' + esc(r.worker_name) + '</td><td>' + esc(r.supervisor_name || "—") + '</td><td>' +
       (r.photo_data ? '<a href="#" class="photolink" data-src="' + esc(r.photo_data) + '">📷</a>' : "") + '</td></tr>').join("") + '</tbody></table>';
   box.querySelectorAll(".photolink").forEach(a => a.onclick = ev => { ev.preventDefault(); window.open(a.dataset.src, "_blank"); });
 }
 function exportReportCSV(){
-  const rows = [["fecha_hora", "vin_ultimos6", "vin_completo", "marca_modelo", "trabajador"]];
-  repRows.forEach(r => rows.push([new Date(r.client_at).toLocaleString("es-AU"), r.vin6, r.vin_full || "", r.make_model || "", r.worker_name]));
+  const rows = [["fecha_hora", "vin_ultimos6", "vin_completo", "marca", "modelo", "color", "trabajador", "supervisor"]];
+  repRows.forEach(r => rows.push([new Date(r.client_at).toLocaleString("es-AU"), r.vin6 || "", r.vin_full || "", r.make || "", r.model || "", r.color || "", r.worker_name, r.supervisor_name || ""]));
   const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
@@ -722,8 +740,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("crop_cancel").onclick = cancelCrop;
   document.getElementById("crop_fineRotate").addEventListener("input", e => applyFineRotation(Number(e.target.value)));
   wireCropCanvas();
-  document.getElementById("set_worker").value = getWorkerName();
-  document.getElementById("set_workerSave").onclick = () => { setWorkerName(document.getElementById("set_worker").value.trim()); toast("✓ Guardado"); };
+  document.getElementById("set_supervisor").value = getSupervisorName();
+  document.getElementById("set_supervisorSave").onclick = () => { setSupervisorName(document.getElementById("set_supervisor").value.trim()); toast("✓ Guardado"); };
   document.querySelectorAll("#rep_periodChips .chip").forEach(ch => ch.onclick = () => {
     document.querySelectorAll("#rep_periodChips .chip").forEach(c => c.classList.remove("on"));
     ch.classList.add("on"); repPeriod = ch.dataset.period; repAnchor = new Date(); loadReport();
