@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Green Cleans · Registro VIN</title>
+<meta name="theme-color" content="#0d1210">
+<style>
+:root{
+  --bg:#0d1210; --panel:#151b19; --panel2:#1c2320; --line:#2a332f; --text:#eef2ef; --muted:#93a099;
+  --green:#3AAA35; --green-dark:#0E5C2F; --mint:#00D084; --amber:#ffb020; --red:#e5484d;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding-bottom:70px}
+header{padding:16px 16px 10px;display:flex;align-items:center;gap:10px}
+header .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--green),var(--mint));display:flex;align-items:center;justify-content:center;font-weight:800;color:#04210f}
+header h1{font-size:16px;margin:0;font-weight:700}
+header p{margin:0;font-size:11px;color:var(--muted)}
+main{padding:0 16px 24px;max-width:640px;margin:0 auto}
+nav.tabs{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--panel);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom));z-index:20}
+nav.tabs button{flex:1;background:none;border:none;color:var(--muted);font-size:11px;padding:8px 4px;border-radius:10px;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav.tabs button .ic{font-size:19px}
+nav.tabs button.active{color:var(--mint);background:rgba(0,208,132,.09)}
+.cap-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 6px}
+.btn-big{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:linear-gradient(160deg,var(--green),var(--green-dark));color:#fff;border-radius:16px;padding:22px 10px;font-weight:700;font-size:14px;cursor:pointer;border:1px solid rgba(255,255,255,.08)}
+.btn-big.alt{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+.btn-big .emoji{font-size:26px}
+.hint{color:var(--muted);font-size:12.5px;margin:6px 0}
+h3{font-size:14px;margin:18px 0 8px;display:flex;align-items:center;gap:8px}
+.badge{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--mint)}
+.qbadge{display:inline-block;background:rgba(255,176,32,.14);color:var(--amber);border:1px solid rgba(255,176,32,.3);border-radius:999px;padding:3px 10px;font-size:11.5px;margin:4px 0}
+.vrow{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px}
+.vrow.pending{border-style:dashed;opacity:.8}
+.vrow-vin{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:18px;font-weight:800;letter-spacing:1px;background:var(--panel2);border-radius:8px;padding:6px 10px;min-width:76px;text-align:center}
+.vrow-meta{display:flex;flex-direction:column;gap:2px;font-size:12.5px;color:var(--muted)}
+.vrow-meta b{color:var(--text);font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:999px;padding:6px 12px;font-size:12.5px;cursor:pointer}
+.chip.on{background:var(--green);border-color:var(--green);color:#04210f;font-weight:700}
+.repnav{display:flex;align-items:center;justify-content:space-between;margin:12px 0 4px}
+.repnav button{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:6px 10px;font-size:14px}
+.rephead{display:flex;align-items:baseline;justify-content:space-between;margin:6px 0 10px}
+.rephead .tot{font-size:26px;font-weight:800;color:var(--mint)}
+table.reptable{width:100%;border-collapse:collapse;font-size:12px}
+table.reptable th{text-align:left;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg)}
+table.reptable td{padding:7px 8px;border-bottom:1px solid var(--line)}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+label.f{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:12px}
+input.inp{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:11px 12px;font-size:15px;font-family:inherit}
+button.primary{width:100%;background:var(--green);color:#04210f;font-weight:800;border:none;border-radius:12px;padding:13px;font-size:15px;margin-top:6px}
+button.secondary{width:100%;background:none;color:var(--muted);border:1px solid var(--line);border-radius:12px;padding:11px;font-size:14px;margin-top:8px}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .2s;z-index:30}
+.scrim.open{opacity:1;pointer-events:auto}
+.sheet{background:var(--panel);width:100%;max-height:92vh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom));margin:0 auto;max-width:640px}
+.sheet h3{margin-top:0}
+.sheet img{width:100%;border-radius:12px;margin-bottom:12px;max-height:220px;object-fit:cover}
+#rev_vin6{font-size:26px;text-align:center;letter-spacing:3px;font-family:ui-monospace,Menlo,monospace}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);background:#1c2320;border:1px solid var(--line);color:var(--text);padding:10px 16px;border-radius:12px;font-size:13px;opacity:0;transition:.25s;z-index:50;max-width:88vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.photolink{color:var(--mint);text-decoration:none;font-size:15px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">GC</div>
+  <div><h1>Registro VIN</h1><p>Green Cleans · respaldo diario</p></div>
+</header>
+<main>
+  <section id="tab-registrar">
+    <div class="cap-buttons">
+      <label class="btn-big" for="camInput"><span class="emoji">📷</span>Tomar foto</label>
+      <input type="file" id="camInput" accept="image/*" capture="environment" hidden>
+      <label class="btn-big alt" for="galInput"><span class="emoji">🖼️</span>Desde galería</label>
+      <input type="file" id="galInput" accept="image/*" hidden>
+    </div>
+    <div id="ocrStatus" class="hint"></div>
+    <span id="queueBadge" class="qbadge" hidden></span>
+    <h3>Hoy <span id="todayCount" class="badge">0</span></h3>
+    <div id="todayList"></div>
+  </section>
+
+  <section id="tab-reportes" hidden>
+    <div class="chips" id="rep_periodChips">
+      <button class="chip" data-period="day" type="button">Hoy</button>
+      <button class="chip on" data-period="week" type="button">Semana</button>
+      <button class="chip" data-period="fortnight" type="button">Quincena</button>
+      <button class="chip" data-period="month" type="button">Mes</button>
+      <button class="chip" data-period="semester" type="button">Semestre</button>
+    </div>
+    <div class="repnav">
+      <button id="rep_prev" type="button">‹ Anterior</button>
+      <span id="rep_range" class="hint" style="margin:0"></span>
+      <button id="rep_next" type="button">Siguiente ›</button>
+    </div>
+    <div class="rephead">
+      <div><div class="hint" style="margin:0">Autos registrados</div><div class="tot" id="rep_total">0</div></div>
+      <button class="secondary" style="width:auto;margin:0" id="rep_export">⬇ Exportar CSV</button>
+    </div>
+    <div class="chips" id="rep_byWorker" style="margin-bottom:12px"></div>
+    <div class="tablewrap"><div id="rep_table"></div></div>
+  </section>
+
+  <section id="tab-ajustes" hidden>
+    <label class="f">Tu nombre (para firmar tus registros)<input class="inp" id="set_worker" placeholder="ej. Raúl"></label>
+    <button class="primary" id="set_workerSave" type="button">Guardar</button>
+    <p class="hint" style="margin-top:18px">Los registros se sincronizan automáticamente entre los teléfonos del equipo. Si no hay señal, se guardan en el teléfono y se suben solos apenas vuelva la conexión.</p>
+  </section>
+</main>
+
+<nav class="tabs">
+  <button data-tab="registrar" class="active" type="button"><span class="ic">📷</span>Registrar</button>
+  <button data-tab="reportes" type="button"><span class="ic">📊</span>Reportes</button>
+  <button data-tab="ajustes" type="button"><span class="ic">⚙️</span>Ajustes</button>
+</nav>
+
+<div class="scrim" id="reviewScrim">
+  <div class="sheet">
+    <h3>Confirmar registro</h3>
+    <img id="rev_photo" hidden>
+    <div id="rev_ocrHint" class="hint"></div>
+    <label class="f">Últimos 6 dígitos del VIN *<input class="inp" id="rev_vin6" maxlength="8" autocapitalize="characters"></label>
+    <label class="f">VIN completo (si se detectó)<input class="inp" id="rev_vinFull" autocapitalize="characters"></label>
+    <label class="f">Marca / Modelo<input class="inp" id="rev_makeModel" placeholder="ej. Mazda CX-5"></label>
+    <label class="f">Trabajador *<input class="inp" id="rev_worker" placeholder="Tu nombre"></label>
+    <label class="f">Fecha y hora<input class="inp" type="datetime-local" id="rev_when"></label>
+    <button class="primary" id="rev_save" type="button">Guardar</button>
+    <button class="secondary" id="rev_cancel" type="button">Cancelar</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+const CLOUD = {
+  url: "https://orajysldssgztignuist.supabase.co",
+  key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9yYWp5c2xkc3NnenRpZ251aXN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwMjAxNDYsImV4cCI6MjEwMDU5NjE0Nn0.PwFvcUD8-Kj1nw8OKrcZ2oSqY9WYNN4qcssHkqYHQO8"
+};
+const LSKEY_WORKER = "vinlog_worker_name";
+const LSKEY_QUEUE = "vinlog_pending_queue_v1";
+
+/* ===================== Conexión ===================== */
+async function rpc(fn, body){
+  const r = await fetch(CLOUD.url + "/rest/v1/rpc/" + fn, { method: "POST",
+    headers: { "Content-Type": "application/json", "apikey": CLOUD.key, "Authorization": "Bearer " + CLOUD.key },
+    body: JSON.stringify(body) });
+  if (!r.ok) { throw new Error("HTTP " + r.status); }
+  const t = await r.text(); return t ? JSON.parse(t) : null;
+}
+
+/* ===================== Extraccion de VIN ===================== */
+const VIN_CONFUSIONS = { I: "1", O: "0", Q: "0" };
+function cleanVinToken(tok){ return tok.toUpperCase().split("").map(c => VIN_CONFUSIONS[c] || c).join(""); }
+function isValidVin(v){ return /^[A-HJ-NPR-Z0-9]{17}$/.test(v); }
+function extractVinFromText(text){
+  const upper = String(text).toUpperCase();
+  const lines = upper.split(/\n/);
+  const anchored = [];
+  lines.forEach((line, li) => {
+    const vinIdx = line.indexOf("VIN");
+    if (vinIdx === -1) return;
+    const tail = line.slice(vinIdx + 3) + " " + (lines[li + 1] || "");
+    (tail.match(/[A-Z0-9]+/g) || []).forEach(t => anchored.push(t));
+  });
+  const all = upper.match(/[A-Z0-9]+/g) || [];
+  const seen = new Set();
+  const ordered = [...anchored, ...all].filter(t => { if (seen.has(t)) return false; seen.add(t); return true; });
+  for (const raw of ordered) {
+    if (raw.length < 17) continue;
+    const maxStart = Math.min(raw.length - 17, 5);
+    for (let start = 0; start <= maxStart; start++) {
+      const cleaned = cleanVinToken(raw.slice(start, start + 17));
+      if (isValidVin(cleaned)) return cleaned;
+    }
+  }
+  return null;
+}
+function vin6of(v){ return v ? v.slice(-6) : ""; }
+const KNOWN_MAKES = ["TOYOTA","MAZDA","MITSUBISHI","SUBARU","HONDA","NISSAN","FORD","HOLDEN","HYUNDAI","KIA","VOLKSWAGEN","BMW","MERCEDES","AUDI","SUZUKI","ISUZU","JEEP","LDV","MG","GWM","HAVAL"];
+function capWord(s){ return s.charAt(0) + s.slice(1).toLowerCase(); }
+function guessMakeModel(text){
+  const upper = String(text).toUpperCase();
+  for (const mk of KNOWN_MAKES) {
+    if (upper.includes(mk)) {
+      const re = new RegExp(mk + "\\s+([A-Z0-9\\-]+)");
+      const m = upper.match(re);
+      return m ? (capWord(mk) + " " + m[1]) : capWord(mk);
+    }
+  }
+  return "";
+}
+
+/* ===================== Imagen ===================== */
+function compressImg(file, cb, maxDim, quality){
+  const fr = new FileReader();
+  fr.onload = () => {
+    const im = new Image();
+    im.onload = () => {
+      const mx = maxDim || 1200;
+      let w = im.width, h = im.height;
+      if (w > mx || h > mx) { const r = Math.min(mx / w, mx / h); w = Math.round(w * r); h = Math.round(h * r); }
+      const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+      cv.getContext("2d").drawImage(im, 0, 0, w, h);
+      cb(cv.toDataURL("image/jpeg", quality || 0.72));
+    };
+    im.onerror = () => cb(null);
+    im.src = fr.result;
+  };
+  fr.readAsDataURL(file);
+}
+
+/* ===================== Utilidades ===================== */
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+let tT; function toast(m){ const t = document.getElementById("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(tT); tT = setTimeout(() => t.classList.remove("show"), 2400); }
+function getWorkerName(){ try { return localStorage.getItem(LSKEY_WORKER) || ""; } catch (e) { return ""; } }
+function setWorkerName(n){ try { localStorage.setItem(LSKEY_WORKER, n); } catch (e) {} }
+function toLocalInputValue(d){ const p = n => String(n).padStart(2, "0"); return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":" + p(d.getMinutes()); }
+function startOfDay(d){ const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+function endOfDayExclusive(d){ const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() + 1); return x; }
+
+/* ===================== Cola sin conexion ===================== */
+function getQueue(){ try { return JSON.parse(localStorage.getItem(LSKEY_QUEUE)) || []; } catch (e) { return []; } }
+function setQueue(q){ try { localStorage.setItem(LSKEY_QUEUE, JSON.stringify(q)); } catch (e) {} }
+function queueOffline(params){ const q = getQueue(); q.push(params); setQueue(q); }
+async function flushQueue(){
+  const q = getQueue();
+  if (!q.length) return;
+  const remaining = [];
+  for (const item of q) { try { await rpc("vin_log_insert", item); } catch (e) { remaining.push(item); } }
+  setQueue(remaining);
+  renderQueueBadge();
+  if (remaining.length < q.length) loadToday();
+}
+function renderQueueBadge(){
+  const n = getQueue().length;
+  const el = document.getElementById("queueBadge");
+  el.hidden = n === 0; el.textContent = n + " pendiente(s) de subir";
+}
+window.addEventListener("online", flushQueue);
+setInterval(flushQueue, 45000);
+
+/* ===================== Captura + revision ===================== */
+let pendingReview = null;
+function handleFile(file){
+  if (!file) return;
+  document.getElementById("ocrStatus").textContent = "🔎 Leyendo VIN…";
+  compressImg(file, storeDataUrl => {
+    compressImg(file, ocrDataUrl => { runOcr(ocrDataUrl, storeDataUrl); }, 1800, 0.82);
+  }, 900, 0.55);
+}
+function runOcr(ocrDataUrl, storeDataUrl){
+  const statusEl = document.getElementById("ocrStatus");
+  const run = () => Tesseract.recognize(ocrDataUrl, "eng").then(({ data }) => {
+    statusEl.textContent = "";
+    const vinFull = extractVinFromText(data.text);
+    openReview({ photo: storeDataUrl, vinFull: vinFull || "", vin6: vin6of(vinFull), makeModel: guessMakeModel(data.text) });
+  }).catch(() => { statusEl.textContent = ""; openReview({ photo: storeDataUrl, vinFull: "", vin6: "", makeModel: "" }); });
+  if (window.Tesseract) run();
+  else {
+    const sc = document.createElement("script"); sc.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+    sc.onload = run;
+    sc.onerror = () => { statusEl.textContent = ""; toast("No se pudo cargar el lector (¿sin internet?)"); openReview({ photo: storeDataUrl, vinFull: "", vin6: "", makeModel: "" }); };
+    document.head.appendChild(sc);
+  }
+}
+function openReview(data){
+  pendingReview = data;
+  const img = document.getElementById("rev_photo");
+  if (data.photo) { img.src = data.photo; img.hidden = false; } else { img.hidden = true; }
+  document.getElementById("rev_vinFull").value = data.vinFull || "";
+  document.getElementById("rev_vin6").value = data.vin6 || "";
+  document.getElementById("rev_makeModel").value = data.makeModel || "";
+  document.getElementById("rev_worker").value = getWorkerName();
+  document.getElementById("rev_when").value = toLocalInputValue(new Date());
+  document.getElementById("rev_ocrHint").textContent = data.vinFull
+    ? "✓ VIN detectado automáticamente — revisa que esté correcto."
+    : "⚠︎ No se detectó el VIN automáticamente. Escribe los últimos dígitos a mano.";
+  const sc = document.getElementById("reviewScrim"); sc.classList.add("open");
+}
+function closeReview(){ document.getElementById("reviewScrim").classList.remove("open"); pendingReview = null; }
+async function saveReview(){
+  const vin6 = document.getElementById("rev_vin6").value.trim().toUpperCase();
+  const worker = document.getElementById("rev_worker").value.trim();
+  if (!vin6 || vin6.length < 3) { toast("⚠︎ Escribe al menos los últimos dígitos del VIN"); return; }
+  if (!worker) { toast("⚠︎ Falta el nombre de quién registra"); return; }
+  setWorkerName(worker);
+  const vinFull = document.getElementById("rev_vinFull").value.trim().toUpperCase();
+  const makeModel = document.getElementById("rev_makeModel").value.trim();
+  const whenLocal = document.getElementById("rev_when").value;
+  const clientAt = whenLocal ? new Date(whenLocal).toISOString() : new Date().toISOString();
+  const photo = pendingReview ? pendingReview.photo : null;
+  const params = { p_vin_full: vinFull || null, p_vin6: vin6, p_make_model: makeModel || null, p_worker_name: worker, p_client_at: clientAt, p_photo_data: photo };
+  const btn = document.getElementById("rev_save"); btn.disabled = true; btn.textContent = "Guardando…";
+  try {
+    await rpc("vin_log_insert", params);
+    toast("✓ VIN registrado"); closeReview(); loadToday();
+  } catch (e) {
+    queueOffline(params); toast("📶 Sin conexión — guardado en el teléfono, se sube solo"); closeReview(); renderQueueBadge();
+  } finally { btn.disabled = false; btn.textContent = "Guardar"; }
+}
+
+/* ===================== Hoy ===================== */
+async function loadToday(){
+  const now = new Date();
+  try {
+    const rows = await rpc("vin_log_list_range", { p_from: startOfDay(now).toISOString(), p_to: endOfDayExclusive(now).toISOString() });
+    renderTodayList(rows || []);
+  } catch (e) { document.getElementById("todayList").innerHTML = '<p class="hint">⚠︎ No se pudo cargar (revisa tu conexión).</p>'; }
+}
+function renderTodayList(rows){
+  const pend = getQueue().map(q => ({ vin6: q.p_vin6, make_model: q.p_make_model, worker_name: q.p_worker_name, client_at: q.p_client_at, _pending: true }));
+  const list = pend.concat(rows);
+  document.getElementById("todayCount").textContent = list.length;
+  document.getElementById("todayList").innerHTML = list.length ? list.map(rowHTML).join("") : '<p class="hint">Sin registros hoy todavía.</p>';
+}
+function rowHTML(r){
+  const time = new Date(r.client_at).toLocaleTimeString("es-AU", { hour: "2-digit", minute: "2-digit" });
+  return '<div class="vrow ' + (r._pending ? "pending" : "") + '">' +
+    '<div class="vrow-vin">' + esc(r.vin6) + '</div>' +
+    '<div class="vrow-meta"><b>' + esc(r.make_model || "—") + '</b><span>' + esc(r.worker_name) + ' · ' + time + (r._pending ? " · ⏳ pendiente" : "") + '</span></div></div>';
+}
+
+/* ===================== Reportes ===================== */
+let repPeriod = "week", repAnchor = new Date(), repRows = [];
+function periodRange(type, anyDay){
+  const d = new Date(anyDay);
+  if (type === "day") return { from: startOfDay(d), to: endOfDayExclusive(d) };
+  if (type === "week") { const day = (d.getDay() + 6) % 7; const mon = new Date(d); mon.setHours(0,0,0,0); mon.setDate(d.getDate() - day); const sun = new Date(mon); sun.setDate(mon.getDate() + 7); return { from: mon, to: sun }; }
+  if (type === "fortnight") { const first = d.getDate() <= 15; const from = new Date(d.getFullYear(), d.getMonth(), first ? 1 : 16); const to = first ? new Date(d.getFullYear(), d.getMonth(), 16) : new Date(d.getFullYear(), d.getMonth() + 1, 1); return { from, to }; }
+  if (type === "month") return { from: new Date(d.getFullYear(), d.getMonth(), 1), to: new Date(d.getFullYear(), d.getMonth() + 1, 1) };
+  if (type === "semester") { const h1 = d.getMonth() < 6; return { from: new Date(d.getFullYear(), h1 ? 0 : 6, 1), to: new Date(d.getFullYear(), h1 ? 6 : 12, 1) }; }
+}
+function fmtRange(r){ const f = x => x.toLocaleDateString("es-AU", { day: "2-digit", month: "short", year: "numeric" }); return f(r.from) + " – " + f(new Date(r.to.getTime() - 1)); }
+function shiftAnchor(dir){
+  const d = new Date(repAnchor);
+  if (repPeriod === "day") d.setDate(d.getDate() + dir);
+  else if (repPeriod === "week") d.setDate(d.getDate() + 7 * dir);
+  else if (repPeriod === "fortnight") d.setDate(d.getDate() + 15 * dir);
+  else if (repPeriod === "month") d.setMonth(d.getMonth() + dir);
+  else if (repPeriod === "semester") d.setMonth(d.getMonth() + 6 * dir);
+  repAnchor = d;
+}
+async function loadReport(){
+  const range = periodRange(repPeriod, repAnchor);
+  document.getElementById("rep_range").textContent = fmtRange(range);
+  const box = document.getElementById("rep_table"); box.innerHTML = '<p class="hint">Cargando…</p>';
+  try { repRows = await rpc("vin_log_list_range", { p_from: range.from.toISOString(), p_to: range.to.toISOString() }) || []; renderReport(); }
+  catch (e) { box.innerHTML = '<p class="hint">⚠︎ No se pudo cargar el reporte.</p>'; }
+}
+function renderReport(){
+  document.getElementById("rep_total").textContent = repRows.length;
+  const byWorker = {};
+  repRows.forEach(r => { byWorker[r.worker_name] = (byWorker[r.worker_name] || 0) + 1; });
+  document.getElementById("rep_byWorker").innerHTML = Object.entries(byWorker).sort((a, b) => b[1] - a[1]).map(([w, n]) => '<span class="chip">' + esc(w) + ': ' + n + '</span>').join("") || '<span class="hint">—</span>';
+  const box = document.getElementById("rep_table");
+  if (!repRows.length) { box.innerHTML = '<p class="hint">Sin registros en este período.</p>'; return; }
+  box.innerHTML = '<table class="reptable"><thead><tr><th>Fecha</th><th>VIN (6)</th><th>VIN completo</th><th>Marca/Modelo</th><th>Trabajador</th><th></th></tr></thead><tbody>' +
+    repRows.map(r => '<tr><td>' + new Date(r.client_at).toLocaleString("es-AU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) +
+      '</td><td><b>' + esc(r.vin6) + '</b></td><td>' + esc(r.vin_full || "—") + '</td><td>' + esc(r.make_model || "—") + '</td><td>' + esc(r.worker_name) + '</td><td>' +
+      (r.photo_data ? '<a href="#" class="photolink" data-src="' + esc(r.photo_data) + '">📷</a>' : "") + '</td></tr>').join("") + '</tbody></table>';
+  box.querySelectorAll(".photolink").forEach(a => a.onclick = ev => { ev.preventDefault(); window.open(a.dataset.src, "_blank"); });
+}
+function exportReportCSV(){
+  const rows = [["fecha_hora", "vin_ultimos6", "vin_completo", "marca_modelo", "trabajador"]];
+  repRows.forEach(r => rows.push([new Date(r.client_at).toLocaleString("es-AU"), r.vin6, r.vin_full || "", r.make_model || "", r.worker_name]));
+  const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  a.download = "registro-vin-" + repPeriod + "-" + new Date().toISOString().slice(0, 10) + ".csv";
+  a.click();
+}
+
+/* ===================== Navegacion ===================== */
+function showTab(name){
+  ["registrar", "reportes", "ajustes"].forEach(t => { document.getElementById("tab-" + t).hidden = t !== name; });
+  document.querySelectorAll("nav.tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+  if (name === "reportes") loadReport();
+  if (name === "registrar") loadToday();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+  document.getElementById("camInput").addEventListener("change", e => { handleFile(e.target.files[0]); e.target.value = ""; });
+  document.getElementById("galInput").addEventListener("change", e => { handleFile(e.target.files[0]); e.target.value = ""; });
+  document.getElementById("rev_save").onclick = saveReview;
+  document.getElementById("rev_cancel").onclick = closeReview;
+  document.getElementById("set_worker").value = getWorkerName();
+  document.getElementById("set_workerSave").onclick = () => { setWorkerName(document.getElementById("set_worker").value.trim()); toast("✓ Guardado"); };
+  document.querySelectorAll("#rep_periodChips .chip").forEach(ch => ch.onclick = () => {
+    document.querySelectorAll("#rep_periodChips .chip").forEach(c => c.classList.remove("on"));
+    ch.classList.add("on"); repPeriod = ch.dataset.period; repAnchor = new Date(); loadReport();
+  });
+  document.getElementById("rep_prev").onclick = () => { shiftAnchor(-1); loadReport(); };
+  document.getElementById("rep_next").onclick = () => { shiftAnchor(1); loadReport(); };
+  document.getElementById("rep_export").onclick = exportReportCSV;
+  loadToday();
+  renderQueueBadge();
+  flushQueue();
+});
+</script>
+</body>
+</html>
