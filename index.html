@@ -159,7 +159,7 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
       <div class="statcard">
         <div class="statq">¿A cuántos les falta el VIN?</div>
         <div class="statnum" id="stat_missing">0</div>
-        <div class="statsub">se puede completar después mirando la foto guardada</div>
+        <div class="statsub">se puede completar mirando la foto, guardada por 3 semanas</div>
       </div>
 
       <div class="card">
@@ -252,45 +252,55 @@ async function rpc(fn, body){
 const VIN_CONFUSIONS = { I: "1", O: "0", Q: "0" };
 function cleanVinToken(tok){ return tok.toUpperCase().split("").map(c => VIN_CONFUSIONS[c] || c).join(""); }
 function isValidVin(v){ return /^[A-HJ-NPR-Z0-9]{17}$/.test(v); }
+// El usuario SIEMPRE recorta la foto a mano justo sobre el codigo VIN antes de leerlo, asi que la
+// palabra "VIN" cerca del codigo ya NO es un requisito -- muchas placas (ej. VW, o vidrio grabado)
+// no la traen impresa en absoluto. La extraccion ahora busca el codigo de 17 caracteres en TODO el
+// texto que se leyo del recorte, prefiriendo el que este cerca de la palabra "VIN" cuando aparece
+// (sigue siendo una señal util para desempatar), y si no aparece, exige que el codigo represente la
+// MAYOR PARTE del texto leido en el recorte (no un fragmento chico perdido entre mucho otro texto,
+// que es la firma de ruido de OCR, no de un VIN real -- se comprobo con una imagen ruidosa real:
+// "6YOETOIWETN6LETIC NIA" generaba un VIN falso con apariencia valida si no se exige esto).
+function collectVinCandidates(tokens, maxWindow, out){
+  for (const raw of tokens) {
+    if (raw.length < 17) continue;
+    const maxStart = Math.min(raw.length - 17, maxWindow);
+    for (let start = 0; start <= maxStart; start++) {
+      const cleaned = cleanVinToken(raw.slice(start, start + 17));
+      if (isValidVin(cleaned)) out.push(cleaned);
+    }
+  }
+}
+function pickBestVin(candidates){
+  // Entre varios candidatos, se prefiere el que pasa el digito verificador ISO 3779 (nunca se usa
+  // como filtro duro porque autos JDM/importados no siempre lo cumplen, solo como desempate).
+  return candidates.find(c => vinChecksumOk(c)) || candidates[0];
+}
 function extractVinFromText(text){
   const upper = String(text).toUpperCase();
   const lines = upper.split(/\n/);
-  const anchored = [];
+  const allTokens = upper.match(/[A-Z0-9]+/g) || [];
+  const totalLen = allTokens.reduce((s, t) => s + t.length, 0);
+
+  // 1) Con ancla "VIN" (tolerando que el OCR pierda la I, o la lea como 1/L; sin exigir borde de
+  // palabra porque el OCR a veces pega la etiqueta directo al codigo sin espacio, caso real:
+  // "VNMRHRU5830MP063738" en vez de "VIN MRHRU5830MP063738"): se tolera una ventana deslizante mas
+  // amplia, el contexto de la palabra "VIN" ya justifica esa flexibilidad extra.
+  const anchoredCandidates = [];
   lines.forEach((line, li) => {
-    // "VIN" tolerando que el OCR pierda la I (muy comun: "VIN"->"VN") o la lea como 1/L, y SIN exigir
-    // borde de palabra porque el OCR a veces pega la etiqueta directo al codigo sin espacio (caso real:
-    // "VNMRHRU5830MP063738" en vez de "VIN MRHRU5830MP063738").
     const m = line.match(/V[I1L]?N/);
     if (!m) return;
     const tail = line.slice(m.index + m[0].length) + " " + (lines[li + 1] || "");
-    (tail.match(/[A-Z0-9]+/g) || []).forEach(t => anchored.push(t));
+    collectVinCandidates(tail.match(/[A-Z0-9]+/g) || [], 5, anchoredCandidates);
   });
-  // Con ancla "VIN": se tolera una ventana deslizante (el OCR pudo pegar 1-5 caracteres extra al codigo),
-  // el contexto de la palabra "VIN" justifica esa flexibilidad.
-  for (const raw of anchored) {
-    if (raw.length < 17) continue;
-    const maxStart = Math.min(raw.length - 17, 5);
-    for (let start = 0; start <= maxStart; start++) {
-      const cleaned = cleanVinToken(raw.slice(start, start + 17));
-      if (isValidVin(cleaned)) return cleaned;
-    }
-  }
-  // Sin ancla "VIN" en el texto: exigir EXACTAMENTE 17 caracteres Y que sea (casi) todo el contenido
-  // de su linea -- una VIN grabada en vidrio se lee sola en su linea; ruido random de OCR suele traer
-  // mas texto alrededor. Tolera hasta 2 caracteres sueltos extra (una mota/mancha mal leida).
-  // Sin este filtro, CUALQUIER token de 17 caracteres "valida" tras la limpieza O/I/Q (se comprobo
-  // con una imagen ruidosa real: "6YOETOIWETN6LETIC NIA" generaba un VIN falso con apariencia valida).
-  for (const line of lines) {
-    const toks = line.match(/[A-Z0-9]+/g) || [];
-    const totalLen = toks.reduce((s, t) => s + t.length, 0);
-    for (const raw of toks) {
-      if (raw.length !== 17) continue;
-      if (totalLen - raw.length > 2) continue;
-      const cleaned = cleanVinToken(raw);
-      if (isValidVin(cleaned)) return cleaned;
-    }
-  }
-  return null;
+  if (anchoredCandidates.length) return pickBestVin(anchoredCandidates);
+
+  // 2) Sin ancla: el recorte ya esta enfocado a mano sobre el VIN, no hace falta la palabra "VIN"
+  // cerca -- pero se exige que el candidato sea al menos la mitad del texto leido en el recorte.
+  const candidates = [];
+  collectVinCandidates(allTokens, 3, candidates);
+  if (!candidates.length) return null;
+  if (totalLen === 0 || 17 / totalLen < 0.5) return null;
+  return pickBestVin(candidates);
 }
 function vin6of(v){ return v ? v.slice(-6) : ""; }
 // Digito verificador ISO 3779 (mod-11). Algunos VIN JDM/europeos importados NO lo cumplen (no es
@@ -839,7 +849,7 @@ function renderReport(){
   box.innerHTML = '<table class="reptable"><thead><tr><th>Fecha</th><th>VIN (6)</th><th>VIN completo</th><th>Marca</th><th>Modelo</th><th>Color</th><th>Trabajador</th><th>Supervisor</th><th></th></tr></thead><tbody>' +
     repRows.map(r => '<tr data-id="' + esc(r.id) + '"><td>' + new Date(r.client_at).toLocaleString("es-AU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) +
       '</td><td><b>' + esc(r.vin6 || "—") + '</b></td><td>' + esc(r.vin_full || "—") + '</td><td>' + esc(r.make || "—") + '</td><td>' + esc(r.model || "—") + '</td><td>' + esc(r.color || "—") + '</td><td>' + esc(r.worker_name) + '</td><td>' + esc(r.supervisor_name || "—") + '</td><td>' +
-      (r.photo_data ? '<a href="#" class="photolink" data-src="' + esc(r.photo_data) + '">📷</a>' : "") + '</td></tr>').join("") + '</tbody></table>';
+      (r.photo_data ? '<a href="#" class="photolink" data-src="' + esc(r.photo_data) + '">📷</a>' : (r.photo_had ? '<span class="hint" title="La foto se guardó por 3 semanas y ya se eliminó automáticamente">📷 expiró</span>' : "")) + '</td></tr>').join("") + '</tbody></table>';
   box.querySelectorAll(".photolink").forEach(a => a.onclick = ev => { ev.preventDefault(); ev.stopPropagation(); window.open(a.dataset.src, "_blank"); });
   box.querySelectorAll("tr[data-id]").forEach(tr => tr.onclick = () => openEditFromId(tr.dataset.id, repRows));
 }
