@@ -4,23 +4,45 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>Green Cleans · Registro VIN</title>
-<meta name="theme-color" content="#0d1210">
+<meta name="theme-color" content="#0b120e">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#0d1210; --panel:#151b19; --panel2:#1c2320; --line:#2a332f; --text:#eef2ef; --muted:#93a099;
-  --green:#3AAA35; --green-dark:#0E5C2F; --mint:#00D084; --amber:#ffb020; --red:#e5484d;
+  --bg:#0b120e; --panel:#141d18; --panel2:#1c2721; --line:#26352c; --text:#eef4f0; --muted:#8fa096;
+  --green:#3fa939; --green-dark:#0E5C2F; --mint:#00D084; --amber:#ffb020; --red:#e5484d; --pillbg:#172a18;
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding-bottom:70px}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Poppins',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding-bottom:70px}
 header{padding:16px 16px 10px;display:flex;align-items:center;gap:10px}
 header .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--green),var(--mint));display:flex;align-items:center;justify-content:center;font-weight:800;color:#04210f}
 header h1{font-size:16px;margin:0;font-weight:700}
 header p{margin:0;font-size:11px;color:var(--muted)}
 main{padding:0 16px 24px;max-width:640px;margin:0 auto}
-nav.tabs{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--panel);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom));z-index:20}
-nav.tabs button{flex:1;background:none;border:none;color:var(--muted);font-size:11px;padding:8px 4px;border-radius:10px;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav.tabs{position:fixed;bottom:0;left:0;right:0;display:flex;gap:4px;background:var(--panel);border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom));z-index:20}
+nav.tabs button{flex:1;background:none;border:none;color:var(--muted);font-size:11px;font-weight:600;padding:9px 4px;border-radius:999px;display:flex;flex-direction:column;align-items:center;gap:2px;transition:background .15s,color .15s}
 nav.tabs button .ic{font-size:19px}
-nav.tabs button.active{color:var(--mint);background:rgba(0,208,132,.09)}
+nav.tabs button.active{color:#04210f;background:var(--green);font-weight:700}
+.segctrl{display:flex;gap:2px;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:4px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.segctrl::-webkit-scrollbar{display:none}
+.segctrl button{flex:0 0 auto;background:none;border:none;color:var(--muted);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:999px;cursor:pointer;white-space:nowrap}
+.segctrl button.on{background:var(--pillbg);color:var(--text);border:1px solid var(--green)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+.card h3{margin:0 0 12px;font-size:14px}
+.statcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:10px}
+.statq{font-size:13px;color:var(--muted);font-weight:600;margin-bottom:6px}
+.statnum{font-size:30px;font-weight:800;color:var(--text);line-height:1.1}
+.statnum .unit{font-size:15px;font-weight:600;color:var(--muted);margin-left:4px}
+.statsub{font-size:12px;color:var(--muted);margin-top:4px}
+#rep_insightsList{list-style:none;margin:0;padding:0}
+#rep_insightsList li{position:relative;padding:9px 0 9px 20px;font-size:13.5px;color:var(--text);border-bottom:1px solid var(--line)}
+#rep_insightsList li:last-child{border-bottom:none;padding-bottom:0}
+#rep_insightsList li::before{content:"";position:absolute;left:2px;top:16px;width:7px;height:7px;border-radius:50%;background:var(--amber)}
+@media print{
+  body *{visibility:hidden}
+  #rep_printArea, #rep_printArea *{visibility:visible}
+  #rep_printArea{position:absolute;left:0;top:0;width:100%;padding:0}
+}
 .cap-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 6px}
 .btn-big{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:linear-gradient(160deg,var(--green),var(--green-dark));color:#fff;border-radius:16px;padding:22px 10px;font-weight:700;font-size:14px;cursor:pointer;border:1px solid rgba(255,255,255,.08)}
 .btn-big.alt{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
@@ -31,6 +53,9 @@ h3{font-size:14px;margin:18px 0 8px;display:flex;align-items:center;gap:8px}
 .qbadge{display:inline-block;background:rgba(255,176,32,.14);color:var(--amber);border:1px solid rgba(255,176,32,.3);border-radius:999px;padding:3px 10px;font-size:11.5px;margin:4px 0}
 .qbadge[hidden]{display:none}
 .vrow{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px}
+.vrow[data-id]{cursor:pointer}
+table.reptable tr[data-id]{cursor:pointer}
+table.reptable tr[data-id]:hover{background:var(--panel2)}
 .vrow.pending{border-style:dashed;opacity:.8}
 .vrow-vin{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:18px;font-weight:800;letter-spacing:1px;background:var(--panel2);border-radius:8px;padding:6px 10px;min-width:76px;text-align:center}
 .vrow-meta{display:flex;flex-direction:column;gap:2px;font-size:12.5px;color:var(--muted)}
@@ -86,24 +111,51 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
   </section>
 
   <section id="tab-reportes" hidden>
-    <div class="chips" id="rep_periodChips">
-      <button class="chip" data-period="day" type="button">Hoy</button>
-      <button class="chip on" data-period="week" type="button">Semana</button>
-      <button class="chip" data-period="fortnight" type="button">Quincena</button>
-      <button class="chip" data-period="month" type="button">Mes</button>
-      <button class="chip" data-period="semester" type="button">Semestre</button>
+    <div class="segctrl" id="rep_periodChips">
+      <button class="seg" data-period="day" type="button">Hoy</button>
+      <button class="seg on" data-period="week" type="button">Semana</button>
+      <button class="seg" data-period="fortnight" type="button">Quincena</button>
+      <button class="seg" data-period="month" type="button">Mes</button>
+      <button class="seg" data-period="semester" type="button">Semestre</button>
     </div>
     <div class="repnav">
       <button id="rep_prev" type="button">‹ Anterior</button>
       <span id="rep_range" class="hint" style="margin:0"></span>
       <button id="rep_next" type="button">Siguiente ›</button>
     </div>
-    <div class="rephead">
-      <div><div class="hint" style="margin:0">Autos registrados</div><div class="tot" id="rep_total">0</div></div>
-      <button class="secondary" style="width:auto;margin:0" id="rep_export">⬇ Exportar CSV</button>
+    <button class="primary" id="rep_pdf" type="button">🖨️ Imprimir o guardar en PDF</button>
+
+    <div id="rep_printArea">
+      <div class="statcard">
+        <div class="statq">¿Cuántos autos se lavaron?</div>
+        <div class="statnum" id="stat_total">0</div>
+        <div class="statsub" id="stat_totalsub"></div>
+      </div>
+      <div class="statcard">
+        <div class="statq">¿Quién lavó más?</div>
+        <div class="statnum" id="stat_top">—</div>
+        <div class="statsub" id="stat_topsub"></div>
+      </div>
+      <div class="statcard">
+        <div class="statq">¿A cuántos les falta el VIN?</div>
+        <div class="statnum" id="stat_missing">0</div>
+        <div class="statsub">se puede completar después mirando la foto guardada</div>
+      </div>
+
+      <div class="card">
+        <h3>Cómo viene la cosa</h3>
+        <canvas id="rep_chart" height="160"></canvas>
+      </div>
+
+      <div class="card">
+        <h3>Qué dicen los números</h3>
+        <ul id="rep_insightsList"></ul>
+      </div>
+
+      <div class="chips" id="rep_byWorker" style="margin-bottom:12px"></div>
+      <div class="tablewrap"><div id="rep_table"></div></div>
     </div>
-    <div class="chips" id="rep_byWorker" style="margin-bottom:12px"></div>
-    <div class="tablewrap"><div id="rep_table"></div></div>
+    <button class="secondary" id="rep_export" type="button">⬇ Exportar CSV</button>
   </section>
 
   <section id="tab-ajustes" hidden>
@@ -121,7 +173,7 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 
 <div class="scrim" id="reviewScrim">
   <div class="sheet">
-    <h3>Confirmar registro</h3>
+    <h3 id="rev_title">Confirmar registro</h3>
     <img id="rev_photo" hidden>
     <div id="rev_ocrHint" class="hint"></div>
     <label class="f">Últimos 6 dígitos del VIN (opc.)<input class="inp" id="rev_vin6" maxlength="8" autocapitalize="characters"></label>
@@ -133,6 +185,7 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
     <label class="f">Supervisor *<input class="inp" id="rev_supervisor" placeholder="Quién sube esta foto"></label>
     <label class="f">Fecha y hora<input class="inp" type="datetime-local" id="rev_when"></label>
     <button class="primary" id="rev_save" type="button">Guardar</button>
+    <button class="secondary" id="rev_delete" type="button" hidden style="color:var(--red);border-color:var(--red)">🗑️ Eliminar registro</button>
     <button class="secondary" id="rev_cancel" type="button">Cancelar</button>
   </div>
 </div>
@@ -156,6 +209,7 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 const CLOUD = {
   url: "https://orajysldssgztignuist.supabase.co",
@@ -395,7 +449,7 @@ window.addEventListener("online", flushQueue);
 setInterval(flushQueue, 45000);
 
 /* ===================== Captura -> editor de recorte/rotacion ===================== */
-let pendingReview = null;
+let pendingReview = null, editingId = null;
 function handleFile(file){
   if (!file) return;
   const fr = new FileReader();
@@ -600,18 +654,23 @@ async function runOcr(cropCanvas){
 }
 function openReview(data){
   pendingReview = data;
+  editingId = data.id || null;
   const img = document.getElementById("rev_photo");
   if (data.photo) { img.src = data.photo; img.hidden = false; } else { img.hidden = true; }
   document.getElementById("rev_vinFull").value = data.vinFull || "";
   document.getElementById("rev_vin6").value = data.vin6 || "";
   document.getElementById("rev_make").value = data.make || "";
   document.getElementById("rev_model").value = data.model || "";
-  document.getElementById("rev_color").value = "";
-  document.getElementById("rev_worker").value = getLastWorkerName();
-  document.getElementById("rev_supervisor").value = getSupervisorName();
-  document.getElementById("rev_when").value = toLocalInputValue(new Date());
+  document.getElementById("rev_color").value = data.color || "";
+  document.getElementById("rev_worker").value = data.worker != null ? data.worker : getLastWorkerName();
+  document.getElementById("rev_supervisor").value = data.supervisor != null ? data.supervisor : getSupervisorName();
+  document.getElementById("rev_when").value = toLocalInputValue(data.when ? new Date(data.when) : new Date());
+  document.getElementById("rev_title").textContent = editingId ? "Editar registro" : "Confirmar registro";
+  document.getElementById("rev_delete").hidden = !editingId;
   let hint;
-  if (data.vinFull) {
+  if (data.skipHint) {
+    hint = "Editando un registro ya guardado.";
+  } else if (data.vinFull) {
     hint = data.checksum
       ? "✓ VIN detectado y verificado — revisa que esté correcto."
       : "✓ VIN detectado automáticamente — revisa que esté correcto (no se pudo verificar el dígito de control, puede pasar con autos importados).";
@@ -623,7 +682,11 @@ function openReview(data){
   document.getElementById("rev_ocrHint").textContent = hint;
   const sc = document.getElementById("reviewScrim"); sc.classList.add("open");
 }
-function closeReview(){ document.getElementById("reviewScrim").classList.remove("open"); pendingReview = null; }
+function closeReview(){ document.getElementById("reviewScrim").classList.remove("open"); pendingReview = null; editingId = null; }
+function refreshOpenTabs(){
+  loadToday();
+  if (!document.getElementById("tab-reportes").hidden) loadReport();
+}
 async function saveReview(){
   const worker = document.getElementById("rev_worker").value.trim();
   const supervisor = document.getElementById("rev_supervisor").value.trim();
@@ -631,16 +694,27 @@ async function saveReview(){
   if (!supervisor) { toast("⚠︎ Falta el nombre del supervisor"); return; }
   setLastWorkerName(worker);
   setSupervisorName(supervisor);
-  const vin6 = document.getElementById("rev_vin6").value.trim().toUpperCase();
-  const vinFull = document.getElementById("rev_vinFull").value.trim().toUpperCase();
-  const make = document.getElementById("rev_make").value.trim();
-  const model = document.getElementById("rev_model").value.trim();
-  const color = document.getElementById("rev_color").value.trim();
+  const fields = {
+    p_vin_full: document.getElementById("rev_vinFull").value.trim().toUpperCase() || null,
+    p_vin6: document.getElementById("rev_vin6").value.trim().toUpperCase() || null,
+    p_make: document.getElementById("rev_make").value.trim() || null,
+    p_model: document.getElementById("rev_model").value.trim() || null,
+    p_color: document.getElementById("rev_color").value.trim() || null,
+    p_worker_name: worker, p_supervisor_name: supervisor,
+  };
   const whenLocal = document.getElementById("rev_when").value;
   const clientAt = whenLocal ? new Date(whenLocal).toISOString() : new Date().toISOString();
-  const photo = pendingReview ? pendingReview.photo : null;
-  const params = { p_vin_full: vinFull || null, p_vin6: vin6 || null, p_make: make || null, p_model: model || null, p_color: color || null, p_worker_name: worker, p_supervisor_name: supervisor, p_client_at: clientAt, p_photo_data: photo };
   const btn = document.getElementById("rev_save"); btn.disabled = true; btn.textContent = "Guardando…";
+  if (editingId) {
+    try {
+      await rpc("vin_log_update", { p_id: editingId, ...fields, p_client_at: clientAt });
+      toast("✓ Actualizado"); closeReview(); refreshOpenTabs();
+    } catch (e) { toast("⚠︎ No se pudo actualizar. Revisa tu conexión e intenta de nuevo."); }
+    finally { btn.disabled = false; btn.textContent = "Guardar"; }
+    return;
+  }
+  const photo = pendingReview ? pendingReview.photo : null;
+  const params = { ...fields, p_client_at: clientAt, p_photo_data: photo };
   try {
     await rpc("vin_log_insert", params);
     toast("✓ Registrado"); closeReview(); loadToday();
@@ -648,13 +722,25 @@ async function saveReview(){
     queueOffline(params); toast("📶 Sin conexión — guardado en el teléfono, se sube solo"); closeReview(); renderQueueBadge();
   } finally { btn.disabled = false; btn.textContent = "Guardar"; }
 }
+async function deleteEntry(){
+  if (!editingId) return;
+  if (!confirm("¿Eliminar este registro? No se puede deshacer.")) return;
+  const btn = document.getElementById("rev_delete"); btn.disabled = true; btn.textContent = "Eliminando…";
+  try {
+    await rpc("vin_log_delete", { p_id: editingId });
+    toast("✓ Eliminado"); closeReview(); refreshOpenTabs();
+  } catch (e) { toast("⚠︎ No se pudo eliminar. Revisa tu conexión."); }
+  finally { btn.disabled = false; btn.textContent = "🗑️ Eliminar registro"; }
+}
 
 /* ===================== Hoy ===================== */
+let todayRows = [];
 async function loadToday(){
   const now = new Date();
   try {
     const rows = await rpc("vin_log_list_range", { p_from: startOfDay(now).toISOString(), p_to: endOfDayExclusive(now).toISOString() });
-    renderTodayList(rows || []);
+    todayRows = rows || [];
+    renderTodayList(todayRows);
   } catch (e) { document.getElementById("todayList").innerHTML = '<p class="hint">⚠︎ No se pudo cargar (revisa tu conexión).</p>'; }
 }
 function renderTodayList(rows){
@@ -662,13 +748,20 @@ function renderTodayList(rows){
   const list = pend.concat(rows);
   document.getElementById("todayCount").textContent = list.length;
   document.getElementById("todayList").innerHTML = list.length ? list.map(rowHTML).join("") : '<p class="hint">Sin registros hoy todavía.</p>';
+  document.querySelectorAll("#todayList .vrow[data-id]").forEach(el => el.onclick = () => openEditFromId(el.dataset.id, todayRows));
 }
 function rowHTML(r){
   const time = new Date(r.client_at).toLocaleTimeString("es-AU", { hour: "2-digit", minute: "2-digit" });
   const makeModel = [r.make, r.model].filter(Boolean).join(" ");
-  return '<div class="vrow ' + (r._pending ? "pending" : "") + '">' +
+  const idAttr = r._pending ? "" : ' data-id="' + esc(r.id) + '"';
+  return '<div class="vrow ' + (r._pending ? "pending" : "") + '"' + idAttr + '>' +
     '<div class="vrow-vin">' + esc(r.vin6 || "—") + '</div>' +
     '<div class="vrow-meta"><b>' + esc(makeModel || "—") + '</b><span>' + esc(r.worker_name) + ' · ' + time + (r._pending ? " · ⏳ pendiente" : "") + '</span></div></div>';
+}
+function openEditFromId(id, source){
+  const row = source.find(r => String(r.id) === String(id));
+  if (!row) return;
+  openReview({ id: row.id, photo: row.photo_data, vinFull: row.vin_full || "", vin6: row.vin6 || "", make: row.make || "", model: row.model || "", color: row.color || "", worker: row.worker_name || "", supervisor: row.supervisor_name || "", when: row.client_at, skipHint: true });
 }
 
 /* ===================== Reportes ===================== */
@@ -698,18 +791,80 @@ async function loadReport(){
   try { repRows = await rpc("vin_log_list_range", { p_from: range.from.toISOString(), p_to: range.to.toISOString() }) || []; renderReport(); }
   catch (e) { box.innerHTML = '<p class="hint">⚠︎ No se pudo cargar el reporte.</p>'; }
 }
+let repChartInstance = null;
 function renderReport(){
-  document.getElementById("rep_total").textContent = repRows.length;
+  const total = repRows.length;
   const byWorker = {};
   repRows.forEach(r => { byWorker[r.worker_name] = (byWorker[r.worker_name] || 0) + 1; });
-  document.getElementById("rep_byWorker").innerHTML = Object.entries(byWorker).sort((a, b) => b[1] - a[1]).map(([w, n]) => '<span class="chip">' + esc(w) + ': ' + n + '</span>').join("") || '<span class="hint">—</span>';
+  const workerEntries = Object.entries(byWorker).sort((a, b) => b[1] - a[1]);
+  const missing = repRows.filter(r => !r.vin6).length;
+
+  document.getElementById("stat_total").textContent = total;
+  document.getElementById("stat_totalsub").textContent = document.getElementById("rep_range").textContent;
+  document.getElementById("stat_top").textContent = workerEntries.length ? workerEntries[0][0] : "—";
+  document.getElementById("stat_topsub").textContent = workerEntries.length
+    ? (workerEntries[0][1] + " auto(s)" + (workerEntries[1] ? (" · " + (workerEntries[0][1] - workerEntries[1][1]) + " más que " + workerEntries[1][0]) : ""))
+    : "sin datos todavía en este período";
+  document.getElementById("stat_missing").textContent = missing;
+
+  document.getElementById("rep_byWorker").innerHTML = workerEntries.map(([w, n]) => '<span class="chip">' + esc(w) + ': ' + n + '</span>').join("") || '<span class="hint">—</span>';
+
+  renderReportChart();
+  renderReportInsights(workerEntries, missing, total);
+
   const box = document.getElementById("rep_table");
-  if (!repRows.length) { box.innerHTML = '<p class="hint">Sin registros en este período.</p>'; return; }
+  if (!total) { box.innerHTML = '<p class="hint">Sin registros en este período.</p>'; return; }
   box.innerHTML = '<table class="reptable"><thead><tr><th>Fecha</th><th>VIN (6)</th><th>VIN completo</th><th>Marca</th><th>Modelo</th><th>Color</th><th>Trabajador</th><th>Supervisor</th><th></th></tr></thead><tbody>' +
-    repRows.map(r => '<tr><td>' + new Date(r.client_at).toLocaleString("es-AU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) +
+    repRows.map(r => '<tr data-id="' + esc(r.id) + '"><td>' + new Date(r.client_at).toLocaleString("es-AU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) +
       '</td><td><b>' + esc(r.vin6 || "—") + '</b></td><td>' + esc(r.vin_full || "—") + '</td><td>' + esc(r.make || "—") + '</td><td>' + esc(r.model || "—") + '</td><td>' + esc(r.color || "—") + '</td><td>' + esc(r.worker_name) + '</td><td>' + esc(r.supervisor_name || "—") + '</td><td>' +
       (r.photo_data ? '<a href="#" class="photolink" data-src="' + esc(r.photo_data) + '">📷</a>' : "") + '</td></tr>').join("") + '</tbody></table>';
-  box.querySelectorAll(".photolink").forEach(a => a.onclick = ev => { ev.preventDefault(); window.open(a.dataset.src, "_blank"); });
+  box.querySelectorAll(".photolink").forEach(a => a.onclick = ev => { ev.preventDefault(); ev.stopPropagation(); window.open(a.dataset.src, "_blank"); });
+  box.querySelectorAll("tr[data-id]").forEach(tr => tr.onclick = () => openEditFromId(tr.dataset.id, repRows));
+}
+function renderReportChart(){
+  const canvas = document.getElementById("rep_chart");
+  if (!window.Chart || !canvas) return;
+  const range = periodRange(repPeriod, repAnchor);
+  const days = [];
+  for (let d = new Date(range.from); d < range.to; d.setDate(d.getDate() + 1)) days.push(new Date(d));
+  const counts = days.map(d => {
+    const dayStart = startOfDay(d), dayEnd = endOfDayExclusive(d);
+    return repRows.filter(r => { const t = new Date(r.client_at); return t >= dayStart && t < dayEnd; }).length;
+  });
+  const labels = days.map(d => d.toLocaleDateString("es-AU", { day: "2-digit", month: "short" }));
+  if (repChartInstance) { repChartInstance.destroy(); repChartInstance = null; }
+  repChartInstance = new Chart(canvas, {
+    type: "bar",
+    data: { labels, datasets: [{ label: "Autos", data: counts, backgroundColor: "#3fa939", borderRadius: 6, maxBarThickness: 36 }] },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { color: "#8fa096", precision: 0 }, grid: { color: "#26352c" } },
+        x: { ticks: { color: "#8fa096" }, grid: { display: false } },
+      },
+    },
+  });
+}
+function renderReportInsights(workerEntries, missing, total){
+  const list = document.getElementById("rep_insightsList");
+  const bullets = [];
+  if (!total) {
+    bullets.push("Sin registros en este período todavía.");
+  } else {
+    if (workerEntries.length) {
+      const [topName, topN] = workerEntries[0];
+      bullets.push(topName + " lavó " + topN + " auto(s), el " + Math.round(topN / total * 100) + "% del total del período.");
+    }
+    if (workerEntries.length > 1) {
+      bullets.push("Entre " + workerEntries.length + " trabajador(es) distinto(s) se repartió el trabajo de este período.");
+    }
+    if (missing > 0) {
+      bullets.push(missing + " de " + total + " auto(s) todavía no tienen el VIN completo — se puede terminar de cargar mirando la foto guardada.");
+    } else {
+      bullets.push("Todos los autos de este período ya tienen el VIN cargado.");
+    }
+  }
+  list.innerHTML = bullets.map(b => "<li>" + esc(b) + "</li>").join("");
 }
 function exportReportCSV(){
   const rows = [["fecha_hora", "vin_ultimos6", "vin_completo", "marca", "modelo", "color", "trabajador", "supervisor"]];
@@ -734,6 +889,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("camInput").addEventListener("change", e => { handleFile(e.target.files[0]); e.target.value = ""; });
   document.getElementById("galInput").addEventListener("change", e => { handleFile(e.target.files[0]); e.target.value = ""; });
   document.getElementById("rev_save").onclick = saveReview;
+  document.getElementById("rev_delete").onclick = deleteEntry;
   document.getElementById("rev_cancel").onclick = closeReview;
   document.getElementById("crop_rotate").onclick = rotateCropWork;
   document.getElementById("crop_confirm").onclick = confirmCrop;
@@ -742,13 +898,14 @@ document.addEventListener("DOMContentLoaded", () => {
   wireCropCanvas();
   document.getElementById("set_supervisor").value = getSupervisorName();
   document.getElementById("set_supervisorSave").onclick = () => { setSupervisorName(document.getElementById("set_supervisor").value.trim()); toast("✓ Guardado"); };
-  document.querySelectorAll("#rep_periodChips .chip").forEach(ch => ch.onclick = () => {
-    document.querySelectorAll("#rep_periodChips .chip").forEach(c => c.classList.remove("on"));
+  document.querySelectorAll("#rep_periodChips .seg").forEach(ch => ch.onclick = () => {
+    document.querySelectorAll("#rep_periodChips .seg").forEach(c => c.classList.remove("on"));
     ch.classList.add("on"); repPeriod = ch.dataset.period; repAnchor = new Date(); loadReport();
   });
   document.getElementById("rep_prev").onclick = () => { shiftAnchor(-1); loadReport(); };
   document.getElementById("rep_next").onclick = () => { shiftAnchor(1); loadReport(); };
   document.getElementById("rep_export").onclick = exportReportCSV;
+  document.getElementById("rep_pdf").onclick = () => window.print();
   loadToday();
   renderQueueBadge();
   flushQueue();
