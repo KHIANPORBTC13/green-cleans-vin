@@ -139,6 +139,9 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
     <h3>Encuadra el VIN</h3>
     <p class="hint">Arrastra el recuadro sobre el código VIN. Usa 🔄 si la foto quedó de costado.</p>
     <div class="crop-stage"><canvas id="crop_canvas"></canvas></div>
+    <label class="f" style="margin-top:2px">Enderezar (si la placa está en diagonal) <span id="crop_fineLabel">0°</span>
+      <input type="range" id="crop_fineRotate" min="-45" max="45" step="1" value="0" style="width:100%">
+    </label>
     <div class="crop-actions">
       <button class="secondary" id="crop_rotate" type="button">🔄 Rotar</button>
       <button class="primary" id="crop_confirm" type="button">✓ Listo</button>
@@ -396,7 +399,8 @@ function handleFile(file){
   fr.readAsDataURL(file);
 }
 
-let cropWork = null, cropRect = { x: 0, y: 0, w: 0, h: 0 }, cropDispW = 0, cropDispH = 0, cropScale = 1, cropDrag = null;
+let cropBase = null, cropWork = null, cropFineDeg = 0;
+let cropRect = { x: 0, y: 0, w: 0, h: 0 }, cropDispW = 0, cropDispH = 0, cropScale = 1, cropDrag = null;
 function bakeToCanvas(img){
   const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
   const CAP = 2400;
@@ -415,23 +419,62 @@ function rotateCanvas90(src){
   ctx.drawImage(src, -src.width / 2, -src.height / 2);
   return cv;
 }
+// Rotacion en angulo libre (grados, no solo 90 en 90) para placas fotografiadas en diagonal --
+// el canvas de salida CRECE lo necesario para no recortar esquinas al girar.
+function rotateCanvasByAngle(src, deg){
+  const rad = deg * Math.PI / 180;
+  const cos = Math.abs(Math.cos(rad)), sin = Math.abs(Math.sin(rad));
+  const w = Math.ceil(src.width * cos + src.height * sin);
+  const h = Math.ceil(src.width * sin + src.height * cos);
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  const ctx = cv.getContext("2d");
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate(rad);
+  ctx.drawImage(src, -src.width / 2, -src.height / 2);
+  return cv;
+}
 function openCropEditor(img){
-  cropWork = bakeToCanvas(img);
+  cropBase = bakeToCanvas(img);
+  cropFineDeg = 0;
+  cropWork = cropBase;
+  const slider = document.getElementById("crop_fineRotate");
+  if (slider) { slider.value = "0"; document.getElementById("crop_fineLabel").textContent = "0°"; }
   resetCropView();
   document.getElementById("cropScrim").classList.add("open");
 }
 function resetCropView(){
   const stage = document.querySelector(".crop-stage");
   const maxDispW = Math.min((stage && stage.clientWidth) || 360, 480);
+  const prevDispW = cropDispW, prevDispH = cropDispH, prevRect = cropRect;
   cropScale = Math.min(1, maxDispW / cropWork.width);
   cropDispW = Math.round(cropWork.width * cropScale);
   cropDispH = Math.round(cropWork.height * cropScale);
   const cv = document.getElementById("crop_canvas");
   cv.width = cropDispW; cv.height = cropDispH;
-  cropRect = { x: cropDispW * 0.1, y: cropDispH * 0.35, w: cropDispW * 0.8, h: cropDispH * 0.3 };
+  if (prevDispW && prevDispH) {
+    // reescala el recuadro existente en vez de perderlo (pasa al ajustar la rotacion fina)
+    const rx = cropDispW / prevDispW, ry = cropDispH / prevDispH;
+    cropRect = clampRectTo({ x: prevRect.x * rx, y: prevRect.y * ry, w: prevRect.w * rx, h: prevRect.h * ry }, cropDispW, cropDispH);
+  } else {
+    cropRect = { x: cropDispW * 0.1, y: cropDispH * 0.35, w: cropDispW * 0.8, h: cropDispH * 0.3 };
+  }
   drawCrop();
 }
-function rotateCropWork(){ cropWork = rotateCanvas90(cropWork); resetCropView(); }
+function rotateCropWork(){
+  cropBase = rotateCanvas90(cropBase);
+  cropFineDeg = 0;
+  cropWork = cropBase;
+  const slider = document.getElementById("crop_fineRotate");
+  if (slider) { slider.value = "0"; document.getElementById("crop_fineLabel").textContent = "0°"; }
+  cropDispW = 0; cropDispH = 0; // fuerza a recentrar el recuadro (cambio de orientacion grande)
+  resetCropView();
+}
+function applyFineRotation(deg){
+  cropFineDeg = deg;
+  cropWork = deg === 0 ? cropBase : rotateCanvasByAngle(cropBase, deg);
+  document.getElementById("crop_fineLabel").textContent = deg + "°";
+  resetCropView();
+}
 function cropHandles(){
   const { x, y, w, h } = cropRect;
   return [{ name: "nw", x: x, y: y }, { name: "ne", x: x + w, y: y }, { name: "sw", x: x, y: y + h }, { name: "se", x: x + w, y: y + h }];
@@ -479,7 +522,7 @@ function wireCropCanvas(){
   window.addEventListener("pointerup", () => { cropDrag = null; });
 }
 function closeCropEditor(){ document.getElementById("cropScrim").classList.remove("open"); }
-function cancelCrop(){ closeCropEditor(); cropWork = null; }
+function cancelCrop(){ closeCropEditor(); cropWork = null; cropBase = null; }
 function confirmCrop(){
   const nx = cropRect.x / cropScale, ny = cropRect.y / cropScale, nw = cropRect.w / cropScale, nh = cropRect.h / cropScale;
   const { w: outW, h: outH } = cropOutputSize(nw, nh);
@@ -677,6 +720,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("crop_rotate").onclick = rotateCropWork;
   document.getElementById("crop_confirm").onclick = confirmCrop;
   document.getElementById("crop_cancel").onclick = cancelCrop;
+  document.getElementById("crop_fineRotate").addEventListener("input", e => applyFineRotation(Number(e.target.value)));
   wireCropCanvas();
   document.getElementById("set_worker").value = getWorkerName();
   document.getElementById("set_workerSave").onclick = () => { setWorkerName(document.getElementById("set_worker").value.trim()); toast("✓ Guardado"); };
