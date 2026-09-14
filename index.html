@@ -58,6 +58,11 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);background:#1c2320;border:1px solid var(--line);color:var(--text);padding:10px 16px;border-radius:12px;font-size:13px;opacity:0;transition:.25s;z-index:50;max-width:88vw;text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .photolink{color:var(--mint);text-decoration:none;font-size:15px}
+.crop-sheet{max-width:480px}
+.crop-stage{display:flex;justify-content:center;background:#000;border-radius:12px;overflow:hidden;margin:10px 0}
+#crop_canvas{touch-action:none;display:block;max-width:100%}
+.crop-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
+.crop-actions button{margin-top:0}
 </style>
 </head>
 <body>
@@ -128,6 +133,19 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
   </div>
 </div>
 
+<div class="scrim" id="cropScrim">
+  <div class="sheet crop-sheet">
+    <h3>Encuadra el VIN</h3>
+    <p class="hint">Arrastra el recuadro sobre el código VIN. Usa 🔄 si la foto quedó de costado.</p>
+    <div class="crop-stage"><canvas id="crop_canvas"></canvas></div>
+    <div class="crop-actions">
+      <button class="secondary" id="crop_rotate" type="button">🔄 Rotar</button>
+      <button class="primary" id="crop_confirm" type="button">✓ Listo</button>
+    </div>
+    <button class="secondary" id="crop_cancel" type="button">Cancelar</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -191,22 +209,31 @@ function guessMakeModel(text){
 }
 
 /* ===================== Imagen ===================== */
-function compressImg(file, cb, maxDim, quality){
-  const fr = new FileReader();
-  fr.onload = () => {
-    const im = new Image();
-    im.onload = () => {
-      const mx = maxDim || 1200;
-      let w = im.width, h = im.height;
-      if (w > mx || h > mx) { const r = Math.min(mx / w, mx / h); w = Math.round(w * r); h = Math.round(h * r); }
-      const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
-      cv.getContext("2d").drawImage(im, 0, 0, w, h);
-      cb(cv.toDataURL("image/jpeg", quality || 0.72));
-    };
-    im.onerror = () => cb(null);
-    im.src = fr.result;
-  };
-  fr.readAsDataURL(file);
+function cropOutputSize(nw, nh){
+  const MIN_H = 260, MAX_DIM = 1400;
+  let scale = 1;
+  if (nh < MIN_H) scale = Math.min(3, MIN_H / nh);
+  const longSide = Math.max(nw, nh) * scale;
+  if (longSide > MAX_DIM) scale *= MAX_DIM / longSide;
+  return { w: Math.max(1, Math.round(nw * scale)), h: Math.max(1, Math.round(nh * scale)) };
+}
+function resizeRectFromCorner(startRect, corner, dx, dy){
+  let { x, y, w, h } = startRect;
+  if (corner === "nw") { x += dx; y += dy; w -= dx; h -= dy; }
+  if (corner === "ne") { y += dy; w += dx; h -= dy; }
+  if (corner === "sw") { x += dx; w -= dx; h += dy; }
+  if (corner === "se") { w += dx; h += dy; }
+  if (w < 0) { x += w; w = -w; }
+  if (h < 0) { y += h; h = -h; }
+  return { x, y, w, h };
+}
+function clampRectTo(rect, boundsW, boundsH){
+  let { x, y, w, h } = rect;
+  w = Math.max(30, Math.min(w, boundsW));
+  h = Math.max(20, Math.min(h, boundsH));
+  x = Math.max(0, Math.min(x, boundsW - w));
+  y = Math.max(0, Math.min(y, boundsH - h));
+  return { x, y, w, h };
 }
 
 /* ===================== Utilidades ===================== */
@@ -239,28 +266,147 @@ function renderQueueBadge(){
 window.addEventListener("online", flushQueue);
 setInterval(flushQueue, 45000);
 
-/* ===================== Captura + revision ===================== */
+/* ===================== Captura -> editor de recorte/rotacion ===================== */
 let pendingReview = null;
 function handleFile(file){
   if (!file) return;
-  document.getElementById("ocrStatus").textContent = "🔎 Leyendo VIN…";
-  compressImg(file, storeDataUrl => {
-    compressImg(file, ocrDataUrl => { runOcr(ocrDataUrl, storeDataUrl); }, 1800, 0.82);
-  }, 900, 0.55);
+  const fr = new FileReader();
+  fr.onload = () => {
+    const im = new Image();
+    im.onload = () => openCropEditor(im);
+    im.onerror = () => toast("⚠︎ No se pudo abrir la imagen.");
+    im.src = fr.result;
+  };
+  fr.readAsDataURL(file);
 }
-function runOcr(ocrDataUrl, storeDataUrl){
-  const statusEl = document.getElementById("ocrStatus");
-  const run = () => Tesseract.recognize(ocrDataUrl, "eng").then(({ data }) => {
-    statusEl.textContent = "";
-    const vinFull = extractVinFromText(data.text);
-    openReview({ photo: storeDataUrl, vinFull: vinFull || "", vin6: vin6of(vinFull), makeModel: guessMakeModel(data.text) });
-  }).catch(() => { statusEl.textContent = ""; openReview({ photo: storeDataUrl, vinFull: "", vin6: "", makeModel: "" }); });
-  if (window.Tesseract) run();
-  else {
+
+let cropWork = null, cropRect = { x: 0, y: 0, w: 0, h: 0 }, cropDispW = 0, cropDispH = 0, cropScale = 1, cropDrag = null;
+function bakeToCanvas(img){
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const CAP = 2400;
+  let w = iw, h = ih;
+  if (Math.max(w, h) > CAP) { const r = CAP / Math.max(w, h); w = Math.round(w * r); h = Math.round(h * r); }
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  cv.getContext("2d").drawImage(img, 0, 0, w, h);
+  return cv;
+}
+function rotateCanvas90(src){
+  const cv = document.createElement("canvas");
+  cv.width = src.height; cv.height = src.width;
+  const ctx = cv.getContext("2d");
+  ctx.translate(cv.width / 2, cv.height / 2);
+  ctx.rotate(Math.PI / 2);
+  ctx.drawImage(src, -src.width / 2, -src.height / 2);
+  return cv;
+}
+function openCropEditor(img){
+  cropWork = bakeToCanvas(img);
+  resetCropView();
+  document.getElementById("cropScrim").classList.add("open");
+}
+function resetCropView(){
+  const stage = document.querySelector(".crop-stage");
+  const maxDispW = Math.min((stage && stage.clientWidth) || 360, 480);
+  cropScale = Math.min(1, maxDispW / cropWork.width);
+  cropDispW = Math.round(cropWork.width * cropScale);
+  cropDispH = Math.round(cropWork.height * cropScale);
+  const cv = document.getElementById("crop_canvas");
+  cv.width = cropDispW; cv.height = cropDispH;
+  cropRect = { x: cropDispW * 0.1, y: cropDispH * 0.35, w: cropDispW * 0.8, h: cropDispH * 0.3 };
+  drawCrop();
+}
+function rotateCropWork(){ cropWork = rotateCanvas90(cropWork); resetCropView(); }
+function cropHandles(){
+  const { x, y, w, h } = cropRect;
+  return [{ name: "nw", x: x, y: y }, { name: "ne", x: x + w, y: y }, { name: "sw", x: x, y: y + h }, { name: "se", x: x + w, y: y + h }];
+}
+function drawCrop(){
+  const cv = document.getElementById("crop_canvas"); const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, cropDispW, cropDispH);
+  ctx.drawImage(cropWork, 0, 0, cropDispW, cropDispH);
+  ctx.fillStyle = "rgba(0,0,0,.6)";
+  ctx.fillRect(0, 0, cropDispW, cropRect.y);
+  ctx.fillRect(0, cropRect.y + cropRect.h, cropDispW, cropDispH - (cropRect.y + cropRect.h));
+  ctx.fillRect(0, cropRect.y, cropRect.x, cropRect.h);
+  ctx.fillRect(cropRect.x + cropRect.w, cropRect.y, cropDispW - (cropRect.x + cropRect.w), cropRect.h);
+  ctx.strokeStyle = "#00D084"; ctx.lineWidth = 2;
+  ctx.strokeRect(cropRect.x, cropRect.y, cropRect.w, cropRect.h);
+  const hs = 14; ctx.fillStyle = "#00D084";
+  cropHandles().forEach(h => ctx.fillRect(h.x - hs / 2, h.y - hs / 2, hs, hs));
+}
+function cropPointerPos(ev, cv){
+  const r = cv.getBoundingClientRect();
+  return { x: (ev.clientX - r.left) * (cv.width / r.width), y: (ev.clientY - r.top) * (cv.height / r.height) };
+}
+function wireCropCanvas(){
+  const cv = document.getElementById("crop_canvas");
+  cv.addEventListener("pointerdown", ev => {
+    const p = cropPointerPos(ev, cv);
+    const hit = cropHandles().find(h => Math.hypot(h.x - p.x, h.y - p.y) < 26);
+    if (hit) cropDrag = { mode: "resize", corner: hit.name, startRect: { ...cropRect }, startP: p };
+    else if (p.x > cropRect.x && p.x < cropRect.x + cropRect.w && p.y > cropRect.y && p.y < cropRect.y + cropRect.h)
+      cropDrag = { mode: "move", startRect: { ...cropRect }, startP: p };
+    else { cropDrag = { mode: "new", startP: p }; cropRect = { x: p.x, y: p.y, w: 1, h: 1 }; }
+    ev.preventDefault();
+  });
+  cv.addEventListener("pointermove", ev => {
+    if (!cropDrag) return;
+    const p = cropPointerPos(ev, cv);
+    const dx = p.x - cropDrag.startP.x, dy = p.y - cropDrag.startP.y;
+    if (cropDrag.mode === "move") { cropRect = { ...cropDrag.startRect, x: cropDrag.startRect.x + dx, y: cropDrag.startRect.y + dy }; }
+    else if (cropDrag.mode === "new") { cropRect = { x: Math.min(cropDrag.startP.x, p.x), y: Math.min(cropDrag.startP.y, p.y), w: Math.abs(dx), h: Math.abs(dy) }; }
+    else if (cropDrag.mode === "resize") { cropRect = resizeRectFromCorner(cropDrag.startRect, cropDrag.corner, dx, dy); }
+    cropRect = clampRectTo(cropRect, cropDispW, cropDispH);
+    drawCrop();
+    ev.preventDefault();
+  });
+  window.addEventListener("pointerup", () => { cropDrag = null; });
+}
+function closeCropEditor(){ document.getElementById("cropScrim").classList.remove("open"); }
+function cancelCrop(){ closeCropEditor(); cropWork = null; }
+function confirmCrop(){
+  const nx = cropRect.x / cropScale, ny = cropRect.y / cropScale, nw = cropRect.w / cropScale, nh = cropRect.h / cropScale;
+  const { w: outW, h: outH } = cropOutputSize(nw, nh);
+  const out = document.createElement("canvas"); out.width = outW; out.height = outH;
+  const octx = out.getContext("2d"); octx.imageSmoothingEnabled = true; octx.imageSmoothingQuality = "high";
+  octx.drawImage(cropWork, nx, ny, nw, nh, 0, 0, outW, outH);
+  const dataUrl = out.toDataURL("image/jpeg", 0.92);
+  closeCropEditor();
+  document.getElementById("ocrStatus").textContent = "🔎 Leyendo VIN…";
+  runOcr(dataUrl);
+}
+
+/* ===================== OCR (sobre el recorte ya encuadrado) ===================== */
+function ensureTesseract(){
+  return new Promise((resolve, reject) => {
+    if (window.Tesseract) return resolve();
     const sc = document.createElement("script"); sc.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
-    sc.onload = run;
-    sc.onerror = () => { statusEl.textContent = ""; toast("No se pudo cargar el lector (¿sin internet?)"); openReview({ photo: storeDataUrl, vinFull: "", vin6: "", makeModel: "" }); };
+    sc.onload = resolve; sc.onerror = reject;
     document.head.appendChild(sc);
+  });
+}
+async function runOcr(dataUrl){
+  const statusEl = document.getElementById("ocrStatus");
+  try {
+    await ensureTesseract();
+    const worker = await Tesseract.createWorker("eng");
+    let vinFull = null, ocrText = "";
+    try {
+      await worker.setParameters({ tessedit_pageseg_mode: "7" });
+      let { data } = await worker.recognize(dataUrl);
+      ocrText = data.text || ""; vinFull = extractVinFromText(ocrText);
+      if (!vinFull) {
+        await worker.setParameters({ tessedit_pageseg_mode: "6" });
+        ({ data } = await worker.recognize(dataUrl));
+        if (data.text) { ocrText += "\n" + data.text; vinFull = extractVinFromText(data.text); }
+      }
+    } finally { await worker.terminate(); }
+    statusEl.textContent = "";
+    openReview({ photo: dataUrl, vinFull: vinFull || "", vin6: vin6of(vinFull), makeModel: guessMakeModel(ocrText) });
+  } catch (e) {
+    statusEl.textContent = "";
+    toast("⚠︎ No se pudo leer automáticamente. Escribe el VIN a mano.");
+    openReview({ photo: dataUrl, vinFull: "", vin6: "", makeModel: "" });
   }
 }
 function openReview(data){
@@ -384,6 +530,10 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("galInput").addEventListener("change", e => { handleFile(e.target.files[0]); e.target.value = ""; });
   document.getElementById("rev_save").onclick = saveReview;
   document.getElementById("rev_cancel").onclick = closeReview;
+  document.getElementById("crop_rotate").onclick = rotateCropWork;
+  document.getElementById("crop_confirm").onclick = confirmCrop;
+  document.getElementById("crop_cancel").onclick = cancelCrop;
+  wireCropCanvas();
   document.getElementById("set_worker").value = getWorkerName();
   document.getElementById("set_workerSave").onclick = () => { setWorkerName(document.getElementById("set_worker").value.trim()); toast("✓ Guardado"); };
   document.querySelectorAll("#rep_periodChips .chip").forEach(ch => ch.onclick = () => {
