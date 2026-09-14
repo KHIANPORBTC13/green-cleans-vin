@@ -87,6 +87,8 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);background:#1c2320;border:1px solid var(--line);color:var(--text);padding:10px 16px;border-radius:12px;font-size:13px;opacity:0;transition:.25s;z-index:50;max-width:88vw;text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .photolink{color:var(--mint);text-decoration:none;font-size:15px}
+#photoScrim .sheet{max-width:520px;padding:12px;background:transparent}
+#photoScrim img{width:100%;max-height:80vh;object-fit:contain;border-radius:12px;margin-bottom:10px;background:#000}
 .crop-sheet{max-width:480px}
 .crop-stage{display:flex;justify-content:center;background:#000;border-radius:12px;overflow:hidden;margin:10px 0}
 #crop_canvas{touch-action:none;display:block;max-width:100%}
@@ -226,6 +228,13 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
   </div>
 </div>
 
+<div class="scrim" id="photoScrim">
+  <div class="sheet">
+    <img id="photoScrim_img" alt="Foto del VIN">
+    <button class="secondary" id="photoScrim_close" type="button">Cerrar</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -303,6 +312,17 @@ function extractVinFromText(text){
   return pickBestVin(candidates);
 }
 function vin6of(v){ return v ? v.slice(-6) : ""; }
+// Cuando NO se valido un VIN completo, se rellena igual el campo de "ultimos 6 digitos" con la
+// mejor lectura cruda disponible -- para ganar tiempo, el usuario corrige en vez de tipear desde
+// cero. Se toma el token alfanumerico mas largo leido (lo mas probable es que sea el codigo VIN,
+// aunque este mal leido) y sus ultimos 6 caracteres, limpiados con la misma correccion O/I/Q.
+function bestGuessVin6(text){
+  const tokens = String(text || "").toUpperCase().match(/[A-Z0-9]+/g) || [];
+  if (!tokens.length) return "";
+  const longest = tokens.reduce((a, b) => (b.length > a.length ? b : a), "");
+  if (longest.length < 6) return "";
+  return cleanVinToken(longest).slice(-6);
+}
 // Digito verificador ISO 3779 (mod-11). Algunos VIN JDM/europeos importados NO lo cumplen (no es
 // universal fuera del estandar NHTSA), asi que se usa solo como señal de puntaje para desempatar
 // entre varios candidatos leidos, NUNCA como filtro que descarte un VIN real.
@@ -675,7 +695,8 @@ async function runOcr(cropCanvas){
     statusEl.textContent = "";
     const vinFull = best ? best.vin : null;
     const guess = guessMakeModel(lastRawText);
-    openReview({ photo: storeDataUrl, vinFull: vinFull || "", vin6: vin6of(vinFull), make: guess.make, model: guess.model, rawText: vinFull ? "" : lastRawText, checksum: best ? best.checksum : false });
+    const vin6 = vinFull ? vin6of(vinFull) : bestGuessVin6(lastRawText);
+    openReview({ photo: storeDataUrl, vinFull: vinFull || "", vin6, vin6Guessed: !vinFull && !!vin6, make: guess.make, model: guess.model, rawText: vinFull ? "" : lastRawText, checksum: best ? best.checksum : false });
   } catch (e) {
     console.error("[VIN OCR] error", e);
     statusEl.textContent = "";
@@ -705,6 +726,8 @@ function openReview(data){
     hint = data.checksum
       ? "✓ VIN detectado y verificado — revisa que esté correcto."
       : "✓ VIN detectado automáticamente — revisa que esté correcto (no se pudo verificar el dígito de control, puede pasar con autos importados).";
+  } else if (data.vin6Guessed) {
+    hint = "⚠︎ No se pudo confirmar el VIN. Se rellenaron los últimos 6 dígitos con la mejor lectura automática — revísalos y corrígelos antes de guardar. La cámara leyó: \"" + data.rawText.trim().replace(/\s+/g, " ").slice(0, 80) + "\"";
   } else if (data.rawText && data.rawText.trim()) {
     hint = "⚠︎ No se detectó el VIN automáticamente. La cámara leyó esto, puede ayudarte a escribirlo a mano: \"" + data.rawText.trim().replace(/\s+/g, " ").slice(0, 80) + "\"";
   } else {
@@ -714,6 +737,14 @@ function openReview(data){
   const sc = document.getElementById("reviewScrim"); sc.classList.add("open");
 }
 function closeReview(){ document.getElementById("reviewScrim").classList.remove("open"); pendingReview = null; editingId = null; }
+// Chrome bloquea la navegacion a data: URLs abiertas con window.open (medida anti-phishing) --
+// una foto se guarda como data URL, asi que abrirla en pestaña nueva quedaba en blanco sin error
+// visible. Se muestra en un visor dentro de la misma pagina en vez de navegar a la URL.
+function openPhotoLightbox(src){
+  document.getElementById("photoScrim_img").src = src;
+  document.getElementById("photoScrim").classList.add("open");
+}
+function closePhotoLightbox(){ document.getElementById("photoScrim").classList.remove("open"); document.getElementById("photoScrim_img").src = ""; }
 function refreshOpenTabs(){
   loadToday();
   if (!document.getElementById("tab-reportes").hidden) loadReport();
@@ -850,7 +881,7 @@ function renderReport(){
     repRows.map(r => '<tr data-id="' + esc(r.id) + '"><td>' + new Date(r.client_at).toLocaleString("es-AU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) +
       '</td><td><b>' + esc(r.vin6 || "—") + '</b></td><td>' + esc(r.vin_full || "—") + '</td><td>' + esc(r.make || "—") + '</td><td>' + esc(r.model || "—") + '</td><td>' + esc(r.color || "—") + '</td><td>' + esc(r.worker_name) + '</td><td>' + esc(r.supervisor_name || "—") + '</td><td>' +
       (r.photo_data ? '<a href="#" class="photolink" data-src="' + esc(r.photo_data) + '">📷</a>' : (r.photo_had ? '<span class="hint" title="La foto se guardó por 3 semanas y ya se eliminó automáticamente">📷 expiró</span>' : "")) + '</td></tr>').join("") + '</tbody></table>';
-  box.querySelectorAll(".photolink").forEach(a => a.onclick = ev => { ev.preventDefault(); ev.stopPropagation(); window.open(a.dataset.src, "_blank"); });
+  box.querySelectorAll(".photolink").forEach(a => a.onclick = ev => { ev.preventDefault(); ev.stopPropagation(); openPhotoLightbox(a.dataset.src); });
   box.querySelectorAll("tr[data-id]").forEach(tr => tr.onclick = () => openEditFromId(tr.dataset.id, repRows));
 }
 function renderReportChart(){
@@ -923,6 +954,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("rev_save").onclick = saveReview;
   document.getElementById("rev_delete").onclick = deleteEntry;
   document.getElementById("rev_cancel").onclick = closeReview;
+  document.getElementById("photoScrim_close").onclick = closePhotoLightbox;
   document.getElementById("crop_rotate").onclick = rotateCropWork;
   document.getElementById("crop_confirm").onclick = confirmCrop;
   document.getElementById("crop_cancel").onclick = cancelCrop;
