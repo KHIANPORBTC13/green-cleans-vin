@@ -29,6 +29,7 @@ nav.tabs button.active{color:var(--mint);background:rgba(0,208,132,.09)}
 h3{font-size:14px;margin:18px 0 8px;display:flex;align-items:center;gap:8px}
 .badge{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--mint)}
 .qbadge{display:inline-block;background:rgba(255,176,32,.14);color:var(--amber);border:1px solid rgba(255,176,32,.3);border-radius:999px;padding:3px 10px;font-size:11.5px;margin:4px 0}
+.qbadge[hidden]{display:none}
 .vrow{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px}
 .vrow.pending{border-style:dashed;opacity:.8}
 .vrow-vin{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:18px;font-weight:800;letter-spacing:1px;background:var(--panel2);border-radius:8px;padding:6px 10px;min-width:76px;text-align:center}
@@ -180,14 +181,28 @@ function extractVinFromText(text){
     const tail = line.slice(vinIdx + 3) + " " + (lines[li + 1] || "");
     (tail.match(/[A-Z0-9]+/g) || []).forEach(t => anchored.push(t));
   });
-  const all = upper.match(/[A-Z0-9]+/g) || [];
-  const seen = new Set();
-  const ordered = [...anchored, ...all].filter(t => { if (seen.has(t)) return false; seen.add(t); return true; });
-  for (const raw of ordered) {
+  // Con ancla "VIN": se tolera una ventana deslizante (el OCR pudo pegar 1-5 caracteres extra al codigo),
+  // el contexto de la palabra "VIN" justifica esa flexibilidad.
+  for (const raw of anchored) {
     if (raw.length < 17) continue;
     const maxStart = Math.min(raw.length - 17, 5);
     for (let start = 0; start <= maxStart; start++) {
       const cleaned = cleanVinToken(raw.slice(start, start + 17));
+      if (isValidVin(cleaned)) return cleaned;
+    }
+  }
+  // Sin ancla "VIN" en el texto: exigir EXACTAMENTE 17 caracteres Y que sea (casi) todo el contenido
+  // de su linea -- una VIN grabada en vidrio se lee sola en su linea; ruido random de OCR suele traer
+  // mas texto alrededor. Tolera hasta 2 caracteres sueltos extra (una mota/mancha mal leida).
+  // Sin este filtro, CUALQUIER token de 17 caracteres "valida" tras la limpieza O/I/Q (se comprobo
+  // con una imagen ruidosa real: "6YOETOIWETN6LETIC NIA" generaba un VIN falso con apariencia valida).
+  for (const line of lines) {
+    const toks = line.match(/[A-Z0-9]+/g) || [];
+    const totalLen = toks.reduce((s, t) => s + t.length, 0);
+    for (const raw of toks) {
+      if (raw.length !== 17) continue;
+      if (totalLen - raw.length > 2) continue;
+      const cleaned = cleanVinToken(raw);
       if (isValidVin(cleaned)) return cleaned;
     }
   }
