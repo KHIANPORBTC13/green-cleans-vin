@@ -220,6 +220,17 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
     <label class="f">Tu nombre (supervisor/gerente que sube las fotos desde este teléfono)<input class="inp" id="set_supervisor" placeholder="ej. Raúl"></label>
     <button class="primary" id="set_supervisorSave" type="button">Guardar</button>
     <p class="hint" style="margin-top:18px">Los registros se sincronizan automáticamente entre los teléfonos del equipo. Si no hay señal, se guardan en el teléfono y se suben solos apenas vuelva la conexión.</p>
+
+    <h3 style="margin:26px 0 6px">Espacio y limpieza</h3>
+    <p class="hint">Las fotos son el respaldo de que el auto se hizo, pero ocupan casi todo el espacio. Se borran solas pasados los días que elijas; el registro (chasis, fecha y quién lo hizo) se conserva siempre.</p>
+    <div id="esp_datos" class="hint" style="margin:10px 0">Cargando…</div>
+    <label class="f">Guardar las fotos durante
+      <select class="inp" id="esp_dias"></select>
+    </label>
+    <button class="primary" id="esp_guardar" type="button">Guardar</button>
+    <button class="ghost" id="esp_liberar" type="button" style="margin-top:8px">Liberar fotos antiguas ahora</button>
+    <button class="ghost" id="esp_borrar" type="button" style="margin-top:8px">Borrar registros de más de 60 días</button>
+    <p class="hint" style="margin-top:8px">Borrar registros es definitivo y sólo alcanza a lo de hace más de dos meses.</p>
   </section>
 </main>
 
@@ -228,6 +239,18 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
   <button data-tab="reportes" type="button"><svg class="ic gcico" viewBox="0 0 24 24"><use href="#ico-report"/></svg>Reportes</button>
   <button data-tab="ajustes" type="button"><svg class="ic gcico" viewBox="0 0 24 24"><use href="#ico-settings"/></svg>Ajustes</button>
 </nav>
+
+<!-- Ventana de alerta propia y no el confirm del navegador: el aviso de VIN
+     repetido tiene que decir cuando y quien lo registro, y el confirm solo
+     admite una linea de texto plano. -->
+<div class="scrim" id="askScrim">
+  <div class="sheet">
+    <h3 id="ask_title">Aviso</h3>
+    <p class="hint" id="ask_text" style="font-size:15px;line-height:1.5"></p>
+    <button class="primary" id="ask_ok" type="button">Continuar</button>
+    <button class="ghost" id="ask_cancel" type="button" style="margin-top:8px">Cancelar</button>
+  </div>
+</div>
 
 <div class="scrim" id="reviewScrim">
   <div class="sheet">
@@ -785,6 +808,46 @@ function refreshOpenTabs(){
   loadToday();
   if (!document.getElementById("tab-reportes").hidden) loadReport();
 }
+/* Pregunta y espera. Devuelve true si la persona decide seguir. */
+function preguntar(titulo, texto, textoOk){
+  return new Promise(resolve => {
+    const scrim = document.getElementById("askScrim");
+    document.getElementById("ask_title").textContent = titulo;
+    document.getElementById("ask_text").textContent = texto;
+    const ok = document.getElementById("ask_ok");
+    const no = document.getElementById("ask_cancel");
+    ok.textContent = textoOk || "Continuar";
+    const cerrar = valor => { scrim.classList.remove("open"); ok.onclick = null; no.onclick = null; resolve(valor); };
+    ok.onclick = () => cerrar(true);
+    no.onclick = () => cerrar(false);
+    scrim.classList.add("open");
+  });
+}
+
+/* Avisa si ese chasis ya se registro, sin impedirlo: un auto puede volver de
+   verdad. En los quince registros de prueba habia dos duplicados exactos del
+   mismo minuto —un doble toque en el boton—, y al dueño le pagan por auto
+   terminado, asi que un duplicado es una factura de mas.
+   Si la comprobacion falla por falta de señal no se bloquea el guardado:
+   quedarse sin registrar el auto es peor que registrarlo dos veces. */
+async function avisarSiRepetido(vinFull, vin6, excluir){
+  let previo = null;
+  try {
+    const r = await rpc("vin_log_repetidos", { p_vin_full: vinFull, p_vin6: vin6, p_excluir: excluir || null });
+    previo = Array.isArray(r) ? r[0] : r;
+  } catch (e) { return true; }
+  if (!previo || !previo.veces) return true;
+  const cuando = previo.ultima
+    ? new Date(previo.ultima).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+    : "antes";
+  const quien = previo.quien ? " por " + previo.quien : "";
+  return preguntar(
+    "Este auto ya estaba registrado",
+    "Ese chasis ya se registró " + (previo.veces > 1 ? previo.veces + " veces, la última " : "") +
+    "el " + cuando + quien + ". Si el auto ha vuelto, regístralo igual. Si es por error, cancela.",
+    "Registrarlo igual");
+}
+
 async function saveReview(){
   const worker = document.getElementById("rev_worker").value.trim();
   const supervisor = document.getElementById("rev_supervisor").value.trim();
@@ -810,6 +873,9 @@ async function saveReview(){
     } catch (e) { toast("⚠︎ No se pudo actualizar. Revisa tu conexión e intenta de nuevo."); }
     finally { btn.disabled = false; btn.textContent = "Guardar"; }
     return;
+  }
+  if (!(await avisarSiRepetido(fields.p_vin_full, fields.p_vin6, null))) {
+    btn.disabled = false; btn.textContent = "Guardar"; return;
   }
   const photo = pendingReview ? pendingReview.photo : null;
   const params = { ...fields, p_client_at: clientAt, p_photo_data: photo };
@@ -981,6 +1047,33 @@ function showTab(name){
   document.querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
   if (name === "reportes") loadReport();
   if (name === "registrar") loadToday();
+  if (name === "ajustes") loadEspacio();
+}
+
+/* Cuanto ocupa y que se puede soltar. Se piden los numeros a la base en vez
+   de calcularlos aqui porque las fotos viven alli: la aplicacion no sabe
+   cuanto pesan las que subieron los demas telefonos. */
+async function loadEspacio(){
+  const caja = document.getElementById("esp_datos");
+  const sel = document.getElementById("esp_dias");
+  try {
+    const r = await rpc("vin_log_espacio", {});
+    const e = Array.isArray(r) ? r[0] : r;
+    if (!e) { caja.textContent = "Sin datos todavía."; return; }
+    if (!sel.options.length) {
+      for (let d = 15; d <= 25; d++) {
+        const o = document.createElement("option");
+        o.value = String(d); o.textContent = d + " días"; sel.appendChild(o);
+      }
+    }
+    sel.value = String(e.dias_foto);
+    caja.innerHTML = "<b>" + e.registros + "</b> registros · <b>" + e.con_foto + "</b> con foto · <b>" +
+      e.mb_fotos + " MB</b> de fotos" +
+      (e.fotos_liberables > 0 ? "<br><b>" + e.fotos_liberables + "</b> fotos ya se pueden liberar" : "") +
+      (e.registros_antiguos > 0 ? "<br><b>" + e.registros_antiguos + "</b> registros de más de 60 días" : "");
+    document.getElementById("esp_liberar").disabled = !e.fotos_liberables;
+    document.getElementById("esp_borrar").disabled = !e.registros_antiguos;
+  } catch (err) { caja.textContent = "No se pudo consultar el espacio. Revisa la conexión."; }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -998,6 +1091,30 @@ document.addEventListener("DOMContentLoaded", () => {
   wireCropCanvas();
   document.getElementById("set_supervisor").value = getSupervisorName();
   document.getElementById("set_supervisorSave").onclick = () => { setSupervisorName(document.getElementById("set_supervisor").value.trim()); toast("✓ Guardado"); };
+  document.getElementById("esp_guardar").onclick = async () => {
+    try {
+      await rpc("vin_log_config_set", { p_dias_foto: Number(document.getElementById("esp_dias").value) });
+      toast("✓ Guardado"); loadEspacio();
+    } catch (e) { toast("⚠︎ No se pudo guardar"); }
+  };
+  document.getElementById("esp_liberar").onclick = async () => {
+    const dias = Number(document.getElementById("esp_dias").value);
+    if (!(await preguntar("Liberar fotos", "Se borrarán las fotos de más de " + dias +
+      " días. Los registros se conservan: sólo se sueltan las imágenes.", "Liberar"))) return;
+    try {
+      const n = await rpc("vin_log_liberar_fotos", { p_dias: dias });
+      toast("✓ " + n + " fotos liberadas"); loadEspacio();
+    } catch (e) { toast("⚠︎ No se pudo liberar"); }
+  };
+  document.getElementById("esp_borrar").onclick = async () => {
+    if (!(await preguntar("Borrar registros antiguos",
+      "Se borrarán definitivamente los registros de más de 60 días. Esto no se puede deshacer.",
+      "Borrar"))) return;
+    try {
+      const n = await rpc("vin_log_borrar_antiguos", { p_dias: 60 });
+      toast("✓ " + n + " registros borrados"); loadEspacio();
+    } catch (e) { toast("⚠︎ No se pudo borrar"); }
+  };
   document.querySelectorAll("#rep_periodChips .seg").forEach(ch => ch.onclick = () => {
     document.querySelectorAll("#rep_periodChips .seg").forEach(c => c.classList.remove("on"));
     ch.classList.add("on"); repPeriod = ch.dataset.period; repAnchor = new Date(); loadReport();
