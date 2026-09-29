@@ -216,6 +216,11 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
     <button class="secondary" id="rep_export" type="button"><svg class="icobtn gcico" viewBox="0 0 24 24"><use href="#ico-export"/></svg>Exportar CSV</button>
   </section>
 
+  <section id="tab-pendientes" hidden>
+    <p class="hint">Autos guardados cuyo chasis todavía no está confirmado. Se puede resolver desde aquí o desde el ordenador, el que pille antes.</p>
+    <div id="pend_lista"></div>
+  </section>
+
   <section id="tab-ajustes" hidden>
     <label class="f">Tu nombre (supervisor/gerente que sube las fotos desde este teléfono)<input class="inp" id="set_supervisor" placeholder="ej. Raúl"></label>
     <button class="primary" id="set_supervisorSave" type="button">Guardar</button>
@@ -236,6 +241,7 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 
 <nav class="tabs">
   <button data-tab="registrar" class="active" type="button"><svg class="ic gcico" viewBox="0 0 24 24"><use href="#ico-camera"/></svg>Registrar</button>
+  <button data-tab="pendientes" type="button"><svg class="ic gcico" viewBox="0 0 24 24"><use href="#ico-check"/></svg>Por confirmar<span id="pendBadge" class="badge" hidden></span></button>
   <button data-tab="reportes" type="button"><svg class="ic gcico" viewBox="0 0 24 24"><use href="#ico-report"/></svg>Reportes</button>
   <button data-tab="ajustes" type="button"><svg class="ic gcico" viewBox="0 0 24 24"><use href="#ico-settings"/></svg>Ajustes</button>
 </nav>
@@ -243,6 +249,36 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 <!-- Ventana de alerta propia y no el confirm del navegador: el aviso de VIN
      repetido tiene que decir cuando y quien lo registro, y el confirm solo
      admite una linea de texto plano. -->
+<!-- El vistazo antes de guardar: repetir la foto sale gratis aqui y es
+     imposible cuando el auto ya se fue. -->
+<div class="scrim" id="capScrim">
+  <div class="sheet">
+    <h3>¿Se lee la placa?</h3>
+    <img id="cap_foto" style="width:100%;border-radius:10px;margin-bottom:10px">
+    <label class="f">Trabajador<input class="inp" id="cap_worker" placeholder="ej. Dani"></label>
+    <label class="f">Supervisor<input class="inp" id="cap_supervisor" placeholder="ej. Raúl"></label>
+    <button class="primary" id="cap_save" type="button">Guardar y seguir</button>
+    <button class="ghost" id="cap_retry" type="button" style="margin-top:8px">Repetir la foto</button>
+    <button class="ghost" id="cap_cancel" type="button" style="margin-top:8px">Cancelar</button>
+    <p class="hint" style="margin-top:10px">Se guarda con la foto. El chasis lo lee el sistema después y, si no puede, queda en «Por confirmar».</p>
+  </div>
+</div>
+
+<!-- Confirmar un registro de la bandeja. La foto grande manda: si el lector
+     se equivoco, se corrige leyendo de la propia foto. -->
+<div class="scrim" id="confScrim">
+  <div class="sheet">
+    <h3>Confirmar el chasis</h3>
+    <img id="conf_foto" style="width:100%;border-radius:10px;margin-bottom:10px" hidden>
+    <div id="conf_estado" class="hint" style="margin-bottom:8px"></div>
+    <label class="f">VIN completo<input class="inp" id="conf_vinFull" autocapitalize="characters" maxlength="17"></label>
+    <label class="f">Últimos 6 dígitos<input class="inp" id="conf_vin6" autocapitalize="characters" maxlength="8"></label>
+    <button class="primary" id="conf_ok" type="button">Correcto, confirmar</button>
+    <button class="ghost" id="conf_recortar" type="button" style="margin-top:8px">Recortar y volver a leer</button>
+    <button class="ghost" id="conf_cerrar" type="button" style="margin-top:8px">Cerrar</button>
+  </div>
+</div>
+
 <div class="scrim" id="askScrim">
   <div class="sheet">
     <h3 id="ask_title">Aviso</h3>
@@ -319,6 +355,28 @@ async function rpc(fn, body){
 /* ===================== Extraccion de VIN ===================== */
 const VIN_CONFUSIONS = { I: "1", O: "0", Q: "0" };
 function cleanVinToken(tok){ return tok.toUpperCase().split("").map(c => VIN_CONFUSIONS[c] || c).join(""); }
+/* Los tres primeros caracteres dicen el fabricante. No hace falta la lista
+   mundial entera: con la primera letra —la region— y los prefijos que de
+   verdad circulan en Australia se descarta la basura, que es de lo que se
+   trata. El unico control que habia era "17 caracteres", y por eso paso por
+   bueno TU12WMRHRW2850KP0, que no es de ningun fabricante. */
+const VIN_REGIONES = "123458JKLMNPRSVWXYZ6";
+const VIN_ANIOS = "ABCDEFGHJKLMNPRSTVWXY123456789";
+/* Semaforo: verde es "fiate", ambar "echale un ojo", rojo "eso no es un VIN".
+   Asi la bandeja solo pide atencion para los que la necesitan. */
+function vinSemaforo(v){
+  if (!v || !isValidVin(v)) return "rojo";
+  if (VIN_REGIONES.indexOf(v[0]) < 0) return "rojo";
+  if (VIN_ANIOS.indexOf(v[9]) < 0) return "ambar";
+  /* La norma recomienda que los cuatro ultimos sean numeros, y casi todos los
+     fabricantes la siguen. No es ley, asi que no pinta rojo: baja a ambar.
+     Es lo que delata lecturas como TU12WMRHRW2850KP0 o F1TNAZEE303155L0A,
+     que tienen sus 17 caracteres y no son ningun auto. */
+  if (!/^[0-9]{4}$/.test(v.slice(-4))) return "ambar";
+  // El digito verificador solo es obligatorio en Norteamerica (region 1 a 5).
+  if ("12345".indexOf(v[0]) >= 0) return vinChecksumOk(v) ? "verde" : "ambar";
+  return "verde";
+}
 function isValidVin(v){ return /^[A-HJ-NPR-Z0-9]{17}$/.test(v); }
 // El usuario SIEMPRE recorta la foto a mano justo sobre el codigo VIN antes de leerlo, asi que la
 // palabra "VIN" cerca del codigo ya NO es un requisito -- muchas placas (ej. VW, o vidrio grabado)
@@ -560,16 +618,79 @@ setInterval(flushQueue, 45000);
 
 /* ===================== Captura -> editor de recorte/rotacion ===================== */
 let pendingReview = null, editingId = null;
+/* La foto es el respaldo, asi que se guarda primero y el chasis se completa
+   despues. Antes eran seis pasos de pie al lado del auto —foto, recortar a
+   mano, esperar al lector, revisar siete campos, guardar— y por eso 4 de los
+   15 registros de prueba se guardaron sin chasis ninguno.
+
+   Ahora: foto, un vistazo para poder repetirla si salio mal, guardar, y la
+   camara se vuelve a abrir para el siguiente. El lector trabaja despues por
+   su cuenta y lo que no consiga cae en la bandeja. */
+let capFoto = null;
+let ocrDestino = "review";
 function handleFile(file){
   if (!file) return;
   const fr = new FileReader();
   fr.onload = () => {
     const im = new Image();
-    im.onload = () => openCropEditor(im);
+    im.onload = () => abrirVistazo(im);
     im.onerror = () => toast("⚠︎ No se pudo abrir la imagen.");
     im.src = fr.result;
   };
   fr.readAsDataURL(file);
+}
+
+function abrirVistazo(img){
+  const lienzo = bakeToCanvas(img);
+  capFoto = { canvas: lienzo, dataUrl: lienzo.toDataURL("image/jpeg", 0.82) };
+  document.getElementById("cap_foto").src = capFoto.dataUrl;
+  document.getElementById("cap_worker").value = getLastWorkerName() || "";
+  document.getElementById("cap_supervisor").value = getSupervisorName() || "";
+  document.getElementById("capScrim").classList.add("open");
+}
+function cerrarVistazo(){ document.getElementById("capScrim").classList.remove("open"); capFoto = null; }
+
+async function guardarRapido(seguir){
+  if (!capFoto) return;
+  const worker = document.getElementById("cap_worker").value.trim();
+  const supervisor = document.getElementById("cap_supervisor").value.trim();
+  if (!worker) { toast("⚠︎ Falta el nombre del trabajador"); return; }
+  if (!supervisor) { toast("⚠︎ Falta el nombre del supervisor"); return; }
+  setLastWorkerName(worker); setSupervisorName(supervisor);
+  const lienzo = capFoto.canvas;
+  const params = {
+    p_vin_full: null, p_vin6: null, p_make: null, p_model: null, p_color: null,
+    p_worker_name: worker, p_supervisor_name: supervisor,
+    p_client_at: new Date().toISOString(), p_photo_data: capFoto.dataUrl,
+  };
+  const btn = document.getElementById("cap_save"); btn.disabled = true; btn.textContent = "Guardando…";
+  try {
+    const r = await rpc("vin_log_insert", params);
+    const id = Array.isArray(r) ? (r[0] && (r[0].id || r[0])) : (r && (r.id || r));
+    toast("✓ Guardado — el lector sigue por su cuenta");
+    cerrarVistazo(); loadToday(); renderPendientesBadge();
+    if (id) leerEnSegundoPlano(id, lienzo);
+  } catch (e) {
+    /* Sin señal se encola igual: la foto es lo que no se puede perder. */
+    queueOffline(params); toast("📶 Sin conexión — guardado en el teléfono"); cerrarVistazo(); renderQueueBadge();
+  } finally {
+    btn.disabled = false; btn.textContent = "Guardar y seguir";
+    if (seguir) document.getElementById("camInput").click();
+  }
+}
+
+/* El lector, ya sin nadie esperando delante. Intenta leer la foto entera sin
+   pedir recorte; si no saca nada, el registro queda en rojo y alguien lo
+   resuelve en la bandeja recortando a mano. */
+async function leerEnSegundoPlano(id, lienzo){
+  try {
+    const leido = await leerVinDeLienzo(lienzo);
+    const estado = leido ? vinSemaforo(leido) : "rojo";
+    await rpc("vin_log_set_lectura", {
+      p_id: id, p_vin_full: leido || null,
+      p_vin6: leido ? vin6of(leido) : null, p_estado: estado });
+    renderPendientesBadge();
+  } catch (e) { /* si falla, se queda por confirmar, que es lo correcto */ }
 }
 
 let cropBase = null, cropWork = null, cropFineDeg = 0;
@@ -724,6 +845,35 @@ const TESS_BASE_PARAMS = {
   load_number_dawg: "0", load_unambig_dawg: "0", load_bigram_dawg_file: "0",
   preserve_interword_spaces: "0",
 };
+/* El lector, aislado de la pantalla. Antes vivia dentro de runOcr y sólo
+   sabia terminar abriendo la ficha de revision; ahora tambien lo usa el
+   guardado rapido, que corre sin nadie mirando. */
+async function leerVinDeLienzo(lienzo){
+  await ensureTesseract();
+  const variants = buildOcrVariants(lienzo);
+  const worker = await Tesseract.createWorker("eng");
+  let best = null, lastRawText = "";
+  try {
+    const attempts = [];
+    variants.forEach((cv, vi) => { ["7", "8"].forEach(psm => attempts.push({ cv, vi, psm })); });
+    attempts.push({ cv: variants[0], vi: 0, psm: "6" });
+    attempts.push({ cv: variants[0], vi: 0, psm: "11" });
+    for (const at of attempts) {
+      await worker.setParameters({ ...TESS_BASE_PARAMS, tessedit_pageseg_mode: at.psm });
+      const { data } = await worker.recognize(at.cv);
+      if (data.text) lastRawText = data.text;
+      const candidate = extractVinFromText(data.text || "");
+      if (candidate) {
+        const checksum = vinChecksumOk(candidate);
+        const score = (checksum ? 1000 : 0) + (data.confidence || 0);
+        if (!best || score > best.score) best = { vin: candidate, confidence: data.confidence || 0, checksum, score };
+        if (checksum) break;
+      }
+    }
+  } finally { await worker.terminate(); }
+  return { vin: best ? best.vin : null, raw: lastRawText, checksum: best ? best.checksum : false, confidence: best ? best.confidence : 0 };
+}
+
 async function runOcr(cropCanvas){
   const statusEl = document.getElementById("ocrStatus");
   const storeDataUrl = cropCanvas.toDataURL("image/jpeg", 0.92);
@@ -752,6 +902,15 @@ async function runOcr(cropCanvas){
       }
     } finally { await worker.terminate(); }
     statusEl.textContent = "";
+    if (ocrDestino === "confirmacion") {
+      ocrDestino = "review";
+      const v = best ? best.vin : "";
+      document.getElementById("conf_vinFull").value = v || "";
+      document.getElementById("conf_vin6").value = v ? vin6of(v) : "";
+      document.getElementById("conf_estado").textContent = v ? (SEMAFORO[vinSemaforo(v)] || "") : "🔴 Tampoco se pudo leer así";
+      document.getElementById("confScrim").classList.add("open");
+      return;
+    }
     const vinFull = best ? best.vin : null;
     const guess = guessMakeModel(lastRawText);
     const vin6 = vinFull ? vin6of(vinFull) : bestGuessVin6(lastRawText);
@@ -1043,16 +1202,67 @@ function exportReportCSV(){
 
 /* ===================== Navegacion ===================== */
 function showTab(name){
-  ["registrar", "reportes", "ajustes"].forEach(t => { document.getElementById("tab-" + t).hidden = t !== name; });
+  ["registrar", "pendientes", "reportes", "ajustes"].forEach(t => { document.getElementById("tab-" + t).hidden = t !== name; });
   document.querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
   if (name === "reportes") loadReport();
   if (name === "registrar") loadToday();
   if (name === "ajustes") loadEspacio();
+  if (name === "pendientes") loadPendientes();
 }
 
 /* Cuanto ocupa y que se puede soltar. Se piden los numeros a la base en vez
    de calcularlos aqui porque las fotos viven alli: la aplicacion no sabe
    cuanto pesan las que subieron los demas telefonos. */
+/* La bandeja. El semaforo es lo que la hace util: si todo pidiera atencion
+   por igual, revisar quince seria tan pesado como antes. */
+const SEMAFORO = { verde: "🟢 Parece correcto", ambar: "🟡 Revísalo", rojo: "🔴 No se pudo leer" };
+let pendientes = [];
+async function loadPendientes(){
+  const caja = document.getElementById("pend_lista");
+  caja.innerHTML = "<p class='hint'>Cargando…</p>";
+  try {
+    const r = await rpc("vin_log_pendientes", {});
+    pendientes = Array.isArray(r) ? r : [];
+    if (!pendientes.length) { caja.innerHTML = "<p class='hint'>Nada pendiente. Todos los autos tienen su chasis confirmado.</p>"; renderPendientesBadge(); return; }
+    caja.innerHTML = pendientes.map(e => {
+      const cuando = new Date(e.client_at).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+      const sem = SEMAFORO[e.vin_estado] || "⚪️ Sin leer todavía";
+      return "<div class='row' data-id='" + e.id + "' style='padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer'>" +
+        "<div><b>" + esc(e.vin_full || e.vin6 || "sin chasis") + "</b><br>" +
+        "<span class='hint'>" + sem + " · " + cuando + " · " + esc(e.worker_name || "") + "</span></div></div>";
+    }).join("");
+    caja.querySelectorAll("[data-id]").forEach(el => el.onclick = () => abrirConfirmacion(el.dataset.id));
+    renderPendientesBadge();
+  } catch (e) { caja.innerHTML = "<p class='hint'>No se pudo cargar. Revisa la conexión.</p>"; }
+}
+
+async function renderPendientesBadge(){
+  try {
+    const r = await rpc("vin_log_pendientes", {});
+    const n = Array.isArray(r) ? r.length : 0;
+    const b = document.getElementById("pendBadge");
+    b.textContent = String(n); b.hidden = n === 0;
+  } catch (e) {}
+}
+
+let confId = null, confLienzo = null;
+async function abrirConfirmacion(id){
+  const e = pendientes.find(x => x.id === id); if (!e) return;
+  confId = id; confLienzo = null;
+  document.getElementById("conf_vinFull").value = e.vin_full || "";
+  document.getElementById("conf_vin6").value = e.vin6 || "";
+  document.getElementById("conf_estado").textContent = SEMAFORO[e.vin_estado] || "⚪️ El lector no llegó a leerla";
+  const img = document.getElementById("conf_foto"); img.hidden = true; img.src = "";
+  document.getElementById("confScrim").classList.add("open");
+  if (e.tiene_foto) {
+    try {
+      const foto = await rpc("vin_log_foto", { p_id: id });
+      if (foto) { img.src = foto; img.hidden = false; }
+    } catch (err) {}
+  }
+}
+function cerrarConfirmacion(){ document.getElementById("confScrim").classList.remove("open"); confId = null; }
+
 async function loadEspacio(){
   const caja = document.getElementById("esp_datos");
   const sel = document.getElementById("esp_dias");
@@ -1091,6 +1301,28 @@ document.addEventListener("DOMContentLoaded", () => {
   wireCropCanvas();
   document.getElementById("set_supervisor").value = getSupervisorName();
   document.getElementById("set_supervisorSave").onclick = () => { setSupervisorName(document.getElementById("set_supervisor").value.trim()); toast("✓ Guardado"); };
+  document.getElementById("cap_save").onclick = () => guardarRapido(true);
+  document.getElementById("cap_retry").onclick = () => { cerrarVistazo(); document.getElementById("camInput").click(); };
+  document.getElementById("cap_cancel").onclick = () => cerrarVistazo();
+  document.getElementById("conf_cerrar").onclick = () => cerrarConfirmacion();
+  document.getElementById("conf_ok").onclick = async () => {
+    const vinFull = document.getElementById("conf_vinFull").value.trim().toUpperCase();
+    const vin6 = document.getElementById("conf_vin6").value.trim().toUpperCase();
+    if (vinFull && !(await avisarSiRepetido(vinFull, vin6, confId))) return;
+    try {
+      await rpc("vin_log_confirmar", { p_id: confId, p_vin_full: vinFull || null, p_vin6: vin6 || null });
+      toast("✓ Confirmado"); cerrarConfirmacion(); loadPendientes(); loadToday();
+    } catch (e) { toast("⚠︎ No se pudo confirmar"); }
+  };
+  /* Volver a leer recortando a mano: el camino lento, para cuando la lectura
+     automatica de la foto entera no dio con la placa. */
+  document.getElementById("conf_recortar").onclick = () => {
+    const src = document.getElementById("conf_foto").src;
+    if (!src) { toast("⚠︎ Este registro ya no tiene foto"); return; }
+    const im = new Image();
+    im.onload = () => { ocrDestino = "confirmacion"; document.getElementById("confScrim").classList.remove("open"); openCropEditor(im); };
+    im.src = src;
+  };
   document.getElementById("esp_guardar").onclick = async () => {
     try {
       await rpc("vin_log_config_set", { p_dias_foto: Number(document.getElementById("esp_dias").value) });
