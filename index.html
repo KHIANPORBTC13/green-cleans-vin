@@ -150,6 +150,23 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 .crop-stage{display:flex;justify-content:center;background:#000;border-radius:12px;overflow:hidden;margin:10px 0}
 #crop_canvas{touch-action:none;display:block;max-width:100%}
 .crop-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
+/* Las recomendaciones a la vista y no en una linea de letra pequeña: son la
+   diferencia entre que el lector acierte y que no, y hasta ahora solo se
+   mencionaba lo de rotar, de pasada. */
+.consejos{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:2px 0 10px}
+.consejos summary{font-size:12.5px;font-weight:700;color:var(--text);cursor:pointer;list-style:none}
+.consejos summary::-webkit-details-marker{display:none}
+.consejos summary::after{content:" ▾";color:var(--muted)}
+.consejos[open] summary::after{content:" ▴"}
+.consejos[open] summary{margin-bottom:8px}
+.consejos div{font-size:12.5px;color:var(--muted);line-height:1.45}
+.consejos div+div{margin-top:7px}
+.consejos b{color:var(--text)}
+.crop-footer{position:sticky;bottom:0;z-index:4;background:var(--panel);
+  margin:0 -18px calc(-18px - env(safe-area-inset-bottom));
+  padding:10px 18px calc(14px + env(safe-area-inset-bottom));
+  box-shadow:0 -10px 14px -12px #000}
+.avisoVertical{background:#3a2d12;border:1px solid #6b5420;color:#ffd79a;border-radius:10px;padding:10px 12px;font-size:12.5px;margin-bottom:10px}
 .crop-actions button{margin-top:0}
 @media(min-width:1080px){
   header{display:none}
@@ -378,16 +395,33 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 <div class="scrim" id="cropScrim">
   <div class="sheet crop-sheet">
     <h3>Encuadra el VIN</h3>
-    <p class="hint">Arrastra el recuadro sobre el código VIN. Usa <svg class="badgeic gcico" viewBox="0 0 24 24"><use href="#ico-rotate"/></svg>Rotar si la foto quedó de costado.</p>
+    <!-- El aviso arriba porque cambia lo que hay que hacer ahora mismo; la
+         foto justo despues, que es donde se trabaja; y los consejos debajo y
+         plegables, para que no le quiten sitio a la foto en una pantalla
+         pequeña. Empiezan abiertos: quien ya se los sabe los cierra y se
+         quedan cerrados. -->
+    <div id="crop_vertical" class="avisoVertical" hidden>Esta foto está vertical. Pulsa <b>Rotar</b> antes de encuadrar.</div>
     <div class="crop-stage"><canvas id="crop_canvas"></canvas></div>
-    <label class="f" style="margin-top:2px">Enderezar (si la placa está en diagonal) <span id="crop_fineLabel">0°</span>
-      <input type="range" id="crop_fineRotate" min="-45" max="45" step="1" value="0" style="width:100%">
-    </label>
-    <div class="crop-actions">
-      <button class="secondary" id="crop_rotate" type="button"><svg class="icobtn gcico" viewBox="0 0 24 24"><use href="#ico-rotate"/></svg>Rotar</button>
-      <button class="primary" id="crop_confirm" type="button"><svg class="icobtn gcico" viewBox="0 0 24 24"><use href="#ico-check"/></svg>Listo</button>
+    <details class="consejos" id="crop_consejos" open>
+      <summary>Cómo hacerlo para que el lector acierte</summary>
+      <div><b>1.</b> La foto tiene que quedar <b>en horizontal</b>, con el código de izquierda a derecha. Si no lo está, pulsa <b>Rotar</b>.</div>
+      <div><b>2.</b> Si la placa sale inclinada, usa <b>Enderezar</b> hasta que el código quede recto.</div>
+      <div><b>3.</b> El recuadro debe encerrar <b>sólo el VIN</b>. Si entran otras líneas —el motor, el modelo— el lector las mezcla y falla.</div>
+    </details>
+    <!-- Enderezar y los botones anclados abajo: con una foto vertical en un
+         telefono pequeño el contenido pasa del alto de la pantalla y quedaban
+         debajo del borde. El cliente lo leyo como que enderezar estaba
+         desactivado con las fotos verticales; nunca lo estuvo. -->
+    <div class="crop-footer">
+      <label class="f" style="margin:0 0 6px">Enderezar (si la placa está en diagonal) <span id="crop_fineLabel">0°</span>
+        <input type="range" id="crop_fineRotate" min="-45" max="45" step="1" value="0" style="width:100%">
+      </label>
+      <div class="crop-actions">
+        <button class="secondary" id="crop_rotate" type="button"><svg class="icobtn gcico" viewBox="0 0 24 24"><use href="#ico-rotate"/></svg>Rotar</button>
+        <button class="primary" id="crop_confirm" type="button"><svg class="icobtn gcico" viewBox="0 0 24 24"><use href="#ico-check"/></svg>Listo</button>
+      </div>
+      <button class="secondary" id="crop_cancel" type="button">Cancelar</button>
     </div>
-    <button class="secondary" id="crop_cancel" type="button">Cancelar</button>
   </div>
 </div>
 
@@ -864,10 +898,20 @@ function openCropEditor(img){
   document.getElementById("cropScrim").classList.add("open");
 }
 function resetCropView(){
+  const aviso = document.getElementById("crop_vertical");
+  if (aviso && cropWork) aviso.hidden = cropWork.height <= cropWork.width;
   const stage = document.querySelector(".crop-stage");
   const maxDispW = Math.min((stage && stage.clientWidth) || 360, 480);
+  /* Tambien por alto, no solo por ancho.
+
+     La escala se sacaba unicamente del ancho, asi que una foto vertical
+     producia un lienzo altisimo y empujaba el control de enderezar y los
+     botones por debajo del borde de la pantalla. El cliente lo describio como
+     que "enderezar solo esta habilitado con la foto en horizontal": nunca
+     estuvo desactivado, es que no se veia. */
+  const maxDispH = Math.max(160, Math.min(Math.round(window.innerHeight * 0.42), 420));
   const prevDispW = cropDispW, prevDispH = cropDispH, prevRect = cropRect;
-  cropScale = Math.min(1, maxDispW / cropWork.width);
+  cropScale = Math.min(1, maxDispW / cropWork.width, maxDispH / cropWork.height);
   cropDispW = Math.round(cropWork.width * cropScale);
   cropDispH = Math.round(cropWork.height * cropScale);
   const cv = document.getElementById("crop_canvas");
@@ -1451,6 +1495,14 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("crop_rotate").onclick = rotateCropWork;
   document.getElementById("crop_confirm").onclick = confirmCrop;
   document.getElementById("crop_cancel").onclick = cancelCrop;
+  const det = document.getElementById("crop_consejos");
+  try { if (localStorage.getItem("gc_consejos_cerrados") === "1") det.open = false; } catch (e) {}
+  det.addEventListener("toggle", () => {
+    try { localStorage.setItem("gc_consejos_cerrados", det.open ? "0" : "1"); } catch (e) {}
+    /* Al plegarlos cambia el alto disponible, asi que se recalcula el lienzo
+       para que la foto aproveche el sitio que acaba de quedar libre. */
+    if (cropWork) resetCropView();
+  });
   document.getElementById("crop_fineRotate").addEventListener("input", e => applyFineRotation(Number(e.target.value)));
   wireCropCanvas();
   document.getElementById("set_supervisor").value = getSupervisorName();
