@@ -65,6 +65,7 @@ button.danger:disabled,button.secondary:disabled,button.primary:disabled{opacity
 .espnum{font-size:20px;font-weight:800;line-height:1.1}
 .esplbl{font-size:11px;color:var(--muted);margin-top:3px}
 .sep{border:none;border-top:1px solid var(--line);margin:18px 0 14px}
+.blabel{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
 #rep_insightsList{list-style:none;margin:0;padding:0}
 #rep_insightsList li{position:relative;padding:9px 0 9px 20px;font-size:13.5px;color:var(--text);border-bottom:1px solid var(--line)}
 #rep_insightsList li:last-child{border-bottom:none;padding-bottom:0}
@@ -280,15 +281,25 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
         <div><div class="espnum" id="esp_mb">—</div><div class="esplbl">MB en fotos</div></div>
       </div>
 
+      <div class="blabel">Borrado automático</div>
       <label class="f">Guardar las fotos durante<select class="inp" id="esp_dias"></select></label>
       <button class="primary" id="esp_guardar" type="button">Guardar el plazo</button>
+      <p class="hint" style="margin-top:10px">Cada noche se sueltan solas las fotos que pasen de ese plazo. No hay que hacer nada.</p>
 
       <hr class="sep">
 
-      <button class="secondary" id="esp_liberar" type="button">Liberar fotos antiguas</button>
+      <div class="blabel">Liberar espacio ahora</div>
+      <p class="hint" style="margin:-4px 0 10px">Para cuando hace falta sitio antes de que llegue el plazo.</p>
+      <label class="f">Soltar las fotos de más de<select class="inp" id="esp_libDias"></select></label>
+      <button class="secondary" id="esp_liberar" type="button">Liberar</button>
       <p class="hint" id="esp_liberarNota"></p>
 
-      <button class="secondary danger" id="esp_borrar" type="button" style="margin-top:14px">Borrar registros antiguos</button>
+      <hr class="sep">
+
+      <div class="blabel">Borrar registros</div>
+      <p class="hint" style="margin:-4px 0 10px">Se borra todo: chasis, fecha y quién lo hizo. No se puede deshacer.</p>
+      <label class="f">Los anteriores a<select class="inp" id="esp_borrarDias"></select></label>
+      <button class="secondary danger" id="esp_borrar" type="button">Borrar</button>
       <p class="hint" id="esp_borrarNota"></p>
     </div>
   </section>
@@ -1369,40 +1380,62 @@ async function abrirConfirmacion(id){
 }
 function cerrarConfirmacion(){ document.getElementById("confScrim").classList.remove("open"); confId = null; }
 
+function opciones(sel, valores, sufijo){
+  if (sel.options.length) return;
+  valores.forEach(v => {
+    const o = document.createElement("option");
+    o.value = String(v); o.textContent = v + " " + sufijo; sel.appendChild(o);
+  });
+}
+
 async function loadEspacio(){
   const sel = document.getElementById("esp_dias");
-  const liberar = document.getElementById("esp_liberar");
-  const borrar = document.getElementById("esp_borrar");
+  const libSel = document.getElementById("esp_libDias");
+  const borSel = document.getElementById("esp_borrarDias");
+  opciones(libSel, [7, 10, 15, 20, 30], "días");
+  opciones(borSel, [60, 90, 180, 365], "días");
   try {
     const r = await rpc("vin_log_espacio", {});
     const e = Array.isArray(r) ? r[0] : r;
     if (!e) return;
-    if (!sel.options.length) {
-      for (let d = 15; d <= 25; d++) {
-        const o = document.createElement("option");
-        o.value = String(d); o.textContent = d + " días"; sel.appendChild(o);
-      }
-    }
+    opciones(sel, [15,16,17,18,19,20,21,22,23,24,25], "días");
     sel.value = String(e.dias_foto);
     document.getElementById("esp_reg").textContent = e.registros;
     document.getElementById("esp_fotos").textContent = e.con_foto;
-    document.getElementById("esp_mb").textContent = e.mb_fotos;
-
-    /* Un boton apagado y mudo se lee como una averia: el cliente creyo que
-       borrar no funcionaba cuando lo que pasaba es que no habia nada que
-       borrar. Cada boton dice siempre en que estado esta y por que. */
-    liberar.disabled = !e.fotos_liberables;
-    document.getElementById("esp_liberarNota").textContent = e.fotos_liberables
-      ? "Hay " + e.fotos_liberables + " fotos de más de " + e.dias_foto + " días. El registro se conserva."
-      : "Nada que liberar: ninguna foto pasa todavía de " + e.dias_foto + " días.";
-
-    borrar.disabled = !e.registros_antiguos;
-    document.getElementById("esp_borrarNota").textContent = e.registros_antiguos
-      ? "Hay " + e.registros_antiguos + " registros de más de 60 días. Se borran del todo y no se puede deshacer."
-      : "Nada que borrar: no hay registros de más de 60 días. Sólo alcanza a lo de hace más de dos meses.";
+    document.getElementById("esp_mb").textContent = String(e.mb_fotos).replace(".", ",");
+    if (!libSel.value) libSel.value = "7";
+    if (!borSel.value) borSel.value = "60";
+    await refrescarLimpieza();
   } catch (err) {
     document.getElementById("esp_liberarNota").textContent = "No se pudo consultar el espacio. Revisa la conexión.";
   }
+}
+
+/* El boton dice en su propio texto lo que va a hacer y con cuanto.
+   Antes ponia "Liberar fotos antiguas" y estaba gris casi siempre, porque
+   miraba el mismo plazo que el borrado automatico —que ya las habia soltado
+   esa madrugada—, asi que la cuenta era cero todas las mañanas. */
+async function refrescarLimpieza(){
+  const dl = Number(document.getElementById("esp_libDias").value || 7);
+  const db = Number(document.getElementById("esp_borrarDias").value || 60);
+  const bLib = document.getElementById("esp_liberar");
+  const bBor = document.getElementById("esp_borrar");
+  try {
+    const r = await rpc("vin_log_cuanto", { p_dias_fotos: dl, p_dias_registros: db });
+    const c = Array.isArray(r) ? r[0] : r;
+    bLib.disabled = !c.fotos;
+    /* Coma decimal: en español 1.7 MB se lee como mil setecientos. */
+    const mb = String(c.mb).replace(".", ",");
+    bLib.textContent = c.fotos ? "Liberar " + c.fotos + " fotos · " + mb + " MB" : "Liberar";
+    document.getElementById("esp_liberarNota").textContent = c.fotos
+      ? "Se borran las imágenes; el registro de esos " + c.fotos + " autos se conserva."
+      : "Ninguna foto pasa todavía de " + dl + " días.";
+    bBor.disabled = !c.registros;
+    bBor.textContent = c.registros ? "Borrar " + c.registros + " registros" : "Borrar";
+    document.getElementById("esp_borrarNota").textContent = c.registros
+      ? "Se borran del todo y no se puede deshacer."
+      : "No hay registros anteriores a " + db + " días.";
+  } catch (e) {}
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -1497,8 +1530,10 @@ document.addEventListener("DOMContentLoaded", () => {
       toast("✓ Guardado"); loadEspacio();
     } catch (e) { toast("⚠︎ No se pudo guardar"); }
   };
+  document.getElementById("esp_libDias").onchange = refrescarLimpieza;
+  document.getElementById("esp_borrarDias").onchange = refrescarLimpieza;
   document.getElementById("esp_liberar").onclick = async () => {
-    const dias = Number(document.getElementById("esp_dias").value);
+    const dias = Number(document.getElementById("esp_libDias").value);
     if (!(await preguntar("Liberar fotos", "Se borrarán las fotos de más de " + dias +
       " días. Los registros se conservan: sólo se sueltan las imágenes.", "Liberar"))) return;
     try {
@@ -1507,11 +1542,12 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (e) { toast("⚠︎ No se pudo liberar"); }
   };
   document.getElementById("esp_borrar").onclick = async () => {
+    const db = Number(document.getElementById("esp_borrarDias").value);
     if (!(await preguntar("Borrar registros antiguos",
-      "Se borrarán definitivamente los registros de más de 60 días. Esto no se puede deshacer.",
+      "Se borrarán definitivamente los registros anteriores a " + db + " días. Esto no se puede deshacer.",
       "Borrar"))) return;
     try {
-      const n = await rpc("vin_log_borrar_antiguos", { p_dias: 60 });
+      const n = await rpc("vin_log_borrar_antiguos", { p_dias: Number(document.getElementById("esp_borrarDias").value) });
       toast("✓ " + n + " registros borrados"); loadEspacio();
     } catch (e) { toast("⚠︎ No se pudo borrar"); }
   };
