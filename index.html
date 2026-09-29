@@ -452,8 +452,22 @@ function vin6of(v){ return v ? v.slice(-6) : ""; }
 // mejor lectura cruda disponible -- para ganar tiempo, el usuario corrige en vez de tipear desde
 // cero. Se toma el token alfanumerico mas largo leido (lo mas probable es que sea el codigo VIN,
 // aunque este mal leido) y sus ultimos 6 caracteres, limpiados con la misma correccion O/I/Q.
+/* Los ultimos seis del bastidor son, salvo rareza, seis numeros: la norma
+   recomienda que las cuatro ultimas posiciones sean numericas y en la
+   practica lo son mas. Antes se cogia el token mas largo tal cual y salia
+   "13H104" —con una letra en medio— cuando en el mismo texto leido estaba
+   "203135104", cuyos ultimos seis son los correctos: 135104.
+
+   Asi que primero se busca la tirada de digitos mas larga; solo si no hay
+   ninguna de seis se recurre al token mas largo. */
 function bestGuessVin6(text){
-  const tokens = String(text || "").toUpperCase().match(/[A-Z0-9]+/g) || [];
+  const limpio = String(text || "").toUpperCase();
+  const tiradas = limpio.match(/[0-9]{6,}/g) || [];
+  if (tiradas.length) {
+    const mejor = tiradas.reduce((a, b) => (b.length > a.length ? b : a), "");
+    return mejor.slice(-6);
+  }
+  const tokens = limpio.match(/[A-Z0-9]+/g) || [];
   if (!tokens.length) return "";
   const longest = tokens.reduce((a, b) => (b.length > a.length ? b : a), "");
   if (longest.length < 6) return "";
@@ -585,6 +599,51 @@ function bradleyRothBinarize(imgData, w, h, windowFrac, tPct){
   for (let i = 0; i < w * h; i++) { d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = out[i]; }
   return imgData;
 }
+/* Separar los renglones antes de leer.
+
+   Una placa nunca tiene una sola linea: encima del numero de bastidor estan
+   el motor, el modelo, la fabrica. El lector iba configurado para "una sola
+   linea de texto", asi que con dos renglones dentro del recorte los mezclaba
+   y devolvia cosas como "ENGTNE FRANFN MAE TNK43 R203135104D" — con el numero
+   correcto dentro, pero inservible.
+
+   Se mide cuanta tinta hay en cada fila de pixeles; donde hay texto la fila
+   esta oscura y entre renglones esta limpia. Eso da las bandas, y cada banda
+   se lee por separado con el numero ya solo delante.
+
+   Cada banda se amplia hasta unos 64 pixeles de alto: por debajo de eso
+   Tesseract empieza a confundir caracteres —era lo que convertia el 5 en H—
+   y por encima no mejora y tarda mas. */
+function segmentarFilas(lienzo){
+  const w = lienzo.width, h = lienzo.height;
+  if (h < 24) return [];
+  /* Se probo primero separar los renglones midiendo la tinta de cada fila de
+     pixeles. No funciono con la placa de un Toyota: el numero grande de
+     bastidor sube por detras de la linea del motor, los dos renglones se
+     solapan y el perfil nunca baja a cero — salia una sola banda con todo
+     dentro y el lector devolvia "ENGTNE FRANFN MAE TNK43 R203135104D".
+
+     Asi que en vez de buscar donde cortar, se prueban tres franjas fijas que
+     se pisan entre ellas. Alguna cae con el numero solo delante, y con eso
+     basta: se lee cada una y gana el mejor candidato. */
+  const FRANJAS = [[0, 0.62], [0.2, 0.82], [0.38, 1]];
+  return FRANJAS.map(([a, b]) => {
+    const y0 = Math.round(h * a), y1 = Math.round(h * b);
+    const alto = y1 - y0;
+    if (alto < 12) return null;
+    /* Hasta unos 64 pixeles de alto por renglon: por debajo Tesseract empieza
+       a confundir caracteres —era lo que convertia el 5 en H— y por encima no
+       mejora y tarda mas. */
+    const escala = Math.max(1, Math.min(6, 64 / alto));
+    const c = document.createElement("canvas");
+    c.width = Math.round(w * escala); c.height = Math.round(alto * escala);
+    const g = c.getContext("2d");
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
+    g.drawImage(lienzo, 0, y0, w, alto, 0, 0, c.width, c.height);
+    return c;
+  }).filter(Boolean);
+}
+
 function buildOcrVariants(cropCanvas){
   const w = cropCanvas.width, h = cropCanvas.height;
   // Variante A: gris + estiramiento de contraste (conserva tonos, buena en foto ya pareja)
@@ -869,9 +928,17 @@ const TESS_BASE_PARAMS = {
    guardado rapido, que corre sin nadie mirando. */
 async function leerVinDeLienzo(lienzo){
   await ensureTesseract();
+  /* Se probo leer por franjas horizontales ademas del recorte entero, para
+     aislar el renglon del bastidor de los de arriba. Medido sobre una placa
+     real de Toyota salia peor: cada franja aporta una lectura mala mas, y
+     enturbia la eleccion del candidato. Queda el recorte entero. */
   const variants = buildOcrVariants(lienzo);
   const worker = await Tesseract.createWorker("eng");
-  let best = null, lastRawText = "";
+  let best = null;
+  /* Se guarda lo que leyo CADA pasada, no solo la ultima. Guardando solo la
+     ultima, al añadir franjas la buena quedaba pisada por la peor y los
+     ultimos seis digitos salian de un texto inservible. */
+  const textos = [];
   try {
     const attempts = [];
     variants.forEach((cv, vi) => { ["7", "8"].forEach(psm => attempts.push({ cv, vi, psm })); });
@@ -880,7 +947,7 @@ async function leerVinDeLienzo(lienzo){
     for (const at of attempts) {
       await worker.setParameters({ ...TESS_BASE_PARAMS, tessedit_pageseg_mode: at.psm });
       const { data } = await worker.recognize(at.cv);
-      if (data.text) lastRawText = data.text;
+      if (data.text) textos.push(data.text);
       const candidate = extractVinFromText(data.text || "");
       if (candidate) {
         const checksum = vinChecksumOk(candidate);
@@ -890,57 +957,41 @@ async function leerVinDeLienzo(lienzo){
       }
     }
   } finally { await worker.terminate(); }
-  return { vin: best ? best.vin : null, raw: lastRawText, checksum: best ? best.checksum : false, confidence: best ? best.confidence : 0 };
+  return { vin: best ? best.vin : null, raw: textos.join(" \n"), checksum: best ? best.checksum : false, confidence: best ? best.confidence : 0 };
 }
 
 async function runOcr(cropCanvas){
   const statusEl = document.getElementById("ocrStatus");
   const storeDataUrl = cropCanvas.toDataURL("image/jpeg", 0.92);
   try {
-    await ensureTesseract();
-    console.debug("[VIN OCR] recorte", cropCanvas.width + "x" + cropCanvas.height);
-    const variants = buildOcrVariants(cropCanvas);
-    const worker = await Tesseract.createWorker("eng");
-    let best = null, lastRawText = "";
-    try {
-      const attempts = [];
-      variants.forEach((cv, vi) => { ["7", "8"].forEach(psm => attempts.push({ cv, vi, psm })); });
-      attempts.push({ cv: variants[0], vi: 0, psm: "6" }); // ultimo recurso: bloque uniforme
-      for (const at of attempts) {
-        await worker.setParameters({ ...TESS_BASE_PARAMS, tessedit_pageseg_mode: at.psm });
-        const { data } = await worker.recognize(at.cv);
-        console.debug("[VIN OCR] variante", at.vi, "psm", at.psm, "confianza", data.confidence, "texto", JSON.stringify(data.text));
-        if (data.text) lastRawText = data.text;
-        const candidate = extractVinFromText(data.text || "");
-        if (candidate) {
-          const checksum = vinChecksumOk(candidate);
-          const score = (checksum ? 1000 : 0) + (data.confidence || 0);
-          if (!best || score > best.score) best = { vin: candidate, confidence: data.confidence || 0, checksum, score };
-          if (checksum) break; // ya encontramos un candidato que pasa el digito verificador, no hace falta seguir
-        }
-      }
-    } finally { await worker.terminate(); }
+    /* Un unico lector para los dos caminos —el recorte a mano y el de
+       fondo—. Antes habia dos bucles casi iguales con pasadas distintas, y
+       eso hacia que un arreglo llegara a uno y no al otro: con la placa de un
+       Toyota, uno sacaba los ultimos seis correctos y el otro no. */
+    const r = await leerVinDeLienzo(cropCanvas);
     statusEl.textContent = "";
+    const vinFull = r.vin;
     if (ocrDestino === "confirmacion") {
       ocrDestino = "review";
-      const v = best ? best.vin : "";
-      document.getElementById("conf_vinFull").value = v || "";
-      document.getElementById("conf_vin6").value = v ? vin6of(v) : "";
-      document.getElementById("conf_estado").textContent = v ? (SEMAFORO[vinSemaforo(v)] || "") : "🔴 Tampoco se pudo leer así";
+      document.getElementById("conf_vinFull").value = vinFull || "";
+      document.getElementById("conf_vin6").value = vinFull ? vin6of(vinFull) : bestGuessVin6(r.raw);
+      document.getElementById("conf_estado").textContent = vinFull
+        ? (SEMAFORO[vinSemaforo(vinFull)] || "")
+        : "🔴 Tampoco se pudo leer así";
       document.getElementById("confScrim").classList.add("open");
       return;
     }
-    const vinFull = best ? best.vin : null;
-    const guess = guessMakeModel(lastRawText);
-    const vin6 = vinFull ? vin6of(vinFull) : bestGuessVin6(lastRawText);
-    openReview({ photo: storeDataUrl, vinFull: vinFull || "", vin6, vin6Guessed: !vinFull && !!vin6, make: guess.make, model: guess.model, rawText: vinFull ? "" : lastRawText, checksum: best ? best.checksum : false });
+    const guess = guessMakeModel(r.raw);
+    const vin6 = vinFull ? vin6of(vinFull) : bestGuessVin6(r.raw);
+    openReview({ photo: storeDataUrl, vinFull: vinFull || "", vin6, vin6Guessed: !vinFull && !!vin6,
+      make: guess.make, model: guess.model, rawText: vinFull ? "" : r.raw, checksum: r.checksum });
   } catch (e) {
     console.error("[VIN OCR] error", e);
     statusEl.textContent = "";
-    toast("⚠︎ No se pudo leer automáticamente. Escribe el VIN a mano.");
     openReview({ photo: storeDataUrl, vinFull: "", vin6: "", make: "", model: "", rawText: "" });
   }
 }
+
 function openReview(data){
   pendingReview = data;
   editingId = data.id || null;
