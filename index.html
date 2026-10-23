@@ -1453,9 +1453,22 @@ function mostrarInstalar(forzar){
       pedirInstalar = null;
       if (r && r.outcome === "accepted") caja.hidden = true;
     };
-  } else if (/Android/.test(UA)) {
+  } else if (/SamsungBrowser/.test(UA)) {
+    /* El navegador de Samsung, que viene por defecto en sus telefonos, tiene
+       el menu abajo y con otro icono. Las instrucciones de Chrome —"menu de
+       tres puntos arriba a la derecha"— alli no corresponden a nada, y una
+       instruccion que no cuadra con la pantalla es peor que ninguna. */
     pasos.innerHTML = '<ol class="pasos">' +
-      '<li>Toca el menú <b>⋮</b>, arriba a la derecha del navegador.</li>' +
+      '<li>Toca el menú <b>≡</b> (tres rayas), <b>abajo a la derecha</b>.</li>' +
+      '<li>Toca <b>Añadir página a</b> y luego <b>Pantalla de inicio</b>.</li>' +
+      '<li>Confirma con <b>Añadir</b>. Queda con su icono, como cualquier app.</li></ol>' +
+      '<p class="hint" style="margin:6px 0 0">¿No lo encuentras? Abre este mismo enlace en <b>Chrome</b>: ahí sale directamente un botón para instalarla.</p>';
+  } else if (/Android/.test(UA)) {
+    /* Si se abrio desde WhatsApp, Android lo enseña en una ventana de Chrome
+       incrustada que no ofrece instalar: hay que sacarlo a Chrome primero. */
+    pasos.innerHTML = '<ol class="pasos">' +
+      '<li>Si lo abriste desde WhatsApp, toca <b>⋮</b> y luego <b>Abrir en Chrome</b>.</li>' +
+      '<li>En Chrome, toca el menú <b>⋮</b>, arriba a la derecha.</li>' +
       '<li>Toca <b>Instalar aplicación</b> o <b>Añadir a pantalla de inicio</b>.</li></ol>';
   } else {
     return;   // en el ordenador no se ofrece: alli no hace falta
