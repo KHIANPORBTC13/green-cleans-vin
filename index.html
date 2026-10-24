@@ -157,13 +157,6 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 .photolink{color:var(--mint);text-decoration:none;font-size:15px}
 #photoScrim .sheet{max-width:520px;padding:12px;background:transparent}
 #photoScrim img{width:100%;max-height:80vh;object-fit:contain;border-radius:12px;margin-bottom:10px;background:#000}
-.crop-sheet{max-width:480px}
-.crop-stage{display:flex;justify-content:center;background:#000;border-radius:12px;overflow:hidden;margin:10px 0}
-#crop_canvas{touch-action:none;display:block;max-width:100%}
-.crop-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
-/* Las recomendaciones a la vista y no en una linea de letra pequeña: son la
-   diferencia entre que el lector acierte y que no, y hasta ahora solo se
-   mencionaba lo de rotar, de pasada. */
 .instalar{border-color:var(--green)}
 .instalar-top{display:flex;align-items:center;gap:12px}
 .instalar-ico{width:46px;height:46px;border-radius:11px;flex:none;margin:0;max-height:none;object-fit:cover}
@@ -174,21 +167,9 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 .pasos li::before{content:counter(p);position:absolute;left:0;top:8px;width:24px;height:24px;border-radius:50%;
   background:var(--pillbg);border:1px solid var(--green);color:var(--text);font-size:12px;font-weight:700;
   display:flex;align-items:center;justify-content:center}
-.consejos{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:2px 0 10px}
-.consejos summary{font-size:12.5px;font-weight:700;color:var(--text);cursor:pointer;list-style:none}
-.consejos summary::-webkit-details-marker{display:none}
-.consejos summary::after{content:" ▾";color:var(--muted)}
-.consejos[open] summary::after{content:" ▴"}
-.consejos[open] summary{margin-bottom:8px}
-.consejos div{font-size:12.5px;color:var(--muted);line-height:1.45}
-.consejos div+div{margin-top:7px}
-.consejos b{color:var(--text)}
-.crop-footer{position:sticky;bottom:0;z-index:4;background:var(--panel);
-  margin:0 -18px calc(-18px - env(safe-area-inset-bottom));
-  padding:10px 18px calc(14px + env(safe-area-inset-bottom));
-  box-shadow:0 -10px 14px -12px #000}
-.avisoVertical{background:#3a2d12;border:1px solid #6b5420;color:#ffd79a;border-radius:10px;padding:10px 12px;font-size:12.5px;margin-bottom:10px}
-.crop-actions button{margin-top:0}
+/* El lector de VIN (lector-vin.js, el mismo que usa SOO) con el verde de
+   la app. */
+.lv{--lv-acento:var(--green)}
 @media(min-width:1080px){
   header{display:none}
   nav.tabs{display:none}
@@ -248,8 +229,10 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
       <div id="instalar_pasos"></div>
     </div>
     <div class="cap-buttons">
-      <label class="btn-big" for="camInput"><svg class="emoji gcico" viewBox="0 0 24 24"><use href="#ico-camera"/></svg>Tomar foto</label>
-      <input type="file" id="camInput" accept="image/*" capture="environment" hidden>
+      <!-- La camara de la propia app, con marco: se apunta al VIN, se ve en
+           verde cuando se lee bien y se captura. Ya no hay que dibujar el
+           recuadro despues. -->
+      <button class="btn-big" id="btnCamara" type="button"><svg class="emoji gcico" viewBox="0 0 24 24"><use href="#ico-camera"/></svg>Escanear VIN</button>
       <label class="btn-big alt" for="galInput"><svg class="emoji gcico" viewBox="0 0 24 24"><use href="#ico-gallery"/></svg>Desde galería</label>
       <input type="file" id="galInput" accept="image/*" hidden>
     </div>
@@ -365,20 +348,17 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 <!-- Ventana de alerta propia y no el confirm del navegador: el aviso de VIN
      repetido tiene que decir cuando y quien lo registro, y el confirm solo
      admite una linea de texto plano. -->
-<!-- El vistazo antes de guardar: repetir la foto sale gratis aqui y es
-     imposible cuando el auto ya se fue. -->
+<!-- Para ir deprisa: la foto se guarda y el chasis se completa despues.
+     Se llega aqui desde "Guardar sólo la foto" del lector. -->
 <div class="scrim" id="capScrim">
   <div class="sheet">
-    <h3>¿Se lee la placa?</h3>
+    <h3>Guardar sólo la foto</h3>
     <img id="cap_foto" style="width:100%;border-radius:10px;margin-bottom:10px">
     <label class="f">Trabajador<input class="inp" id="cap_worker" placeholder="ej. Dani"></label>
     <label class="f">Supervisor<input class="inp" id="cap_supervisor" placeholder="ej. Raúl"></label>
-    <button class="primary" id="cap_leer" type="button">Recortar y leer el VIN ahora</button>
-    <p class="hint" style="margin:8px 0 14px">Marcas el chasis en la foto y el lector lo saca al momento. Es lo que mejor acierta.</p>
-    <button class="secondary" id="cap_save" type="button">Guardar y seguir sin leer</button>
-    <p class="hint" style="margin:8px 0 14px">Para ir rápido: guarda la foto, el lector lo intenta solo y lo que no pueda queda en «Por confirmar».</p>
-    <button class="secondary" id="cap_retry" type="button">Repetir la foto</button>
-    <button class="secondary" id="cap_cancel" type="button" style="margin-top:8px">Cancelar</button>
+    <button class="primary" id="cap_save" type="button">Guardar y escanear otro</button>
+    <p class="hint" style="margin:8px 0 14px">El lector intenta leerla por su cuenta; lo que no consiga queda en «Por confirmar».</p>
+    <button class="secondary" id="cap_cancel" type="button">Cancelar</button>
   </div>
 </div>
 
@@ -425,39 +405,6 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
   </div>
 </div>
 
-<div class="scrim" id="cropScrim">
-  <div class="sheet crop-sheet">
-    <h3>Encuadra el VIN</h3>
-    <!-- El aviso arriba porque cambia lo que hay que hacer ahora mismo; la
-         foto justo despues, que es donde se trabaja; y los consejos debajo y
-         plegables, para que no le quiten sitio a la foto en una pantalla
-         pequeña. Empiezan abiertos: quien ya se los sabe los cierra y se
-         quedan cerrados. -->
-    <div id="crop_vertical" class="avisoVertical" hidden>Esta foto está vertical. Pulsa <b>Rotar</b> antes de encuadrar.</div>
-    <div class="crop-stage"><canvas id="crop_canvas"></canvas></div>
-    <details class="consejos" id="crop_consejos" open>
-      <summary>Cómo hacerlo para que el lector acierte</summary>
-      <div><b>1.</b> La foto tiene que quedar <b>en horizontal</b>, con el código de izquierda a derecha. Si no lo está, pulsa <b>Rotar</b>.</div>
-      <div><b>2.</b> Si la placa sale inclinada, usa <b>Enderezar</b> hasta que el código quede recto.</div>
-      <div><b>3.</b> El recuadro debe encerrar <b>sólo el VIN</b>. Si entran otras líneas —el motor, el modelo— el lector las mezcla y falla.</div>
-    </details>
-    <!-- Enderezar y los botones anclados abajo: con una foto vertical en un
-         telefono pequeño el contenido pasa del alto de la pantalla y quedaban
-         debajo del borde. El cliente lo leyo como que enderezar estaba
-         desactivado con las fotos verticales; nunca lo estuvo. -->
-    <div class="crop-footer">
-      <label class="f" style="margin:0 0 6px">Enderezar (si la placa está en diagonal) <span id="crop_fineLabel">0°</span>
-        <input type="range" id="crop_fineRotate" min="-45" max="45" step="1" value="0" style="width:100%">
-      </label>
-      <div class="crop-actions">
-        <button class="secondary" id="crop_rotate" type="button"><svg class="icobtn gcico" viewBox="0 0 24 24"><use href="#ico-rotate"/></svg>Rotar</button>
-        <button class="primary" id="crop_confirm" type="button"><svg class="icobtn gcico" viewBox="0 0 24 24"><use href="#ico-check"/></svg>Listo</button>
-      </div>
-      <button class="secondary" id="crop_cancel" type="button">Cancelar</button>
-    </div>
-  </div>
-</div>
-
 <div class="scrim" id="photoScrim">
   <div class="sheet">
     <img id="photoScrim_img" alt="Foto del VIN">
@@ -467,7 +414,9 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 
 <div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<!-- El lector de VIN: el mismo archivo que usa SOO, byte a byte. Se
+     cambia alli y se copia aqui. -->
+<script src="lector-vin.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 const CLOUD = {
@@ -487,249 +436,20 @@ async function rpc(fn, body){
   const t = await r.text(); return t ? JSON.parse(t) : null;
 }
 
-/* ===================== Extraccion de VIN ===================== */
-const VIN_CONFUSIONS = { I: "1", O: "0", Q: "0" };
-function cleanVinToken(tok){ return tok.toUpperCase().split("").map(c => VIN_CONFUSIONS[c] || c).join(""); }
-/* Los tres primeros caracteres dicen el fabricante. No hace falta la lista
-   mundial entera: con la primera letra —la region— y los prefijos que de
-   verdad circulan en Australia se descarta la basura, que es de lo que se
-   trata. El unico control que habia era "17 caracteres", y por eso paso por
-   bueno TU12WMRHRW2850KP0, que no es de ningun fabricante. */
-const VIN_REGIONES = "123458JKLMNPRSVWXYZ6";
-const VIN_ANIOS = "ABCDEFGHJKLMNPRSTVWXY123456789";
-/* Semaforo: verde es "fiate", ambar "echale un ojo", rojo "eso no es un VIN".
-   Asi la bandeja solo pide atencion para los que la necesitan. */
-function vinSemaforo(v){
-  if (!v || !isValidVin(v)) return "rojo";
-  if (VIN_REGIONES.indexOf(v[0]) < 0) return "rojo";
-  if (VIN_ANIOS.indexOf(v[9]) < 0) return "ambar";
-  /* La norma recomienda que los cuatro ultimos sean numeros, y casi todos los
-     fabricantes la siguen. No es ley, asi que no pinta rojo: baja a ambar.
-     Es lo que delata lecturas como TU12WMRHRW2850KP0 o F1TNAZEE303155L0A,
-     que tienen sus 17 caracteres y no son ningun auto. */
-  if (!/^[0-9]{4}$/.test(v.slice(-4))) return "ambar";
-  // El digito verificador solo es obligatorio en Norteamerica (region 1 a 5).
-  if ("12345".indexOf(v[0]) >= 0) return vinChecksumOk(v) ? "verde" : "ambar";
-  return "verde";
-}
-function isValidVin(v){ return /^[A-HJ-NPR-Z0-9]{17}$/.test(v); }
-// El usuario SIEMPRE recorta la foto a mano justo sobre el codigo VIN antes de leerlo, asi que la
-// palabra "VIN" cerca del codigo ya NO es un requisito -- muchas placas (ej. VW, o vidrio grabado)
-// no la traen impresa en absoluto. La extraccion ahora busca el codigo de 17 caracteres en TODO el
-// texto que se leyo del recorte, prefiriendo el que este cerca de la palabra "VIN" cuando aparece
-// (sigue siendo una señal util para desempatar), y si no aparece, exige que el codigo represente la
-// MAYOR PARTE del texto leido en el recorte (no un fragmento chico perdido entre mucho otro texto,
-// que es la firma de ruido de OCR, no de un VIN real -- se comprobo con una imagen ruidosa real:
-// "6YOETOIWETN6LETIC NIA" generaba un VIN falso con apariencia valida si no se exige esto).
-function collectVinCandidates(tokens, maxWindow, out){
-  for (const raw of tokens) {
-    if (raw.length < 17) continue;
-    const maxStart = Math.min(raw.length - 17, maxWindow);
-    for (let start = 0; start <= maxStart; start++) {
-      const cleaned = cleanVinToken(raw.slice(start, start + 17));
-      if (isValidVin(cleaned)) out.push(cleaned);
-    }
-  }
-}
-function pickBestVin(candidates){
-  // Entre varios candidatos, se prefiere el que pasa el digito verificador ISO 3779 (nunca se usa
-  // como filtro duro porque autos JDM/importados no siempre lo cumplen, solo como desempate).
-  return candidates.find(c => vinChecksumOk(c)) || candidates[0];
-}
-function extractVinFromText(text){
-  const upper = String(text).toUpperCase();
-  const lines = upper.split(/\n/);
-  const allTokens = upper.match(/[A-Z0-9]+/g) || [];
-  const totalLen = allTokens.reduce((s, t) => s + t.length, 0);
-
-  // 1) Con ancla "VIN" (tolerando que el OCR pierda la I, o la lea como 1/L; sin exigir borde de
-  // palabra porque el OCR a veces pega la etiqueta directo al codigo sin espacio, caso real:
-  // "VNMRHRU5830MP063738" en vez de "VIN MRHRU5830MP063738"): se tolera una ventana deslizante mas
-  // amplia, el contexto de la palabra "VIN" ya justifica esa flexibilidad extra.
-  const anchoredCandidates = [];
-  lines.forEach((line, li) => {
-    const m = line.match(/V[I1L]?N/);
-    if (!m) return;
-    const tail = line.slice(m.index + m[0].length) + " " + (lines[li + 1] || "");
-    collectVinCandidates(tail.match(/[A-Z0-9]+/g) || [], 5, anchoredCandidates);
-  });
-  if (anchoredCandidates.length) return pickBestVin(anchoredCandidates);
-
-  // 2) Sin ancla: el recorte ya esta enfocado a mano sobre el VIN, no hace falta la palabra "VIN"
-  // cerca -- pero se exige que el candidato sea al menos la mitad del texto leido en el recorte.
-  const candidates = [];
-  collectVinCandidates(allTokens, 3, candidates);
-  if (!candidates.length) return null;
-  if (totalLen === 0 || 17 / totalLen < 0.5) return null;
-  return pickBestVin(candidates);
-}
+/* ===================== VIN ===================== */
+/* Leer, el semaforo y la pantalla de la camara estan en lector-vin.js. */
 function vin6of(v){ return v ? v.slice(-6) : ""; }
-// Cuando NO se valido un VIN completo, se rellena igual el campo de "ultimos 6 digitos" con la
-// mejor lectura cruda disponible -- para ganar tiempo, el usuario corrige en vez de tipear desde
-// cero. Se toma el token alfanumerico mas largo leido (lo mas probable es que sea el codigo VIN,
-// aunque este mal leido) y sus ultimos 6 caracteres, limpiados con la misma correccion O/I/Q.
-/* Los ultimos seis del bastidor son, salvo rareza, seis numeros: la norma
-   recomienda que las cuatro ultimas posiciones sean numericas y en la
-   practica lo son mas. Antes se cogia el token mas largo tal cual y salia
-   "13H104" —con una letra en medio— cuando en el mismo texto leido estaba
-   "203135104", cuyos ultimos seis son los correctos: 135104.
+const vinSemaforo = v => LectorVIN.semaforo(v);
 
-   Asi que primero se busca la tirada de digitos mas larga; solo si no hay
-   ninguna de seis se recurre al token mas largo. */
-function bestGuessVin6(text){
-  const limpio = String(text || "").toUpperCase();
-  const tiradas = limpio.match(/[0-9]{6,}/g) || [];
-  if (tiradas.length) {
-    const mejor = tiradas.reduce((a, b) => (b.length > a.length ? b : a), "");
-    return mejor.slice(-6);
-  }
-  const tokens = limpio.match(/[A-Z0-9]+/g) || [];
-  if (!tokens.length) return "";
-  const longest = tokens.reduce((a, b) => (b.length > a.length ? b : a), "");
-  if (longest.length < 6) return "";
-  return cleanVinToken(longest).slice(-6);
-}
-// Digito verificador ISO 3779 (mod-11). Algunos VIN JDM/europeos importados NO lo cumplen (no es
-// universal fuera del estandar NHTSA), asi que se usa solo como señal de puntaje para desempatar
-// entre varios candidatos leidos, NUNCA como filtro que descarte un VIN real.
-const VIN_TRANSLIT = { A:1,B:2,C:3,D:4,E:5,F:6,G:7,H:8, J:1,K:2,L:3,M:4,N:5, P:7, R:9,
-  S:2,T:3,U:4,V:5,W:6,X:7,Y:8,Z:9, 0:0,1:1,2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:9 };
-const VIN_WEIGHTS = [8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2];
-function vinChecksumOk(vin){
-  if (!/^[0-9A-HJ-NPR-Z]{17}$/.test(vin)) return false;
-  let sum = 0;
-  for (let i = 0; i < 17; i++) {
-    const val = VIN_TRANSLIT[vin[i]];
-    if (val === undefined) return false;
-    sum += val * VIN_WEIGHTS[i];
-  }
-  const rem = sum % 11;
-  const expected = rem === 10 ? "X" : String(rem);
-  return vin[8] === expected;
-}
-const KNOWN_MAKES = ["TOYOTA","MAZDA","MITSUBISHI","SUBARU","HONDA","NISSAN","FORD","HOLDEN","HYUNDAI","KIA","VOLKSWAGEN","BMW","MERCEDES","AUDI","SUZUKI","ISUZU","JEEP","LDV","MG","GWM","HAVAL"];
-function capWord(s){ return s.charAt(0) + s.slice(1).toLowerCase(); }
-function guessMakeModel(text){
-  const upper = String(text).toUpperCase();
-  for (const mk of KNOWN_MAKES) {
-    if (upper.includes(mk)) {
-      const re = new RegExp(mk + "\\s+([A-Z0-9\\-]+)");
-      const m = upper.match(re);
-      return { make: capWord(mk), model: m ? capWord(m[1]) : "" };
-    }
-  }
-  return { make: "", model: "" };
-}
-
-/* ===================== Imagen ===================== */
-// FIX critico: version anterior compartia UN solo factor de escala entre ancho y alto, y el tope de
-// ancho maximo podia pisar silenciosamente el piso de altura minima -- en un recorte ANCHO y BAJO
-// (tipico de encuadrar una placa VIN completa de lado a lado, como las 3 fotos reales que fallaron)
-// el resultado quedaba muy por debajo de los ~30-40px de alto por caracter que Tesseract necesita.
-// Ahora el alto SIEMPRE gana: el ancho solo se topa como salvaguarda de memoria, nunca reduce el alto.
-function cropOutputSize(nw, nh){
-  const TARGET_H = 260, MAX_W = 3000, MAX_H = 1600;
-  let scale = Math.max(1, TARGET_H / nh);
-  let h = nh * scale;
-  if (h > MAX_H) scale *= MAX_H / h;
-  const w = Math.min(MAX_W, Math.round(nw * scale));
-  h = Math.round(nh * scale);
-  return { w: Math.max(1, w), h: Math.max(1, h) };
-}
-function resizeRectFromCorner(startRect, corner, dx, dy){
-  let { x, y, w, h } = startRect;
-  if (corner === "nw") { x += dx; y += dy; w -= dx; h -= dy; }
-  if (corner === "ne") { y += dy; w += dx; h -= dy; }
-  if (corner === "sw") { x += dx; w -= dx; h += dy; }
-  if (corner === "se") { w += dx; h += dy; }
-  if (w < 0) { x += w; w = -w; }
-  if (h < 0) { y += h; h = -h; }
-  return { x, y, w, h };
-}
-function clampRectTo(rect, boundsW, boundsH){
-  let { x, y, w, h } = rect;
-  w = Math.max(30, Math.min(w, boundsW));
-  h = Math.max(20, Math.min(h, boundsH));
-  x = Math.max(0, Math.min(x, boundsW - w));
-  y = Math.max(0, Math.min(y, boundsH - h));
-  return { x, y, w, h };
-}
-
-/* ===================== Preprocesamiento antes del OCR ===================== */
-// Fotos reales de celular traen iluminacion despareja y reflejos (metal/vidrio) que un umbral GLOBAL
-// (tipo Otsu clasico) no puede separar bien de la placa completa. Bradley-Roth usa el promedio LOCAL
-// de cada zona (via imagen integral, rapido) en vez de un solo promedio para toda la imagen.
-function toGrayscale(ctx, w, h){
-  const img = ctx.getImageData(0, 0, w, h);
-  const d = img.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const y = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-    d[i] = d[i + 1] = d[i + 2] = y;
-  }
-  ctx.putImageData(img, 0, 0);
-  return img;
-}
-function contrastStretch(imgData, lowPct, highPct){
-  const d = imgData.data, hist = new Uint32Array(256), n = d.length / 4;
-  for (let i = 0; i < d.length; i += 4) hist[d[i]]++;
-  let cum = 0, lo = 0, hi = 255;
-  const loTarget = n * (lowPct / 100);
-  for (let v = 0; v < 256; v++) { cum += hist[v]; if (cum >= loTarget) { lo = v; break; } }
-  cum = 0;
-  for (let v = 255; v >= 0; v--) { cum += hist[v]; if (cum >= n * (1 - highPct / 100)) { hi = v; break; } }
-  if (hi <= lo) return imgData;
-  const scale = 255 / (hi - lo);
-  for (let i = 0; i < d.length; i += 4) {
-    let v = (d[i] - lo) * scale; v = v < 0 ? 0 : v > 255 ? 255 : v;
-    d[i] = d[i + 1] = d[i + 2] = v;
-  }
-  return imgData;
-}
-function integralImageOf(d, w, h){
-  const intg = new Float64Array((w + 1) * (h + 1));
-  for (let y = 0; y < h; y++) {
-    let rowSum = 0;
-    for (let x = 0; x < w; x++) {
-      rowSum += d[(y * w + x) * 4];
-      intg[(y + 1) * (w + 1) + (x + 1)] = intg[y * (w + 1) + (x + 1)] + rowSum;
-    }
-  }
-  return intg;
-}
-function bradleyRothBinarize(imgData, w, h, windowFrac, tPct){
-  const d = imgData.data;
-  const intg = integralImageOf(d, w, h);
-  const S = Math.max(15, Math.round(Math.min(w, h) * windowFrac)) | 1;
-  const half = S >> 1;
-  const out = new Uint8ClampedArray(w * h);
-  for (let y = 0; y < h; y++) {
-    const y0 = Math.max(0, y - half), y1 = Math.min(h - 1, y + half);
-    for (let x = 0; x < w; x++) {
-      const x0 = Math.max(0, x - half), x1 = Math.min(w - 1, x + half);
-      const area = (x1 - x0 + 1) * (y1 - y0 + 1);
-      const sum = intg[(y1 + 1) * (w + 1) + (x1 + 1)] - intg[y0 * (w + 1) + (x1 + 1)] - intg[(y1 + 1) * (w + 1) + x0] + intg[y0 * (w + 1) + x0];
-      const mean = sum / area;
-      out[y * w + x] = d[(y * w + x) * 4] < mean * (1 - tPct) ? 0 : 255;
-    }
-  }
-  for (let i = 0; i < w * h; i++) { d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = out[i]; }
-  return imgData;
-}
-function buildOcrVariants(cropCanvas){
-  const w = cropCanvas.width, h = cropCanvas.height;
-  // Variante A: gris + estiramiento de contraste (conserva tonos, buena en foto ya pareja)
-  const cvA = document.createElement("canvas"); cvA.width = w; cvA.height = h;
-  const ctxA = cvA.getContext("2d"); ctxA.drawImage(cropCanvas, 0, 0);
-  const imgA = toGrayscale(ctxA, w, h);
-  contrastStretch(imgA, 1, 1);
-  ctxA.putImageData(imgA, 0, 0);
-  // Variante B: gris + binarizado adaptativo (para iluminacion dispareja / reflejos en metal o vidrio)
-  const cvB = document.createElement("canvas"); cvB.width = w; cvB.height = h;
-  const ctxB = cvB.getContext("2d"); ctxB.drawImage(cropCanvas, 0, 0);
-  const imgB = toGrayscale(ctxB, w, h);
-  bradleyRothBinarize(imgB, w, h, 0.25, 0.15);
-  ctxB.putImageData(imgB, 0, 0);
-  return [cvA, cvB];
+/* Los chasis ya registrados, para que el lector corrija contra ellos una B
+   por un 8 y avise si ese VIN ya paso. Sin señal no llega nada y el lector
+   funciona igual. */
+async function vinesConocidos(){
+  try {
+    const hasta = new Date(Date.now() + 864e5), desde = new Date(Date.now() - 60 * 864e5);
+    const rows = await rpc("vin_log_lista", { p_from: desde.toISOString(), p_to: hasta.toISOString() });
+    return (rows || []).filter(r => r.vin_full).map(r => ({ vin: r.vin_full, cuando: r.client_at }));
+  } catch (e) { return []; }
 }
 
 /* ===================== Utilidades ===================== */
@@ -776,34 +496,25 @@ function renderQueueBadge(){
 window.addEventListener("online", flushQueue);
 setInterval(flushQueue, 45000);
 
-/* ===================== Captura -> editor de recorte/rotacion ===================== */
+/* ===================== Captura ===================== */
 let pendingReview = null, editingId = null;
-/* La foto es el respaldo, asi que se guarda primero y el chasis se completa
-   despues. Antes eran seis pasos de pie al lado del auto —foto, recortar a
-   mano, esperar al lector, revisar siete campos, guardar— y por eso 4 de los
-   15 registros de prueba se guardaron sin chasis ninguno.
-
-   Ahora: foto, un vistazo para poder repetirla si salio mal, guardar, y la
-   camara se vuelve a abrir para el siguiente. El lector trabaja despues por
-   su cuenta y lo que no consiga cae en la bandeja. */
-let capFoto = null;
-let ocrDestino = "review";
-function handleFile(file){
-  if (!file) return;
-  const fr = new FileReader();
-  fr.onload = () => {
-    const im = new Image();
-    im.onload = () => abrirVistazo(im);
-    im.onerror = () => toast("⚠︎ No se pudo abrir la imagen.");
-    im.src = fr.result;
-  };
-  fr.readAsDataURL(file);
+/* La camara con marco y la galeria acaban en el mismo sitio: el lector
+   devuelve el VIN ya revisado por la persona y la foto. Con VIN, a la ficha
+   de siempre, con todo rellenado; sin VIN ("Guardar sólo la foto"), al
+   guardado rapido, y el lector lo intenta despues por su cuenta. */
+async function abrirLector(opc){
+  const r = await LectorVIN.abrir(Object.assign({ permitirSoloFoto: true, conocidos: vinesConocidos }, opc));
+  if (!r) return;
+  if (r.soloFoto || !r.vin) { abrirVistazo(r.foto); return; }
+  const completo = r.vin.length === 17 ? r.vin : "";
+  openReview({ photo: r.foto, vinFull: completo, vin6: vin6of(r.vin), make: "", model: "",
+    semaforo: completo ? r.semaforo : null, emparejado: r.emparejado });
 }
 
-function abrirVistazo(img){
-  const lienzo = bakeToCanvas(img);
-  capFoto = { img: img, canvas: lienzo, dataUrl: lienzo.toDataURL("image/jpeg", 0.82) };
-  document.getElementById("cap_foto").src = capFoto.dataUrl;
+let capFoto = null;
+function abrirVistazo(dataUrl){
+  capFoto = { dataUrl };
+  document.getElementById("cap_foto").src = dataUrl;
   document.getElementById("cap_worker").value = getLastWorkerName() || "";
   document.getElementById("cap_supervisor").value = getSupervisorName() || "";
   document.getElementById("capScrim").classList.add("open");
@@ -817,276 +528,46 @@ async function guardarRapido(seguir){
   if (!worker) { toast("⚠︎ Falta el nombre del trabajador"); return; }
   if (!supervisor) { toast("⚠︎ Falta el nombre del supervisor"); return; }
   setLastWorkerName(worker); setSupervisorName(supervisor);
-  const lienzo = capFoto.canvas;
+  const foto = capFoto.dataUrl;
   const params = {
     p_vin_full: null, p_vin6: null, p_make: null, p_model: null, p_color: null,
     p_worker_name: worker, p_supervisor_name: supervisor,
-    p_client_at: new Date().toISOString(), p_photo_data: capFoto.dataUrl,
+    p_client_at: new Date().toISOString(), p_photo_data: foto,
   };
   const btn = document.getElementById("cap_save"); btn.disabled = true; btn.textContent = "Guardando…";
+  let guardado = false;
   try {
     const id = await rpc("vin_log_insert", params);
     toast("✓ Guardado — el lector sigue por su cuenta");
-    cerrarVistazo(); loadToday(); renderPendientesBadge();
-    if (id) leerEnSegundoPlano(id, lienzo);
+    cerrarVistazo(); loadToday(); renderPendientesBadge(); guardado = true;
+    if (id) leerEnSegundoPlano(id, foto);
   } catch (e) {
     /* Sin señal se encola igual: la foto es lo que no se puede perder. */
     if (queueOffline(params)) {
-      toast("📶 Sin conexión — guardado en el teléfono"); cerrarVistazo(); renderQueueBadge();
+      toast("📶 Sin conexión — guardado en el teléfono"); cerrarVistazo(); renderQueueBadge(); guardado = true;
     } else {
       /* No se cierra la ventana: la foto sigue en pantalla y se puede
          reintentar cuando haya señal. Cerrarla seria perderla. */
       toast("⚠︎ No cabe en el teléfono. Conéctate a la red y vuelve a guardar.");
     }
   } finally {
-    btn.disabled = false; btn.textContent = "Guardar y seguir";
-    if (seguir) document.getElementById("camInput").click();
+    btn.disabled = false; btn.textContent = "Guardar y escanear otro";
+    if (seguir && guardado) abrirLector({ fuente: "camara" });
   }
 }
 
-/* El lector, ya sin nadie esperando delante. Intenta leer la foto entera sin
-   pedir recorte; si no saca nada, el registro queda en rojo y alguien lo
-   resuelve en la bandeja recortando a mano. */
-async function leerEnSegundoPlano(id, lienzo){
+/* El lector, ya sin nadie esperando delante: busca el VIN en la foto entera
+   y lo lee. Si no saca nada, el registro queda en rojo y alguien lo resuelve
+   en la bandeja. */
+async function leerEnSegundoPlano(id, foto){
   try {
-    const leido = await leerVinDeLienzo(lienzo);
-    const estado = leido ? vinSemaforo(leido) : "rojo";
+    const r = await LectorVIN.leerFotoEntera(foto);
+    const leido = r && r.vin && r.vin.length === 17 ? r.vin : null;
     await rpc("vin_log_set_lectura", {
-      p_id: id, p_vin_full: leido || null,
-      p_vin6: leido ? vin6of(leido) : null, p_estado: estado });
+      p_id: id, p_vin_full: leido,
+      p_vin6: leido ? vin6of(leido) : null, p_estado: leido ? vinSemaforo(leido) : "rojo" });
     renderPendientesBadge();
   } catch (e) { /* si falla, se queda por confirmar, que es lo correcto */ }
-}
-
-let cropBase = null, cropWork = null, cropFineDeg = 0;
-let cropRect = { x: 0, y: 0, w: 0, h: 0 }, cropDispW = 0, cropDispH = 0, cropScale = 1, cropDrag = null;
-function bakeToCanvas(img){
-  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
-  const CAP = 2400;
-  let w = iw, h = ih;
-  if (Math.max(w, h) > CAP) { const r = CAP / Math.max(w, h); w = Math.round(w * r); h = Math.round(h * r); }
-  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
-  cv.getContext("2d").drawImage(img, 0, 0, w, h);
-  return cv;
-}
-function rotateCanvas90(src){
-  const cv = document.createElement("canvas");
-  cv.width = src.height; cv.height = src.width;
-  const ctx = cv.getContext("2d");
-  ctx.translate(cv.width / 2, cv.height / 2);
-  ctx.rotate(Math.PI / 2);
-  ctx.drawImage(src, -src.width / 2, -src.height / 2);
-  return cv;
-}
-// Rotacion en angulo libre (grados, no solo 90 en 90) para placas fotografiadas en diagonal --
-// el canvas de salida CRECE lo necesario para no recortar esquinas al girar.
-function rotateCanvasByAngle(src, deg){
-  const rad = deg * Math.PI / 180;
-  const cos = Math.abs(Math.cos(rad)), sin = Math.abs(Math.sin(rad));
-  const w = Math.ceil(src.width * cos + src.height * sin);
-  const h = Math.ceil(src.width * sin + src.height * cos);
-  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
-  const ctx = cv.getContext("2d");
-  ctx.translate(w / 2, h / 2);
-  ctx.rotate(rad);
-  ctx.drawImage(src, -src.width / 2, -src.height / 2);
-  return cv;
-}
-function openCropEditor(img){
-  cropBase = bakeToCanvas(img);
-  cropFineDeg = 0;
-  cropWork = cropBase;
-  const slider = document.getElementById("crop_fineRotate");
-  if (slider) { slider.value = "0"; document.getElementById("crop_fineLabel").textContent = "0°"; }
-  resetCropView();
-  document.getElementById("cropScrim").classList.add("open");
-}
-function resetCropView(){
-  const aviso = document.getElementById("crop_vertical");
-  if (aviso && cropWork) aviso.hidden = cropWork.height <= cropWork.width;
-  const stage = document.querySelector(".crop-stage");
-  const maxDispW = Math.min((stage && stage.clientWidth) || 360, 480);
-  /* Tambien por alto, no solo por ancho.
-
-     La escala se sacaba unicamente del ancho, asi que una foto vertical
-     producia un lienzo altisimo y empujaba el control de enderezar y los
-     botones por debajo del borde de la pantalla. El cliente lo describio como
-     que "enderezar solo esta habilitado con la foto en horizontal": nunca
-     estuvo desactivado, es que no se veia. */
-  const maxDispH = Math.max(160, Math.min(Math.round(window.innerHeight * 0.42), 420));
-  const prevDispW = cropDispW, prevDispH = cropDispH, prevRect = cropRect;
-  cropScale = Math.min(1, maxDispW / cropWork.width, maxDispH / cropWork.height);
-  cropDispW = Math.round(cropWork.width * cropScale);
-  cropDispH = Math.round(cropWork.height * cropScale);
-  const cv = document.getElementById("crop_canvas");
-  cv.width = cropDispW; cv.height = cropDispH;
-  if (prevDispW && prevDispH) {
-    // reescala el recuadro existente en vez de perderlo (pasa al ajustar la rotacion fina)
-    const rx = cropDispW / prevDispW, ry = cropDispH / prevDispH;
-    cropRect = clampRectTo({ x: prevRect.x * rx, y: prevRect.y * ry, w: prevRect.w * rx, h: prevRect.h * ry }, cropDispW, cropDispH);
-  } else {
-    cropRect = { x: cropDispW * 0.1, y: cropDispH * 0.35, w: cropDispW * 0.8, h: cropDispH * 0.3 };
-  }
-  drawCrop();
-}
-function rotateCropWork(){
-  cropBase = rotateCanvas90(cropBase);
-  cropFineDeg = 0;
-  cropWork = cropBase;
-  const slider = document.getElementById("crop_fineRotate");
-  if (slider) { slider.value = "0"; document.getElementById("crop_fineLabel").textContent = "0°"; }
-  cropDispW = 0; cropDispH = 0; // fuerza a recentrar el recuadro (cambio de orientacion grande)
-  resetCropView();
-}
-function applyFineRotation(deg){
-  cropFineDeg = deg;
-  cropWork = deg === 0 ? cropBase : rotateCanvasByAngle(cropBase, deg);
-  document.getElementById("crop_fineLabel").textContent = deg + "°";
-  resetCropView();
-}
-function cropHandles(){
-  const { x, y, w, h } = cropRect;
-  return [{ name: "nw", x: x, y: y }, { name: "ne", x: x + w, y: y }, { name: "sw", x: x, y: y + h }, { name: "se", x: x + w, y: y + h }];
-}
-function drawCrop(){
-  const cv = document.getElementById("crop_canvas"); const ctx = cv.getContext("2d");
-  ctx.clearRect(0, 0, cropDispW, cropDispH);
-  ctx.drawImage(cropWork, 0, 0, cropDispW, cropDispH);
-  ctx.fillStyle = "rgba(0,0,0,.6)";
-  ctx.fillRect(0, 0, cropDispW, cropRect.y);
-  ctx.fillRect(0, cropRect.y + cropRect.h, cropDispW, cropDispH - (cropRect.y + cropRect.h));
-  ctx.fillRect(0, cropRect.y, cropRect.x, cropRect.h);
-  ctx.fillRect(cropRect.x + cropRect.w, cropRect.y, cropDispW - (cropRect.x + cropRect.w), cropRect.h);
-  ctx.strokeStyle = "#00D084"; ctx.lineWidth = 2;
-  ctx.strokeRect(cropRect.x, cropRect.y, cropRect.w, cropRect.h);
-  const hs = 14; ctx.fillStyle = "#00D084";
-  cropHandles().forEach(h => ctx.fillRect(h.x - hs / 2, h.y - hs / 2, hs, hs));
-}
-function cropPointerPos(ev, cv){
-  const r = cv.getBoundingClientRect();
-  return { x: (ev.clientX - r.left) * (cv.width / r.width), y: (ev.clientY - r.top) * (cv.height / r.height) };
-}
-function wireCropCanvas(){
-  const cv = document.getElementById("crop_canvas");
-  cv.addEventListener("pointerdown", ev => {
-    const p = cropPointerPos(ev, cv);
-    const hit = cropHandles().find(h => Math.hypot(h.x - p.x, h.y - p.y) < 26);
-    if (hit) cropDrag = { mode: "resize", corner: hit.name, startRect: { ...cropRect }, startP: p };
-    else if (p.x > cropRect.x && p.x < cropRect.x + cropRect.w && p.y > cropRect.y && p.y < cropRect.y + cropRect.h)
-      cropDrag = { mode: "move", startRect: { ...cropRect }, startP: p };
-    else { cropDrag = { mode: "new", startP: p }; cropRect = { x: p.x, y: p.y, w: 1, h: 1 }; }
-    ev.preventDefault();
-  });
-  cv.addEventListener("pointermove", ev => {
-    if (!cropDrag) return;
-    const p = cropPointerPos(ev, cv);
-    const dx = p.x - cropDrag.startP.x, dy = p.y - cropDrag.startP.y;
-    if (cropDrag.mode === "move") { cropRect = { ...cropDrag.startRect, x: cropDrag.startRect.x + dx, y: cropDrag.startRect.y + dy }; }
-    else if (cropDrag.mode === "new") { cropRect = { x: Math.min(cropDrag.startP.x, p.x), y: Math.min(cropDrag.startP.y, p.y), w: Math.abs(dx), h: Math.abs(dy) }; }
-    else if (cropDrag.mode === "resize") { cropRect = resizeRectFromCorner(cropDrag.startRect, cropDrag.corner, dx, dy); }
-    cropRect = clampRectTo(cropRect, cropDispW, cropDispH);
-    drawCrop();
-    ev.preventDefault();
-  });
-  window.addEventListener("pointerup", () => { cropDrag = null; });
-}
-function closeCropEditor(){ document.getElementById("cropScrim").classList.remove("open"); }
-function cancelCrop(){ closeCropEditor(); cropWork = null; cropBase = null; }
-function confirmCrop(){
-  const nx = cropRect.x / cropScale, ny = cropRect.y / cropScale, nw = cropRect.w / cropScale, nh = cropRect.h / cropScale;
-  const { w: outW, h: outH } = cropOutputSize(nw, nh);
-  const out = document.createElement("canvas"); out.width = outW; out.height = outH;
-  const octx = out.getContext("2d"); octx.imageSmoothingEnabled = true; octx.imageSmoothingQuality = "high";
-  octx.drawImage(cropWork, nx, ny, nw, nh, 0, 0, outW, outH);
-  closeCropEditor();
-  document.getElementById("ocrStatus").textContent = "🔎 Leyendo VIN…";
-  runOcr(out);
-}
-
-/* ===================== OCR (sobre el recorte ya encuadrado) ===================== */
-function ensureTesseract(){
-  return new Promise((resolve, reject) => {
-    if (window.Tesseract) return resolve();
-    const sc = document.createElement("script"); sc.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
-    sc.onload = resolve; sc.onerror = reject;
-    document.head.appendChild(sc);
-  });
-}
-const TESS_BASE_PARAMS = {
-  tessedit_ocr_engine_mode: "1",
-  tessedit_char_whitelist: "0123456789ABCDEFGHJKLMNPRSTUVWXYZ",
-  user_defined_dpi: "300",
-  load_system_dawg: "0", load_freq_dawg: "0", load_punc_dawg: "0",
-  load_number_dawg: "0", load_unambig_dawg: "0", load_bigram_dawg_file: "0",
-  preserve_interword_spaces: "0",
-};
-/* El lector, aislado de la pantalla. Antes vivia dentro de runOcr y sólo
-   sabia terminar abriendo la ficha de revision; ahora tambien lo usa el
-   guardado rapido, que corre sin nadie mirando. */
-async function leerVinDeLienzo(lienzo){
-  await ensureTesseract();
-  /* Se probo leer por franjas horizontales ademas del recorte entero, para
-     aislar el renglon del bastidor de los de arriba. Medido sobre una placa
-     real de Toyota salia peor: cada franja aporta una lectura mala mas, y
-     enturbia la eleccion del candidato. Queda el recorte entero. */
-  const variants = buildOcrVariants(lienzo);
-  const worker = await Tesseract.createWorker("eng");
-  let best = null;
-  /* Se guarda lo que leyo CADA pasada, no solo la ultima. Guardando solo la
-     ultima, al añadir franjas la buena quedaba pisada por la peor y los
-     ultimos seis digitos salian de un texto inservible. */
-  const textos = [];
-  try {
-    const attempts = [];
-    variants.forEach((cv, vi) => { ["7", "8"].forEach(psm => attempts.push({ cv, vi, psm })); });
-    attempts.push({ cv: variants[0], vi: 0, psm: "6" });
-    attempts.push({ cv: variants[0], vi: 0, psm: "11" });
-    for (const at of attempts) {
-      await worker.setParameters({ ...TESS_BASE_PARAMS, tessedit_pageseg_mode: at.psm });
-      const { data } = await worker.recognize(at.cv);
-      if (data.text) textos.push(data.text);
-      const candidate = extractVinFromText(data.text || "");
-      if (candidate) {
-        const checksum = vinChecksumOk(candidate);
-        const score = (checksum ? 1000 : 0) + (data.confidence || 0);
-        if (!best || score > best.score) best = { vin: candidate, confidence: data.confidence || 0, checksum, score };
-        if (checksum) break;
-      }
-    }
-  } finally { await worker.terminate(); }
-  return { vin: best ? best.vin : null, raw: textos.join(" \n"), checksum: best ? best.checksum : false, confidence: best ? best.confidence : 0 };
-}
-
-async function runOcr(cropCanvas){
-  const statusEl = document.getElementById("ocrStatus");
-  const storeDataUrl = cropCanvas.toDataURL("image/jpeg", 0.92);
-  try {
-    /* Un unico lector para los dos caminos —el recorte a mano y el de
-       fondo—. Antes habia dos bucles casi iguales con pasadas distintas, y
-       eso hacia que un arreglo llegara a uno y no al otro: con la placa de un
-       Toyota, uno sacaba los ultimos seis correctos y el otro no. */
-    const r = await leerVinDeLienzo(cropCanvas);
-    statusEl.textContent = "";
-    const vinFull = r.vin;
-    if (ocrDestino === "confirmacion") {
-      ocrDestino = "review";
-      document.getElementById("conf_vinFull").value = vinFull || "";
-      document.getElementById("conf_vin6").value = vinFull ? vin6of(vinFull) : bestGuessVin6(r.raw);
-      document.getElementById("conf_estado").textContent = vinFull
-        ? (SEMAFORO[vinSemaforo(vinFull)] || "")
-        : "🔴 Tampoco se pudo leer así";
-      document.getElementById("confScrim").classList.add("open");
-      return;
-    }
-    const guess = guessMakeModel(r.raw);
-    const vin6 = vinFull ? vin6of(vinFull) : bestGuessVin6(r.raw);
-    openReview({ photo: storeDataUrl, vinFull: vinFull || "", vin6, vin6Guessed: !vinFull && !!vin6,
-      make: guess.make, model: guess.model, rawText: vinFull ? "" : r.raw, checksum: r.checksum });
-  } catch (e) {
-    console.error("[VIN OCR] error", e);
-    statusEl.textContent = "";
-    openReview({ photo: storeDataUrl, vinFull: "", vin6: "", make: "", model: "", rawText: "" });
-  }
 }
 
 function openReview(data){
@@ -1108,13 +589,10 @@ function openReview(data){
   if (data.skipHint) {
     hint = "Editando un registro ya guardado.";
   } else if (data.vinFull) {
-    hint = data.checksum
-      ? "✓ VIN detectado y verificado — revisa que esté correcto."
-      : "✓ VIN detectado automáticamente — revisa que esté correcto (no se pudo verificar el dígito de control, puede pasar con autos importados).";
-  } else if (data.vin6Guessed) {
-    hint = "⚠︎ No se pudo confirmar el VIN. Se rellenaron los últimos 6 dígitos con la mejor lectura automática — revísalos y corrígelos antes de guardar. La cámara leyó: \"" + data.rawText.trim().replace(/\s+/g, " ").slice(0, 80) + "\"";
-  } else if (data.rawText && data.rawText.trim()) {
-    hint = "⚠︎ No se detectó el VIN automáticamente. La cámara leyó esto, puede ayudarte a escribirlo a mano: \"" + data.rawText.trim().replace(/\s+/g, " ").slice(0, 80) + "\"";
+    hint = (SEMAFORO[data.semaforo || vinSemaforo(data.vinFull)] || "") + " — ya lo revisaste en el lector.";
+    if (data.emparejado && data.emparejado.tipo === "exacto") hint += " Ojo: este VIN ya se registró antes.";
+  } else if (data.vin6) {
+    hint = "⚠︎ Sólo tienes parte del VIN. Puedes guardar igual con la foto y completarlo después.";
   } else {
     hint = "⚠︎ No se detectó texto legible. El VIN es opcional: puedes guardar igual con la foto de respaldo y completarlo después.";
   }
@@ -1626,25 +1104,18 @@ async function refrescarLimpieza(){
 
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => showTab(b.dataset.tab));
-  document.getElementById("camInput").addEventListener("change", e => { handleFile(e.target.files[0]); e.target.value = ""; });
-  document.getElementById("galInput").addEventListener("change", e => { handleFile(e.target.files[0]); e.target.value = ""; });
+  document.getElementById("btnCamara").onclick = () => abrirLector({ fuente: "camara" });
+  document.getElementById("galInput").addEventListener("change", e => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (f) abrirLector({ archivo: f });
+  });
+  /* El lector tarda unos segundos en arrancar la primera vez: se arranca ya,
+     mientras se mira la lista, para que al pulsar Escanear este listo. */
+  setTimeout(() => LectorVIN.precargar(), 1200);
   document.getElementById("rev_save").onclick = saveReview;
   document.getElementById("rev_delete").onclick = deleteEntry;
   document.getElementById("rev_cancel").onclick = closeReview;
   document.getElementById("photoScrim_close").onclick = closePhotoLightbox;
-  document.getElementById("crop_rotate").onclick = rotateCropWork;
-  document.getElementById("crop_confirm").onclick = confirmCrop;
-  document.getElementById("crop_cancel").onclick = cancelCrop;
-  const det = document.getElementById("crop_consejos");
-  try { if (localStorage.getItem("gc_consejos_cerrados") === "1") det.open = false; } catch (e) {}
-  det.addEventListener("toggle", () => {
-    try { localStorage.setItem("gc_consejos_cerrados", det.open ? "0" : "1"); } catch (e) {}
-    /* Al plegarlos cambia el alto disponible, asi que se recalcula el lienzo
-       para que la foto aproveche el sitio que acaba de quedar libre. */
-    if (cropWork) resetCropView();
-  });
-  document.getElementById("crop_fineRotate").addEventListener("input", e => applyFineRotation(Number(e.target.value)));
-  wireCropCanvas();
   document.getElementById("set_supervisor").value = getSupervisorName();
   document.getElementById("set_supervisorSave").onclick = () => { setSupervisorName(document.getElementById("set_supervisor").value.trim()); toast("✓ Guardado"); };
   /* Una X en cada ventana, puesta desde aqui y no en el marcado, para que
@@ -1656,7 +1127,6 @@ document.addEventListener("DOMContentLoaded", () => {
     confScrim: () => cerrarConfirmacion(),
     askScrim: () => document.getElementById("ask_cancel").click(),
     reviewScrim: () => closeReview(),
-    cropScrim: () => cancelCrop(),
     photoScrim: () => closePhotoLightbox(),
   };
   document.querySelectorAll(".scrim").forEach(scrim => {
@@ -1696,20 +1166,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (abierta) (CERRADORES[abierta.id] || (() => abierta.classList.remove("open")))();
   });
 
-  /* El lector con recorte vuelve al camino de la camara.
-     Al meter el guardado rapido lo deje fuera sin darme cuenta: la camara
-     llevaba solo a "guardar y seguir", asi que el recorte a mano —que es lo
-     que mejor acierta y la razon de ser de la aplicacion— ya no se podia
-     usar salvo entrando despues por la bandeja. Aqui no se ha guardado nada
-     todavia, asi que basta con pasarle la foto al editor de recorte y sigue
-     el camino de siempre hasta la ficha de confirmar. */
-  document.getElementById("cap_leer").onclick = () => {
-    const img = capFoto && capFoto.img;
-    if (!img) return;
-    ocrDestino = "review";
-    cerrarVistazo();
-    openCropEditor(img);
-  };
   mostrarInstalar();
   document.getElementById("instalar_cerrar").onclick = () => {
     try { localStorage.setItem("gc_instalar_cerrado", String(Date.now())); } catch (e) {}
@@ -1718,7 +1174,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("set_instalar").onclick = () => { showTab("registrar"); mostrarInstalar(true);
     if (yaInstalada()) toast("✓ Ya la tienes instalada"); };
   document.getElementById("cap_save").onclick = () => guardarRapido(true);
-  document.getElementById("cap_retry").onclick = () => { cerrarVistazo(); document.getElementById("camInput").click(); };
   document.getElementById("cap_cancel").onclick = () => cerrarVistazo();
   document.getElementById("conf_cerrar").onclick = () => cerrarConfirmacion();
   document.getElementById("conf_ok").onclick = async () => {
@@ -1730,14 +1185,19 @@ document.addEventListener("DOMContentLoaded", () => {
       toast("✓ Confirmado"); cerrarConfirmacion(); loadPendientes(); loadToday();
     } catch (e) { toast("⚠︎ No se pudo confirmar"); }
   };
-  /* Volver a leer recortando a mano: el camino lento, para cuando la lectura
-     automatica de la foto entera no dio con la placa. */
-  document.getElementById("conf_recortar").onclick = () => {
+  /* Volver a leer con el editor del lector, para cuando la lectura de fondo
+     no dio con la placa: ahi se gira, se hace zoom y se ajusta el recuadro. */
+  document.getElementById("conf_recortar").onclick = async () => {
     const src = document.getElementById("conf_foto").src;
-    if (!src) { toast("⚠︎ Este registro ya no tiene foto"); return; }
-    const im = new Image();
-    im.onload = () => { ocrDestino = "confirmacion"; document.getElementById("confScrim").classList.remove("open"); openCropEditor(im); };
-    im.src = src;
+    if (!src || document.getElementById("conf_foto").hidden) { toast("⚠︎ Este registro ya no tiene foto"); return; }
+    const scrim = document.getElementById("confScrim");
+    scrim.classList.remove("open");
+    const r = await LectorVIN.abrir({ archivo: src, conocidos: vinesConocidos });
+    scrim.classList.add("open");
+    if (!r || !r.vin) return;
+    document.getElementById("conf_vinFull").value = r.vin.length === 17 ? r.vin : "";
+    document.getElementById("conf_vin6").value = vin6of(r.vin);
+    document.getElementById("conf_estado").textContent = r.vin.length === 17 ? (SEMAFORO[vinSemaforo(r.vin)] || "") : "";
   };
   document.getElementById("esp_guardar").onclick = async () => {
     try {
