@@ -236,6 +236,9 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
       <label class="btn-big alt" for="galInput"><svg class="emoji gcico" viewBox="0 0 24 24"><use href="#ico-gallery"/></svg>Desde galería</label>
       <input type="file" id="galInput" accept="image/*" hidden>
     </div>
+    <!-- Al acabar el día, la hoja de cada trabajador: sus autos con la foto
+         del VIN y los números del día, para mandarla por WhatsApp. -->
+    <button class="secondary" id="btnResumen" type="button" style="margin-top:10px">📄 Resumen del día por trabajador (foto / PDF)</button>
     <div id="ocrStatus" class="hint"></div>
     <span id="queueBadge" class="qbadge" hidden></span>
     <h3>Hoy <span id="todayCount" class="badge">0</span></h3>
@@ -255,6 +258,7 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
       <span id="rep_range" class="hint" style="margin:0"></span>
       <button id="rep_next" type="button">Siguiente ›</button>
     </div>
+    <button class="secondary" id="btnResumenRep" type="button" style="margin-bottom:8px">📄 Resumen del día por trabajador (foto / PDF)</button>
     <button class="primary" id="rep_pdf" type="button"><svg class="icobtn gcico" viewBox="0 0 24 24"><use href="#ico-print"/></svg>Imprimir o guardar en PDF</button>
 
     <div id="rep_printArea">
@@ -405,6 +409,16 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
   </div>
 </div>
 
+<div class="scrim" id="resScrim">
+  <div class="sheet">
+    <h3>Resumen del día</h3>
+    <p class="hint" style="margin-top:0">Elige el día y toca el trabajador. Sale como foto y como PDF, con la foto del VIN de cada auto.</p>
+    <label class="f">Día<input class="inp" type="date" id="res_dia"></label>
+    <div id="res_gente"></div>
+    <button class="secondary" id="res_cancel" type="button" style="margin-top:8px">Cerrar</button>
+  </div>
+</div>
+
 <div class="scrim" id="photoScrim">
   <div class="sheet">
     <img id="photoScrim_img" alt="Foto del VIN">
@@ -417,6 +431,8 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 <!-- El lector de VIN: el mismo archivo que usa SOO, byte a byte. Se
      cambia alli y se copia aqui. -->
 <script src="lector-vin.js"></script>
+<!-- El resumen del día (foto y PDF): el mismo archivo que usa SOO. -->
+<script src="informe-dia.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 const CLOUD = {
@@ -508,7 +524,7 @@ async function abrirLector(opc){
   if (r.soloFoto || !r.vin) { abrirVistazo(r.foto); return; }
   const completo = r.vin.length === 17 ? r.vin : "";
   openReview({ photo: r.foto, vinFull: completo, vin6: vin6of(r.vin), make: "", model: "",
-    semaforo: completo ? r.semaforo : null, emparejado: r.emparejado });
+    semaforo: completo ? r.semaforo : null, emparejado: r.emparejado, recorte: r.recorte });
 }
 
 let capFoto = null;
@@ -562,6 +578,7 @@ async function guardarRapido(seguir){
 async function leerEnSegundoPlano(id, foto){
   try {
     const r = await LectorVIN.leerFotoEntera(foto);
+    if (r && r.recorte) InformeDia.guardarRecorte(id, r.recorte);
     const leido = r && r.vin && r.vin.length === 17 ? r.vin : null;
     await rpc("vin_log_set_lectura", {
       p_id: id, p_vin_full: leido,
@@ -696,7 +713,10 @@ async function saveReview(){
     p_confirmado: true,
     p_estado: vinRevisado ? vinSemaforo(vinRevisado) : null };
   try {
-    await rpc("vin_log_insert", params);
+    const nuevo = await rpc("vin_log_insert", params);
+    /* La foto del VIN, recortada, se queda en este teléfono para el resumen
+       del día: así sale al momento, sin volver a buscarla en la foto. */
+    if (nuevo && pendingReview && pendingReview.recorte) InformeDia.guardarRecorte(nuevo, pendingReview.recorte);
     toast("✓ Registrado"); closeReview(); loadToday();
   } catch (e) {
     if (queueOffline(params)) {
@@ -716,6 +736,122 @@ async function deleteEntry(){
     toast("✓ Eliminado"); closeReview(); refreshOpenTabs();
   } catch (e) { toast("⚠︎ No se pudo eliminar. Revisa tu conexión."); }
   finally { btn.disabled = false; btn.innerHTML = originalHtml; }
+}
+
+/* ===================== Resumen del día ===================== */
+/* La hoja de un trabajador en un día: sus autos con la foto del VIN y los
+   números que importan, como foto y como PDF. La dibuja informe-dia.js, el
+   mismo archivo que usa SOO. Los nombres se comparan sin mayúsculas ni
+   espacios: "KM" y "Km " son la misma persona (pasó en los primeros
+   registros reales). */
+const normNombre = s => String(s || "").trim().toLowerCase();
+const fechaLocal = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+let resFilas = [];
+function abrirResumen(){
+  const inp = document.getElementById("res_dia");
+  const hoy = fechaLocal(new Date());
+  inp.max = hoy;
+  if (!inp.value) inp.value = hoy;
+  document.getElementById("resScrim").classList.add("open");
+  cargarGenteDelDia();
+}
+async function cargarGenteDelDia(){
+  const dia = document.getElementById("res_dia").value;
+  const caja = document.getElementById("res_gente");
+  caja.innerHTML = '<p class="hint">Cargando…</p>';
+  try {
+    const d0 = new Date(dia + "T00:00");
+    resFilas = await rpc("vin_log_lista", { p_from: startOfDay(d0).toISOString(), p_to: endOfDayExclusive(d0).toISOString() }) || [];
+  } catch (e) { caja.innerHTML = '<p class="hint">⚠︎ No se pudo cargar. Revisa la conexión.</p>'; return; }
+  const gente = new Map();
+  for (const r of resFilas) {
+    const k = normNombre(r.worker_name); if (!k) continue;
+    const g = gente.get(k) || { nombre: String(r.worker_name).trim(), n: 0 };
+    g.n++; gente.set(k, g);
+  }
+  if (!gente.size) { caja.innerHTML = '<p class="hint">Ese día no hay autos registrados.</p>'; return; }
+  caja.innerHTML = [...gente.entries()].sort((a, b) => b[1].n - a[1].n).map(([k, g]) =>
+    '<button class="primary" type="button" data-w="' + esc(k) + '" style="margin-top:8px">' + esc(g.nombre) + ' · ' + g.n + ' auto' + (g.n === 1 ? '' : 's') + '</button>').join("");
+  caja.querySelectorAll("[data-w]").forEach(b => b.onclick = () => generarResumen(dia, b.dataset.w));
+}
+async function generarResumen(dia, clave){
+  const filas = resFilas.filter(r => normNombre(r.worker_name) === clave)
+    .sort((a, b) => new Date(a.client_at) - new Date(b.client_at));
+  if (!filas.length) return;
+  const nombre = String(filas[0].worker_name).trim();
+  const d0 = new Date(dia + "T00:00");
+  /* Su media de los últimos 30 días, contando sólo los días que trabajó:
+     compararse con uno mismo es lo que dice si el día fue bueno. */
+  let media = null;
+  try {
+    const desde = new Date(d0); desde.setDate(desde.getDate() - 30);
+    const hist = await rpc("vin_log_lista", { p_from: startOfDay(desde).toISOString(), p_to: startOfDay(d0).toISOString() }) || [];
+    const porDia = {};
+    for (const r of hist) if (normNombre(r.worker_name) === clave) { const k = fechaLocal(new Date(r.client_at)); porDia[k] = (porDia[k] || 0) + 1; }
+    const v = Object.values(porDia);
+    if (v.length) media = v.reduce((a, b) => a + b, 0) / v.length;
+  } catch (e) {}
+  const n = filas.length;
+  const t0 = new Date(filas[0].client_at), t1 = new Date(filas[n - 1].client_at);
+  const minutos = (t1 - t0) / 60000;
+  const hora = d => d.toLocaleTimeString("es-AU", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const num = (v, dec) => Number(v).toLocaleString("de-DE", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  const completos = filas.filter(r => r.vin_full && r.vin_full.length === 17);
+  const estados = { verde: 0, ambar: 0, rojo: 0 };
+  for (const r of completos) estados[vinSemaforo(r.vin_full)]++;
+  const marcas = {};
+  for (const r of filas) if (r.make) { const m = String(r.make).trim(); marcas[m] = (marcas[m] || 0) + 1; }
+  const dif = media == null ? null : Math.round((n - media) * 10) / 10;
+  const ritmo = n > 1 ? Math.round(minutos / (n - 1)) : null;
+  InformeDia.abrir({
+    idioma: "es",
+    marca: { nombre: "Green & Clean", color: "#2f8f2a", logo: "icon-192.png" },
+    titulo: "Resumen del día", persona: nombre, fecha: dia,
+    lugar: [...new Set(filas.map(r => r.supervisor_name).filter(Boolean))].length
+      ? "Supervisa " + [...new Set(filas.map(r => String(r.supervisor_name).trim()).filter(Boolean))].join(", ") : "",
+    kpis: [
+      { etiqueta: "Vehículos", valor: String(n),
+        nota: media == null ? null : (dif >= 0 ? "+" : "") + num(dif, 1) + " frente a su media (" + num(media, 1) + ")",
+        tono: dif == null ? null : dif >= 0 ? "bien" : "mal" },
+      { etiqueta: "Primero y último", valor: hora(t0) + " – " + hora(t1),
+        nota: n > 1 ? num(minutos / 60, 1) + " h entre el primero y el último" : null },
+      { etiqueta: "Ritmo", valor: ritmo == null ? "—" : "1 cada " + ritmo + " min", nota: n > 1 ? "tiempo medio entre autos" : null },
+      { etiqueta: "VIN completo", valor: completos.length + " de " + n,
+        nota: estados.verde + " en verde" + (estados.ambar ? " · " + estados.ambar + " a revisar" : ""),
+        tono: completos.length === n ? "bien" : null }
+    ],
+    frase: nombre + " registró " + n + " auto" + (n === 1 ? "" : "s") +
+      (n > 1 ? " entre las " + hora(t0) + " y las " + hora(t1) + (ritmo ? ": uno cada " + ritmo + " minutos" : "") : " a las " + hora(t0)) +
+      ". " + (completos.length === n ? "Todos tienen el VIN completo." : (n - completos.length) + " sin el VIN completo: se puede completar mirando la foto."),
+    graficos: [
+      { tipo: "horas", titulo: "Autos por hora del día", datos: InformeDia.porHora(filas.map(r => r.client_at)) },
+      { tipo: "barras", titulo: "Estado del VIN", datos: [
+        { etiqueta: "Parece correcto", valor: estados.verde, color: "#1f9d4c" },
+        { etiqueta: "Revisar", valor: estados.ambar, color: "#c98a00" },
+        { etiqueta: "No es un VIN", valor: estados.rojo, color: "#d23b32" },
+        { etiqueta: "Sin VIN completo", valor: n - completos.length, color: "#9aa5a0" }].filter(x => x.valor) },
+      { tipo: "barras", titulo: "Marcas", datos: Object.entries(marcas).sort((a, b) => b[1] - a[1]).slice(0, 6)
+        .map(([etiqueta, valor]) => ({ etiqueta, valor })) }
+    ],
+    autos: filas.map(r => ({
+      vin: r.vin_full || (r.vin6 ? "…" + r.vin6 : "—"),
+      hora: hora(new Date(r.client_at)),
+      estado: r.vin_full && r.vin_full.length === 17 ? vinSemaforo(r.vin_full) : null,
+      detalle: [r.make, r.model, r.color].filter(Boolean).join(" ") || (r.supervisor_name ? "Supervisor: " + r.supervisor_name : ""),
+      /* Primero el recorte guardado al escanear; si no está en este
+         teléfono, se saca de la foto guardada y se guarda para la próxima. */
+      recorte: async () => {
+        let rc = await InformeDia.leerRecorte(r.id);
+        if (rc || !r.tiene_foto) return rc;
+        const foto = await rpc("vin_log_foto", { p_id: r.id });
+        if (!foto) return null;
+        rc = await LectorVIN.recortarVin(foto);
+        if (rc) InformeDia.guardarRecorte(r.id, rc);
+        return rc;
+      }
+    })),
+    pie: "Generado por Registro VIN el " + new Date().toLocaleString("es-AU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) + " · con lo registrado en el sistema."
+  });
 }
 
 /* ===================== Hoy ===================== */
@@ -1105,6 +1241,10 @@ async function refrescarLimpieza(){
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => showTab(b.dataset.tab));
   document.getElementById("btnCamara").onclick = () => abrirLector({ fuente: "camara" });
+  document.getElementById("btnResumen").onclick = abrirResumen;
+  document.getElementById("btnResumenRep").onclick = abrirResumen;
+  document.getElementById("res_dia").onchange = cargarGenteDelDia;
+  document.getElementById("res_cancel").onclick = () => document.getElementById("resScrim").classList.remove("open");
   document.getElementById("galInput").addEventListener("change", e => {
     const f = e.target.files[0]; e.target.value = "";
     if (f) abrirLector({ archivo: f });
@@ -1195,6 +1335,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const r = await LectorVIN.abrir({ archivo: src, conocidos: vinesConocidos });
     scrim.classList.add("open");
     if (!r || !r.vin) return;
+    if (r.recorte && confId) InformeDia.guardarRecorte(confId, r.recorte);
     document.getElementById("conf_vinFull").value = r.vin.length === 17 ? r.vin : "";
     document.getElementById("conf_vin6").value = vin6of(r.vin);
     document.getElementById("conf_estado").textContent = r.vin.length === 17 ? (SEMAFORO[vinSemaforo(r.vin)] || "") : "";

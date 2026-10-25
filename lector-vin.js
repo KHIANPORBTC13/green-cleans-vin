@@ -813,8 +813,21 @@
     const base = aLienzo(im, 2000)
     const sitio = await localizar(base)
     if (!sitio) return { vin: null, leido: '' }
-    const r = await leer(girarCuartos(base, sitio.cuartos), sitio.caja, opc)
-    return Object.assign(r, { cuartos: sitio.cuartos, caja: sitio.caja })
+    const girada = girarCuartos(base, sitio.cuartos)
+    const r = await leer(girada, sitio.caja, opc)
+    return Object.assign(r, { cuartos: sitio.cuartos, caja: sitio.caja,
+      recorte: recortarYAmpliar(girada, sitio.caja, 560).toDataURL('image/jpeg', 0.82) })
+  }
+
+  /* Sólo el trozo de la placa con el VIN, sin leerlo: lo usa el resumen del
+     día para enseñar la foto de cada auto cuando el recorte no se guardó al
+     escanear (una foto de antes, o hecha en otro teléfono). */
+  async function recortarVin (fuente) {
+    const im = await cargarImagen(fuente)
+    const base = aLienzo(im, 2000)
+    const sitio = await localizar(base)
+    if (!sitio) return null
+    return recortarYAmpliar(girarCuartos(base, sitio.cuartos), sitio.caja, 560).toDataURL('image/jpeg', 0.82)
   }
 
   /* ---------------- Semáforo ----------------
@@ -1788,7 +1801,7 @@
   }
 
   window.LectorVIN = {
-    precargar, abrir, leer, leerRapido, localizar, leerFotoEntera,
+    precargar, abrir, leer, leerRapido, localizar, leerFotoEntera, recortarVin,
     semaforo, verificadorOk, limpiar: limpiarVin, emparejar, recordar, historial,
     get listo () { return _listo },
     /* Para la prueba de acierto: lo que necesita sin pasar por la pantalla. */
