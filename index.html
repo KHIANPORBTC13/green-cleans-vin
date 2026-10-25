@@ -495,6 +495,9 @@ function setQueue(q){
   try { localStorage.setItem(LSKEY_QUEUE, JSON.stringify(q)); return true; }
   catch (e) { return false; }
 }
+/* Un registro en la cola todavía no tiene id; su recorte se guarda con esta
+   clave y pasa al id de verdad cuando se sube. */
+const claveCola = p => "cola:" + p.p_client_at + ":" + (p.p_worker_name || "");
 function queueOffline(params){
   const q = getQueue(); q.push(params);
   return setQueue(q);
@@ -503,7 +506,14 @@ async function flushQueue(){
   const q = getQueue();
   if (!q.length) return;
   const remaining = [];
-  for (const item of q) { try { await rpc("vin_log_insert", item); } catch (e) { remaining.push(item); } }
+  for (const item of q) {
+    try {
+      const id = await rpc("vin_log_insert", item);
+      /* El recorte del VIN esperaba con una clave provisional: pasa al id. */
+      const rc = await InformeDia.leerRecorte(claveCola(item));
+      if (id && rc) await InformeDia.guardarRecorte(id, rc);
+    } catch (e) { remaining.push(item); }
+  }
   setQueue(remaining);
   renderQueueBadge();
   if (remaining.length < q.length) loadToday();
@@ -526,15 +536,18 @@ let pendingReview = null, editingId = null;
 async function abrirLector(opc){
   const r = await LectorVIN.abrir(Object.assign({ permitirSoloFoto: true, conocidos: vinesConocidos }, opc));
   if (!r) return;
-  if (r.soloFoto || !r.vin) { abrirVistazo(r.foto); return; }
+  if (r.soloFoto || !r.vin) { abrirVistazo(r.foto, r.recorte); return; }
   const completo = r.vin.length === 17 ? r.vin : "";
   openReview({ photo: r.foto, vinFull: completo, vin6: vin6of(r.vin), make: "", model: "",
     semaforo: completo ? r.semaforo : null, emparejado: r.emparejado, recorte: r.recorte });
 }
 
 let capFoto = null;
-function abrirVistazo(dataUrl){
-  capFoto = { dataUrl };
+/* recorte: el recuadro que la persona ajustó en el editor. Es la foto del
+   VIN que sale en el resumen del día, así que viaja con la foto hasta que
+   el registro tiene su id. */
+function abrirVistazo(dataUrl, recorte){
+  capFoto = { dataUrl, recorte: recorte || null };
   document.getElementById("cap_foto").src = dataUrl;
   document.getElementById("cap_worker").value = getLastWorkerName() || "";
   document.getElementById("cap_supervisor").value = getSupervisorName() || "";
@@ -550,6 +563,7 @@ async function guardarRapido(seguir){
   if (!supervisor) { toast("⚠︎ Falta el nombre del supervisor"); return; }
   setLastWorkerName(worker); setSupervisorName(supervisor);
   const foto = capFoto.dataUrl;
+  const recorte = capFoto.recorte;
   const params = {
     p_vin_full: null, p_vin6: null, p_make: null, p_model: null, p_color: null,
     p_worker_name: worker, p_supervisor_name: supervisor,
@@ -559,12 +573,14 @@ async function guardarRapido(seguir){
   let guardado = false;
   try {
     const id = await rpc("vin_log_insert", params);
+    if (id && recorte) await InformeDia.guardarRecorte(id, recorte);
     toast("✓ Guardado — el lector sigue por su cuenta");
     cerrarVistazo(); loadToday(); renderPendientesBadge(); guardado = true;
     if (id) leerEnSegundoPlano(id, foto);
   } catch (e) {
     /* Sin señal se encola igual: la foto es lo que no se puede perder. */
     if (queueOffline(params)) {
+      if (recorte) InformeDia.guardarRecorte(claveCola(params), recorte);
       toast("📶 Sin conexión — guardado en el teléfono"); cerrarVistazo(); renderQueueBadge(); guardado = true;
     } else {
       /* No se cierra la ventana: la foto sigue en pantalla y se puede
@@ -583,7 +599,9 @@ async function guardarRapido(seguir){
 async function leerEnSegundoPlano(id, foto){
   try {
     const r = await LectorVIN.leerFotoEntera(foto);
-    if (r && r.recorte) InformeDia.guardarRecorte(id, r.recorte);
+    /* El recorte automático sólo si no hay uno hecho a mano: el recuadro
+       que ajustó la persona es el bueno y no se pisa. */
+    if (r && r.recorte && !(await InformeDia.leerRecorte(id))) InformeDia.guardarRecorte(id, r.recorte);
     const leido = r && r.vin && r.vin.length === 17 ? r.vin : null;
     await rpc("vin_log_set_lectura", {
       p_id: id, p_vin_full: leido,
@@ -725,6 +743,7 @@ async function saveReview(){
     toast("✓ Registrado"); closeReview(); loadToday();
   } catch (e) {
     if (queueOffline(params)) {
+      if (pendingReview && pendingReview.recorte) InformeDia.guardarRecorte(claveCola(params), pendingReview.recorte);
       toast("📶 Sin conexión — guardado en el teléfono, se sube solo"); closeReview(); renderQueueBadge();
     } else {
       toast("⚠︎ No cabe en el teléfono. Conéctate a la red y vuelve a guardar.");

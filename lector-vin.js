@@ -816,7 +816,21 @@
     const girada = girarCuartos(base, sitio.cuartos)
     const r = await leer(girada, sitio.caja, opc)
     return Object.assign(r, { cuartos: sitio.cuartos, caja: sitio.caja,
-      recorte: recortarYAmpliar(girada, sitio.caja, 560).toDataURL('image/jpeg', 0.82) })
+      recorte: recortarYAmpliar(girada, cajaAjustada(sitio.caja), 560).toDataURL('image/jpeg', 0.82) })
+  }
+
+  /* Para la foto del resumen, el recuadro pegado al renglón del VIN.
+     localizar() deja mucho margen a propósito —al lector le sobra y le
+     viene bien—, pero en una miniatura ese margen son los renglones de
+     arriba y abajo de la placa, y el VIN queda pequeño entre ellos. Se
+     quita el margen que puso (6% a los lados, 45% arriba y abajo) y se deja
+     uno fino. */
+  function cajaAjustada (c) {
+    const w0 = c.w / 1.12, h0 = c.h / 1.9
+    const cx = c.x + c.w / 2, cy = c.y + c.h / 2
+    const w = w0 * 1.05, h = h0 * 1.35
+    const x = Math.max(0, cx - w / 2), y = Math.max(0, cy - h / 2)
+    return { x, y, w: Math.min(1 - x, w), h: Math.min(1 - y, h) }
   }
 
   /* Sólo el trozo de la placa con el VIN, sin leerlo: lo usa el resumen del
@@ -827,7 +841,7 @@
     const base = aLienzo(im, 2000)
     const sitio = await localizar(base)
     if (!sitio) return null
-    return recortarYAmpliar(girarCuartos(base, sitio.cuartos), sitio.caja, 560).toDataURL('image/jpeg', 0.82)
+    return recortarYAmpliar(girarCuartos(base, sitio.cuartos), cajaAjustada(sitio.caja), 560).toDataURL('image/jpeg', 0.82)
   }
 
   /* ---------------- Semáforo ----------------
