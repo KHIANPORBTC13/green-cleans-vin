@@ -170,6 +170,11 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 /* El lector de VIN (lector-vin.js, el mismo que usa SOO) con el verde de
    la app. */
 .lv{--lv-acento:var(--green)}
+.ifd{--ifd-acento:var(--green)}
+.resfila{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.resfila button{width:auto;margin:0;padding:11px 14px}
+.resnom{display:flex;flex-direction:column;min-width:0}
+.resnom b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(min-width:1080px){
   header{display:none}
   nav.tabs{display:none}
@@ -238,7 +243,7 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
     </div>
     <!-- Al acabar el día, la hoja de cada trabajador: sus autos con la foto
          del VIN y los números del día, para mandarla por WhatsApp. -->
-    <button class="secondary" id="btnResumen" type="button" style="margin-top:10px">📄 Resumen del día por trabajador (foto / PDF)</button>
+    <button class="secondary" id="btnResumen" type="button" style="margin-top:10px"> 📄 Resumen del día por trabajador</button>
     <div id="ocrStatus" class="hint"></div>
     <span id="queueBadge" class="qbadge" hidden></span>
     <h3>Hoy <span id="todayCount" class="badge">0</span></h3>
@@ -258,7 +263,7 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
       <span id="rep_range" class="hint" style="margin:0"></span>
       <button id="rep_next" type="button">Siguiente ›</button>
     </div>
-    <button class="secondary" id="btnResumenRep" type="button" style="margin-bottom:8px">📄 Resumen del día por trabajador (foto / PDF)</button>
+    <button class="secondary" id="btnResumenRep" type="button" style="margin-bottom:8px">📄 Resumen del día por trabajador</button>
     <button class="primary" id="rep_pdf" type="button"><svg class="icobtn gcico" viewBox="0 0 24 24"><use href="#ico-print"/></svg>Imprimir o guardar en PDF</button>
 
     <div id="rep_printArea">
@@ -412,7 +417,7 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 <div class="scrim" id="resScrim">
   <div class="sheet">
     <h3>Resumen del día</h3>
-    <p class="hint" style="margin-top:0">Elige el día y toca el trabajador. Sale como foto y como PDF, con la foto del VIN de cada auto.</p>
+    <p class="hint" style="margin-top:0">Elige el día y, en cada trabajador, si lo quieres en foto (para WhatsApp) o en PDF (para imprimir). Lleva la foto del VIN de cada auto.</p>
     <label class="f">Día<input class="inp" type="date" id="res_dia"></label>
     <div id="res_gente"></div>
     <button class="secondary" id="res_cancel" type="button" style="margin-top:8px">Cerrar</button>
@@ -770,11 +775,15 @@ async function cargarGenteDelDia(){
     g.n++; gente.set(k, g);
   }
   if (!gente.size) { caja.innerHTML = '<p class="hint">Ese día no hay autos registrados.</p>'; return; }
+  /* Dos botones por persona y no uno: la foto es para mandar por WhatsApp,
+     el PDF para imprimir o archivar, y cada uno prepara sólo lo suyo. */
   caja.innerHTML = [...gente.entries()].sort((a, b) => b[1].n - a[1].n).map(([k, g]) =>
-    '<button class="primary" type="button" data-w="' + esc(k) + '" style="margin-top:8px">' + esc(g.nombre) + ' · ' + g.n + ' auto' + (g.n === 1 ? '' : 's') + '</button>').join("");
-  caja.querySelectorAll("[data-w]").forEach(b => b.onclick = () => generarResumen(dia, b.dataset.w));
+    '<div class="resfila"><div class="resnom"><b>' + esc(g.nombre) + '</b><span class="hint" style="margin:0">' + g.n + ' auto' + (g.n === 1 ? '' : 's') + '</span></div>' +
+    '<button class="primary" type="button" data-w="' + esc(k) + '" data-f="foto">📷 Foto</button>' +
+    '<button class="primary" type="button" data-w="' + esc(k) + '" data-f="pdf">📄 PDF</button></div>').join("");
+  caja.querySelectorAll("[data-w]").forEach(b => b.onclick = () => generarResumen(dia, b.dataset.w, b.dataset.f));
 }
-async function generarResumen(dia, clave){
+async function generarResumen(dia, clave, formato){
   const filas = resFilas.filter(r => normNombre(r.worker_name) === clave)
     .sort((a, b) => new Date(a.client_at) - new Date(b.client_at));
   if (!filas.length) return;
@@ -851,7 +860,7 @@ async function generarResumen(dia, clave){
       }
     })),
     pie: "Generado por Registro VIN el " + new Date().toLocaleString("es-AU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) + " · con lo registrado en el sistema."
-  });
+  }, formato);
 }
 
 /* ===================== Hoy ===================== */

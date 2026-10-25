@@ -388,7 +388,7 @@
   /* Genera la foto y el PDF. Los recortes pueden venir hechos o como una
      función que los consigue (por ejemplo, sacándolos de la foto guardada):
      se piden aquí, de dos en dos, avisando del avance. */
-  async function generar (d, alAvanzar) {
+  async function generar (d, alAvanzar, formato) {
     const L = TEXTOS[d.idioma] || TEXTOS.es
     try {
       FAM = getComputedStyle(document.body).fontFamily || FAM
@@ -397,9 +397,14 @@
     const autos = d.autos || []
     const recortes = new Array(autos.length).fill(null)
     let hechos = 0
+    /* Cada recorte tiene un tope de tiempo. Sacarlo de una foto guardada
+       hace trabajar al lector, y en un teléfono lento uno atascado dejaba la
+       hoja sin terminar y los botones apagados para siempre. Pasado el tope,
+       ese auto sale sin foto y la hoja se termina igual. */
+    const conTope = p => Promise.race([p, new Promise(ok => setTimeout(() => ok(null), 20000))])
     const uno = async i => {
       let src = autos[i].recorte
-      try { if (typeof src === 'function') src = await src() } catch (e) { src = null }
+      try { if (typeof src === 'function') src = await conTope(src()) } catch (e) { src = null }
       if (src) { try { recortes[i] = await cargarImagen(src) } catch (e) {} }
       hechos++; if (alAvanzar) alAvanzar(hechos, autos.length)
     }
@@ -407,10 +412,17 @@
     let logo = null
     if (d.marca && d.marca.logo) { try { logo = await cargarImagen(d.marca.logo) } catch (e) {} }
     const bs = bloques(d, L, recortes, logo)
+    /* Sólo lo que se pidió: la foto o el PDF. Hacer los dos cada vez era
+       el doble de espera para quien sólo quería uno. */
+    if (formato === 'pdf') {
+      const paginas = pintarPaginas(bs, d, L)
+      const vistas = []
+      for (const c of paginas) vistas.push(await aBlob(c, 0.8))
+      return { pdf: await pdfDe(paginas), vistas }
+    }
     const larga = pintarLarga(bs)
     const imagen = await aBlob(larga, 0.9)
-    const pdf = await pdfDe(pintarPaginas(bs, d, L))
-    return { imagen, pdf, ancho: larga.width, alto: larga.height }
+    return { imagen, vistas: [imagen] }
   }
 
   /* ---------------- Pantalla ---------------- */
@@ -418,14 +430,16 @@
     es: {
       titulo: 'Resumen del día', vehiculos: 'Vehículos del día ({n})', ninguno: 'Ningún vehículo registrado este día.',
       sinFoto: 'Sin foto del VIN', pagina: 'Página {i} de {n}', preparando: 'Preparando el resumen…',
-      fotos: 'Preparando las fotos del VIN {i} de {n}…', foto: 'Compartir foto', pdf: 'Compartir PDF',
-      bajarFoto: 'Descargar foto', bajarPdf: 'Descargar PDF', cerrar: 'Cerrar', error: 'No se pudo preparar el resumen.'
+      fotos: 'Preparando las fotos del VIN {i} de {n}…', compartir: 'Compartir', descargar: 'Descargar',
+      enFoto: 'en foto', enPdf: 'en PDF', cerrar: 'Cerrar', error: 'No se pudo preparar el resumen.',
+      bajado: 'Guardado en Descargas'
     },
     en: {
       titulo: 'Daily summary', vehiculos: 'Vehicles of the day ({n})', ninguno: 'No vehicles recorded this day.',
       sinFoto: 'No VIN photo', pagina: 'Page {i} of {n}', preparando: 'Preparing the summary…',
-      fotos: 'Preparing the VIN photos {i} of {n}…', foto: 'Share photo', pdf: 'Share PDF',
-      bajarFoto: 'Download photo', bajarPdf: 'Download PDF', cerrar: 'Close', error: 'The summary could not be prepared.'
+      fotos: 'Preparing the VIN photos {i} of {n}…', compartir: 'Share', descargar: 'Download',
+      enFoto: 'as photo', enPdf: 'as PDF', cerrar: 'Close', error: 'The summary could not be prepared.',
+      bajado: 'Saved to Downloads'
     }
   }
 
@@ -437,12 +451,13 @@
 .ifd-cab h2{flex:1;margin:0;font-size:17px}
 .ifd-x{width:44px;height:44px;border-radius:50%;background:#2a2e2c;display:grid;place-items:center;font-size:20px}
 .ifd-vista{flex:1;overflow:auto;padding:0 14px;-webkit-overflow-scrolling:touch}
-.ifd-vista img{display:block;width:100%;max-width:620px;margin:0 auto;border-radius:12px;background:#fff}
+.ifd-vista img{display:block;width:100%;max-width:620px;margin:0 auto 12px;border-radius:12px;background:#fff}
 .ifd-estado{text-align:center;padding:40px 16px;opacity:.85}
-.ifd-pie{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 14px max(14px,env(safe-area-inset-bottom));border-top:1px solid #222}
+.ifd-pie{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center;padding:10px 14px max(14px,env(safe-area-inset-bottom));border-top:1px solid #222}
 .ifd-pie button{min-height:50px;border-radius:12px;font-weight:700;font-size:15px;background:#2a2e2c}
 .ifd-pie button.ifd-pri{background:var(--ifd-acento,#2A7F26)}
 .ifd-pie button:disabled{opacity:.4}
+.ifd-nota{grid-column:1/-1;text-align:center;font-size:13px;opacity:.8;min-height:16px}
 `
   let _css = false
   const ponerCss = () => { if (_css) return; _css = true; const s = document.createElement('style'); s.textContent = CSS; document.head.appendChild(s) }
@@ -471,7 +486,11 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 60000)
   }
 
-  function abrir (d) {
+  /* formato: 'foto' (una imagen larga, lo que se manda por WhatsApp) o 'pdf'
+     (páginas A4, lo que se imprime). Son dos botones distintos desde el
+     principio y cada uno prepara sólo lo suyo. */
+  function abrir (d, formato) {
+    formato = formato === 'pdf' ? 'pdf' : 'foto'
     ponerCss()
     const L = TEXTOS[d.idioma] || TEXTOS.es
     const raiz = document.createElement('div')
@@ -481,36 +500,42 @@
       <div class="ifd-cab"><button class="ifd-x" data-a="x" aria-label="${L.cerrar}">✕</button><h2></h2></div>
       <div class="ifd-vista"><div class="ifd-estado">${L.preparando}</div></div>
       <div class="ifd-pie">
-        <button class="ifd-pri" data-a="foto" disabled>${L.foto}</button>
-        <button class="ifd-pri" data-a="pdf" disabled>${L.pdf}</button>
-        <button data-a="bfoto" disabled>${L.bajarFoto}</button>
-        <button data-a="bpdf" disabled>${L.bajarPdf}</button>
+        <button class="ifd-pri" data-a="compartir" disabled>${L.compartir}</button>
+        <button data-a="descargar" disabled>${L.descargar}</button>
+        <div class="ifd-nota" aria-live="polite"></div>
       </div>`
-    raiz.querySelector('h2').textContent = (d.titulo || L.titulo) + ' · ' + (d.persona || '')
+    const titulo = (d.titulo || L.titulo) + ' ' + (formato === 'pdf' ? L.enPdf : L.enFoto) + ' · ' + (d.persona || '')
+    raiz.querySelector('h2').textContent = titulo
     document.body.appendChild(raiz)
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const estado = raiz.querySelector('.ifd-estado')
-    let hecho = null, url = null
-    const cerrar = () => { raiz.remove(); document.body.style.overflow = prev; if (url) URL.revokeObjectURL(url) }
-    const nombre = nombreArchivo(d)
+    const nota = raiz.querySelector('.ifd-nota')
+    let hecho = null
+    const urls = []
+    const cerrar = () => { raiz.remove(); document.body.style.overflow = prev; urls.forEach(u => URL.revokeObjectURL(u)) }
+    const nombre = nombreArchivo(d) + (formato === 'pdf' ? '.pdf' : '.jpg')
+    const tipo = formato === 'pdf' ? 'application/pdf' : 'image/jpeg'
     raiz.onclick = async e => {
       const b = e.target.closest('[data-a]'); if (!b) return
       const a = b.dataset.a
       if (a === 'x') return cerrar()
       if (!hecho) return
-      const titulo = (d.titulo || L.titulo) + ' · ' + (d.persona || '')
-      if (a === 'foto') compartir(hecho.imagen, nombre + '.jpg', 'image/jpeg', titulo)
-      else if (a === 'pdf') compartir(hecho.pdf, nombre + '.pdf', 'application/pdf', titulo)
-      else if (a === 'bfoto') descargar(hecho.imagen, nombre + '.jpg')
-      else if (a === 'bpdf') descargar(hecho.pdf, nombre + '.pdf')
+      const blob = formato === 'pdf' ? hecho.pdf : hecho.imagen
+      if (a === 'compartir') {
+        const r = await compartir(blob, nombre, tipo, titulo)
+        if (r === 'descargado') nota.textContent = L.bajado
+      } else if (a === 'descargar') { descargar(blob, nombre); nota.textContent = L.bajado }
     }
-    generar(d, (i, n) => { estado.textContent = L.fotos.replace('{i}', i).replace('{n}', n) })
+    generar(d, (i, n) => { estado.textContent = L.fotos.replace('{i}', i).replace('{n}', n) }, formato)
       .then(r => {
         hecho = r
-        url = URL.createObjectURL(r.imagen)
-        const img = document.createElement('img'); img.src = url; img.alt = raiz.querySelector('h2').textContent
-        const vista = raiz.querySelector('.ifd-vista'); vista.innerHTML = ''; vista.appendChild(img)
+        const vista = raiz.querySelector('.ifd-vista'); vista.innerHTML = ''
+        for (const v of r.vistas) {
+          const u = URL.createObjectURL(v); urls.push(u)
+          const img = document.createElement('img'); img.src = u; img.alt = titulo
+          vista.appendChild(img)
+        }
         raiz.querySelectorAll('.ifd-pie button').forEach(x => { x.disabled = false })
       })
       .catch(() => { estado.textContent = L.error })
