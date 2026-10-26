@@ -198,8 +198,7 @@
     const u = umbralOtsu(datos)
     const bin = new Float32Array(w * h)
     for (let i = 0, j = 0; j < bin.length; i += 4, j++) bin[j] = datos[i] > u ? 0 : 1
-    let mejorAng = 0, mejorVar = -1, varRecta = 0
-    for (let g = -7; g <= 7; g += 0.5) {
+    const varianza = g => {
       const tan = Math.tan(g * Math.PI / 180)
       const filas = new Float32Array(h)
       for (let y = 0; y < h; y += 2) {
@@ -215,12 +214,29 @@
       media /= n
       let varia = 0
       for (let y = 0; y < h; y += 2) varia += (filas[y] - media) * (filas[y] - media)
-      if (Math.abs(g) < 0.01) varRecta = varia
-      if (varia > mejorVar) { mejorVar = varia; mejorAng = g }
+      return varia
+    }
+    /* Hasta 40 grados y no 7: en las placas reales el VIN sale inclinado
+       28 grados más de una vez —la foto se hace como se puede, de lado y
+       con la puerta abierta—. Primero a saltos de dos grados y después fino
+       alrededor del mejor, para que buscar más lejos no cueste el doble. */
+    const varRecta = varianza(0)
+    let mejorAng = 0, mejorVar = varRecta
+    for (let g = -40; g <= 40; g += 2) {
+      if (!g) continue
+      const v = varianza(g)
+      if (v > mejorVar) { mejorVar = v; mejorAng = g }
+    }
+    for (let g = mejorAng - 1.5; g <= mejorAng + 1.5; g += 0.5) {
+      const v = varianza(g)
+      if (v > mejorVar) { mejorVar = v; mejorAng = g }
     }
     /* Si girar no mejora de forma clara, no se gira: cada giro vuelve a
-       interpolar los píxeles y emborrona un poco los caracteres. */
-    return mejorVar > varRecta * 1.08 ? mejorAng : 0
+       interpolar los píxeles y emborrona un poco los caracteres. Para girar
+       mucho se pide una mejora mayor: un máximo lejano por casualidad
+       estropearía una placa que ya estaba recta. */
+    const umbral = Math.abs(mejorAng) > 8 ? 1.3 : 1.08
+    return mejorVar > varRecta * umbral ? mejorAng : 0
   }
 
   function colorDeBorde (c) {
@@ -462,9 +478,20 @@
      primera prueba real lo demostró: una lectura completamente equivocada lo
      pasó. Así que se puntúa con todo lo que se sabe de un VIN. */
   const ANOS_VIN = 'ABCDEFGHJKLMNPRSTVWXY123456789'
+  /* Los fabricantes que de verdad pasan por un lavado en Australia, por sus
+     tres primeros caracteres. Sirve para elegir, entre trozos de diecisiete
+     mal alineados, el que empieza donde empieza un VIN: no para rechazar
+     una marca que no esté en la lista. */
+  const WMI_CONOCIDOS = new Set(('JTD JTE JTF JTH JTJ JTK JTL JTM JTN JTB JT1 JT2 JT3 JT4 MR0 MR1 MR2 ' +
+    'JM0 JM1 JM6 JMZ MP2 MM0 MM6 MM7 JN1 JN6 JN8 MNT VSK JA3 JA4 JMB JMF MMA MMB MMC JF1 JF2 JHM JHL MRH ' +
+    'JS2 JS3 JSA MA3 MPA JAA MNA MNB 6FP WF0 MAJ 6G1 6H8 KL1 KLA KMH KMF KMJ MAL KNA KND KNC U5Y WVW WVG ' +
+    'WV1 WV2 3VW WBA WBS WBY WMW WDD WDB WDC W1K W1N W1V WAU WA1 TRU 5YJ LRW XP7 LSJ SDP LGW LGX LSF LSK ' +
+    'LC0 VF1 VF3 TMB YV1 SAL SAJ 1C4 3C6 1G1 ZFA JYA').split(' '))
   function puntuar (v, confianza) {
     if (!v) return -1
     let p = 0
+    if (v.length === 17 && WMI_CONOCIDOS.has(v.slice(0, 3))) p += 8
+    if (v.length === 17 && semaforo(v) === 'verde') p += 6
     if (v.length === 17) p += 40
     if (esNorteamericano(v) && verificadorOk(v) === true) p += 8
     if (v.length === 17 && (ANOS_VIN.includes(v[9]) || !esNorteamericano(v))) p += 10
@@ -484,9 +511,19 @@
     const fuera = []
     for (const m of bruto.match(/\*([A-Z0-9\s]{10,25})\*/g) || []) fuera.push({ s: m.replace(/\*/g, ''), premio: 30 })
     const limpio = bruto.replace(/[^A-Z0-9\s]/g, ' ')
-    for (const t of limpio.split(/\s+/)) if (t.length >= 11) fuera.push({ s: t, premio: 0 })
+    /* Un bloque que ya mide diecisiete es casi seguro el VIN tal cual; un
+       trozo de diecisiete sacado de pegar renglones es un recurso. En la
+       placa real de un Mazda el lector leyó el VIN exacto como bloque y se
+       eligió un trozo mal alineado de otra pasada: pesaban lo mismo. */
+    for (let t of limpio.split(/\s+/)) {
+      /* "VIN" delante, pegado o leído a medias (VN, V1N): se quita. */
+      const sinVin = t.replace(/^V[I1L]?N(?=[A-Z0-9]{17}$)/, '')
+      if (sinVin.length === 17) fuera.push({ s: sinVin, premio: 25 })
+      else if (t.length >= 11) fuera.push({ s: t, premio: 0 })
+      if (t.length > 17) for (let i = 0; i + 17 <= t.length; i++) fuera.push({ s: t.slice(i, i + 17), premio: 2 })
+    }
     const pegado = limpio.replace(/\s+/g, '')
-    for (let i = 0; i + 17 <= pegado.length; i++) fuera.push({ s: pegado.slice(i, i + 17), premio: 0 })
+    for (let i = 0; i + 17 <= pegado.length; i++) fuera.push({ s: pegado.slice(i, i + 17), premio: -8 })
     return fuera.map(c => ({
       vin: c.s.replace(/[^A-Z0-9]/g, '').replace(/[IOQ]/g, x => (x === 'I' ? '1' : '0')),
       premio: c.premio
@@ -647,9 +684,21 @@
 
   function prepararRecorte (im, caja, ancho) {
     const r = recortarYAmpliar(im, caja || { x: 0, y: 0, w: 1, h: 1 }, ancho)
+    const g = aGris(r)
+    /* Letras claras sobre fondo oscuro —la placa negra de Mazda, Toyota o
+       VW, el grabado del parabrisas— se dan la vuelta: el lector está hecho
+       para tinta oscura sobre papel claro, y con la placa al revés leía
+       medio VIN. El fondo es lo que más ocupa: si la mayoría es oscura, el
+       texto es claro. */
+    const u = umbralOtsu(g.data)
+    let oscuros = 0
+    for (let i = 0; i < g.data.length; i += 4) if (g.data[i] <= u) oscuros++
+    if (oscuros > g.data.length / 8) {
+      for (let i = 0; i < g.data.length; i += 4) g.data[i] = g.data[i + 1] = g.data[i + 2] = 255 - g.data[i]
+      r.getContext('2d').putImageData(g, 0, 0)
+    }
     /* Enderezar va antes que todo lo demás: si la imagen está girada, el
        umbral y el lector trabajan ya con las letras cortadas. */
-    const g = aGris(r)
     return enderezar(r, estimarInclinacion(g.data, r.width, r.height))
   }
 
@@ -685,7 +734,9 @@
       const worker = await obtenerWorker()
       _listo = true
       const im = await cargarImagen(fuente)
-      const recorte = prepararRecorte(im, caja, 1200)
+      let recorte = prepararRecorte(im, caja, 1200)
+      const linea = await renglonDelVin(worker, recorte)
+      if (linea) recorte = linea
       const imagenes = variantes(recorte)
       const todos = (opc.previas || []).filter(c => c && c.vin && c.vin.length === 17)
       const leido = []
@@ -715,14 +766,31 @@
         }
       }
 
+      /* Cuántas pasadas dicen exactamente lo mismo cuenta tanto como lo
+         segura que estaba cada una. Antes ganaba la lectura suelta con más
+         puntos, y con las placas reales eso fallaba: en un Toyota, siete
+         pasadas leyeron el VIN bien y cuatro con una S por un 9, empataban a
+         puntos y ganaba la primera que saliera; en un Kia la buena salía
+         tres veces y perdía por tres puntos de confianza contra una que
+         salía dos. Las lecturas de la cámara en vivo cuentan media. */
+      const apoyo = new Map()
+      for (const c of todos) if (c.vin.length === 17) apoyo.set(c.vin, (apoyo.get(c.vin) || 0) + (c.vivo ? 0.5 : 1))
+      /* En proporción al VIN más repetido, no con un tope fijo: con un
+         tope de cuatro, diez pasadas y seis pasadas valían lo mismo. */
+      const maxApoyo = Math.max(1, ...apoyo.values())
+      const conApoyo = c => c.puntos + Math.round(20 * (apoyo.get(c.vin) || 0) / maxApoyo)
       let mejor = null
-      for (const c of todos) if (!c.vivo && (!mejor || c.puntos > mejor.puntos)) mejor = c
+      for (const c of todos) if (!c.vivo && (!mejor || conApoyo(c) > conApoyo(mejor))) mejor = c
+      if (mejor) mejor = Object.assign({}, mejor, { puntos: conApoyo(mejor) })
       const cons = consenso(todos)
       if (cons) {
         const base = cifrasAlFinal(arreglarVerificador(cons.vin))
         const afinado = afinarConVotos(base, cons.alternativas) || corregirConVerificador(base)
         const vin = afinado || base
-        const p = puntuar(vin, mejor ? mejor.confianza : null)
+        /* La votación cuenta como un bloque leído entero (el premio que se
+           le da en candidatosDe) más el apoyo de las pasadas que coinciden. */
+        const p = puntuar(vin, mejor ? mejor.confianza : null) + 25 +
+          Math.round(20 * (apoyo.get(vin) || 0) / maxApoyo)
         /* Estrictamente mejor: cuando una sola pasada sale limpia y las
            demás a medias, empatar y sustituirla la estropea. */
         if (!mejor || p > mejor.puntos) {
@@ -731,16 +799,101 @@
         const a = acuerdoDe(cons.votos, mejor.vin)
         if (a != null) mejor.confianza = a
       }
+      /* Los caracteres en los que las pasadas no se pusieron de acuerdo, con
+         lo que más votaron las demás. El editor los marca y ofrece cambiarlos
+         con un toque: en el Kia real todas las pasadas dudaban entre B y 8 en
+         el mismo sitio, y eso no lo arregla ninguna votación, pero la persona
+         lo ve en la placa en un segundo. */
+      let dudas = []
+      if (mejor && cons && mejor.vin.length === 17) {
+        for (let i = 0; i < 17; i++) {
+          const vs = cons.votos[i]
+          const tot = vs.reduce((a, b) => a + b[1], 0)
+          if (!tot) continue
+          const mio = (vs.find(x => x[0] === mejor.vin[i]) || [null, 0])[1]
+          const otras = vs.filter(x => x[0] !== mejor.vin[i] && x[1] / tot >= 0.15).slice(0, 2).map(x => x[0])
+          if (mio / tot < 0.75 && otras.length) dudas.push({ i, es: mejor.vin[i], otras })
+        }
+      }
       const crudo = Array.from(new Set(leido)).slice(0, 6).join(' | ')
+      if (opc.depurar) opc.depurar(todos.map(c => ({ vin: c.vin, puntos: c.puntos, vivo: !!c.vivo })), cons && cons.vin)
       if (!mejor) return { vin: null, leido: crudo }
       return {
         vin: mejor.vin,
         confianza: mejor.confianza == null ? null : Math.round(mejor.confianza),
         corregido: mejor.corregido || null,
         semaforo: semaforo(mejor.vin),
+        dudas,
         leido: crudo
       }
     })
+  }
+
+  /* De lo que el lector vio en una imagen, el renglón que más parece un
+     VIN y su recuadro (en fracciones), con margen mx a los lados y my
+     arriba y abajo, en proporción al propio renglón. */
+  function mejorRenglon (data, c, mx, my) {
+    let mejor = null
+    for (const bl of (data && data.blocks) || []) {
+      for (const pa of bl.paragraphs || []) {
+        for (const li of pa.lines || []) {
+          const k = mejorCandidato(li.text, li.confidence)
+          const bb = li.bbox
+          if (!k || !bb || k.vin.length < 14) continue
+          /* Un VIN es un renglón ancho y bajo; uno alto es basura que el
+             lector juntó en vertical. */
+          if ((bb.x1 - bb.x0) < (bb.y1 - bb.y0) * 3) continue
+          /* El renglón que más parece un VIN, no el que da diecisiete
+             caracteres: en la misma placa "VEHICLE IDENTIFICATION" también
+             da diecisiete letras, y con la foto un poco torcida el renglón
+             del VIN sale con uno de menos. Aquí se busca sitio, no lectura,
+             así que cuenta la forma: que acabe en cifras, que mezcle letras
+             y cifras, que vaya entre asteriscos y que pase el semáforo. */
+          const v = k.vin
+          const cifras = (v.match(/[0-9]/g) || []).length
+          const p = (v.length >= 16 ? 20 : 10) +
+            (/[0-9]{4}$/.test(v) ? 30 : 0) +
+            (cifras >= 4 && cifras <= 13 ? 15 : 0) +
+            (/\*/.test(li.text) ? 20 : 0) +
+            (v.length === 17 ? ({ verde: 25, ambar: 0, rojo: -20 })[semaforo(v)] : 0) +
+            (v.length === 17 && WMI_CONOCIDOS.has(v.slice(0, 3)) ? 10 : 0) +
+            Math.round((li.confidence || 0) / 10)
+          if (!mejor || p > mejor.p) {
+            const mw = (bb.x1 - bb.x0) * mx, mh = (bb.y1 - bb.y0) * my
+            const x = Math.max(0, bb.x0 - mw), y = Math.max(0, bb.y0 - mh)
+            mejor = {
+              p, vin: k.vin, alto: (bb.y1 - bb.y0) / c.height,
+              caja: {
+                x: x / c.width, y: y / c.height,
+                w: Math.min(c.width - x, bb.x1 - bb.x0 + 2 * mw) / c.width,
+                h: Math.min(c.height - y, bb.y1 - bb.y0 + 2 * mh) / c.height
+              }
+            }
+          }
+        }
+      }
+    }
+    return mejor
+  }
+
+  /* Si en el recuadro entran varios renglones —"VOLKSWAGEN AG" encima, "kg"
+     debajo, el código de barras—, se busca el del VIN y se lee sólo ese.
+     Leyéndolo todo junto el lector mezclaba renglones: con la placa real de
+     un VW salía media palabra de la marca dentro del VIN. Si el recuadro ya
+     es un solo renglón, se deja como está. */
+  async function renglonDelVin (worker, recorte) {
+    /* "Un bloque" y no "texto suelto": suelto, el lector se saltaba el
+       renglón del VIN de la placa de VW entera. */
+    await worker.setParameters({ tessedit_char_whitelist: VIN_ALFABETO + '*', tessedit_pageseg_mode: '6' })
+    const { data } = await worker.recognize(recorte, {}, { text: true, blocks: true })
+    const m = mejorRenglon(data, recorte, 0, 0.45)
+    if (!m || m.alto > 0.55 || m.caja.h > 0.85) return null
+    /* La franja entera de lado a lado, no sólo lo que el lector cree que
+       ocupa el renglón: en las placas reales cortaba el principio —WVGZ en
+       un VW, MNAAXX en un Ford grabado en el vidrio— justo por ser lo más
+       tenue. El recuadro lo puso la persona alrededor del VIN, así que a
+       lo ancho no sobra nada. */
+    return recortarYAmpliar(recorte, { x: 0, y: m.caja.y, w: 1, h: m.caja.h }, 1200)
   }
 
   /* Dónde está el VIN en una foto entera, y en qué posición está la foto.
@@ -761,46 +914,23 @@
         const c = girarCuartos(base, q)
         await worker.setParameters({ tessedit_char_whitelist: VIN_ALFABETO + '*', tessedit_pageseg_mode: '11' })
         const { data } = await worker.recognize(c, {}, { text: true, blocks: true })
-        for (const bl of (data && data.blocks) || []) {
-          for (const pa of bl.paragraphs || []) {
-            for (const li of pa.lines || []) {
-              const k = mejorCandidato(li.text, li.confidence)
-              const bb = li.bbox
-              if (!k || !bb || k.vin.length < 14) continue
-              /* Un VIN es un renglón ancho y bajo; uno alto es basura que el
-                 lector juntó en vertical. */
-              if ((bb.x1 - bb.x0) < (bb.y1 - bb.y0) * 3) continue
-              /* El renglón que más parece un VIN, no el que da diecisiete
-                 caracteres: en la misma placa "VEHICLE IDENTIFICATION"
-                 también da diecisiete letras, y con la foto un poco
-                 torcida el renglón del VIN sale con uno de menos. Aquí se
-                 busca sitio, no lectura, así que cuenta la forma: que
-                 acabe en cifras, que mezcle letras y cifras, que vaya
-                 entre asteriscos y que pase el semáforo si está entero. */
-              const v = k.vin
-              const cifras = (v.match(/[0-9]/g) || []).length
-              const p = (v.length >= 16 ? 20 : 10) +
-                (/[0-9]{4}$/.test(v) ? 30 : 0) +
-                (cifras >= 4 && cifras <= 13 ? 15 : 0) +
-                (/\*/.test(li.text) ? 20 : 0) +
-                (v.length === 17 ? ({ verde: 25, ambar: 0, rojo: -20 })[semaforo(v)] : 0) +
-                Math.round((li.confidence || 0) / 10)
-              if (!mejor || p > mejor.p) {
-                const mw = (bb.x1 - bb.x0) * 0.06, mh = (bb.y1 - bb.y0) * 0.45
-                const x = Math.max(0, bb.x0 - mw), y = Math.max(0, bb.y0 - mh)
-                mejor = {
-                  p, cuartos: q, vin: k.vin,
-                  caja: {
-                    x: x / c.width, y: y / c.height,
-                    w: Math.min(c.width - x, bb.x1 - bb.x0 + 2 * mw) / c.width,
-                    h: Math.min(c.height - y, bb.y1 - bb.y0 + 2 * mh) / c.height
-                  }
-                }
-              }
-            }
-          }
-        }
+        const m = mejorRenglon(data, c, 0.06, 0.45)
+        if (m && (!mejor || m.p > mejor.p)) mejor = Object.assign(m, { cuartos: q, enderezado: 0 })
         if (mejor && mejor.vin.length === 17 && mejor.p >= 90) break
+      }
+      /* Las placas reales salen muchas veces muy inclinadas —25 o 30
+         grados—, y así el lector no encuentra ningún renglón. Sólo si no
+         apareció nada claro se prueba la foto enderezada a un lado y a
+         otro: en las fotos fáciles no se espera nada de más. */
+      if (!posiciones && !(mejor && mejor.vin.length === 17 && mejor.p >= 90)) {
+        for (const a of [25, -25]) {
+          const c = enderezar(base, a)
+          await worker.setParameters({ tessedit_char_whitelist: VIN_ALFABETO + '*', tessedit_pageseg_mode: '11' })
+          const { data } = await worker.recognize(c, {}, { text: true, blocks: true })
+          const m = mejorRenglon(data, c, 0.06, 0.45)
+          if (m && (!mejor || m.p > mejor.p)) mejor = Object.assign(m, { cuartos: 0, enderezado: a })
+          if (mejor && mejor.vin.length === 17 && mejor.p >= 90) break
+        }
       }
       return mejor
     })
@@ -813,7 +943,7 @@
     const base = aLienzo(im, 2000)
     const sitio = await localizar(base)
     if (!sitio) return { vin: null, leido: '' }
-    const girada = girarCuartos(base, sitio.cuartos)
+    const girada = enderezar(girarCuartos(base, sitio.cuartos), sitio.enderezado || 0)
     const r = await leer(girada, sitio.caja, opc)
     return Object.assign(r, { cuartos: sitio.cuartos, caja: sitio.caja,
       recorte: recortarYAmpliar(girada, cajaAjustada(sitio.caja), 560).toDataURL('image/jpeg', 0.82) })
@@ -841,7 +971,8 @@
     const base = aLienzo(im, 2000)
     const sitio = await localizar(base)
     if (!sitio) return null
-    return recortarYAmpliar(girarCuartos(base, sitio.cuartos), cajaAjustada(sitio.caja), 560).toDataURL('image/jpeg', 0.82)
+    return recortarYAmpliar(enderezar(girarCuartos(base, sitio.cuartos), sitio.enderezado || 0),
+      cajaAjustada(sitio.caja), 560).toDataURL('image/jpeg', 0.82)
   }
 
   /* ---------------- Semáforo ----------------
@@ -866,6 +997,12 @@
        también acaba en cuatro cifras, y esto es lo que lo delata. */
     if ((v.slice(-6).match(/[0-9]/g) || []).length < 5) return 'ambar'
     if (esNorteamericano(v)) return verificadorOk(v) ? 'verde' : 'ambar'
+    /* Fuera de Norteamérica, verde sólo si el fabricante es de los que
+       pasan por aquí o el dígito de control cuadra. Con una placa real de
+       Ford el lector se comió la primera letra y añadió una al final
+       (NAAXXMAWANY965907), y salía en verde: cumplía todo lo demás. Un
+       fabricante desconocido no es un error, pero sí motivo para mirarlo. */
+    if (!WMI_CONOCIDOS.has(v.slice(0, 3)) && !verificadorOk(v)) return 'ambar'
     return 'verde'
   }
 
@@ -1004,7 +1141,9 @@
       tanda: 'Mismo modelo que otro auto: se completó el principio ({n}).',
       deshacer: 'Volver a lo leído', escrito: 'Has escrito el VIN a mano. El lector leyó {v}.', usarLeido: 'Usar lo leído',
       vertical: 'La foto está vertical: si el VIN se ve de lado, pulsa Girar.',
-      caracteres: '{n} carácter', caracteresN: '{n} caracteres'
+      caracteres: '{n} carácter', caracteresN: '{n} caracteres',
+      dudas: 'El lector dudó en lo marcado. Compáralo con la placa y, si hace falta, toca la otra opción:',
+      posicion: '{n}º'
     },
     en: {
       cerrar: 'Close', marco: 'Fit the VIN inside the frame', marco2: 'Horizontal, filling the frame',
@@ -1028,7 +1167,9 @@
       tanda: 'Same model as another car: the start was completed ({n}).',
       deshacer: 'Back to what was read', escrito: 'You typed the VIN. The reader read {v}.', usarLeido: 'Use what was read',
       vertical: 'The photo is portrait: if the VIN is sideways, tap Rotate.',
-      caracteres: '{n} character', caracteresN: '{n} characters'
+      caracteres: '{n} character', caracteresN: '{n} characters',
+      dudas: 'The reader was unsure about the marked ones. Compare with the plate and, if needed, tap the other option:',
+      posicion: '#{n}'
     }
   }
 
@@ -1106,6 +1247,8 @@
 .lv-nota mark{background:#ffc23d;color:#000;border-radius:3px;padding:0 1px}
 .lv-vin{font-family:ui-monospace,Menlo,Consolas,monospace;letter-spacing:.05em}
 .lv-acciones{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.lv-dudas{display:flex;flex-wrap:wrap;gap:6px}
+.lv .lv-duda{background:#ffc23d;color:#000;border-radius:999px;padding:8px 12px;font-weight:700;font-size:14px;min-height:38px}
 @media (min-width:700px){.lv-panel{max-height:46%}.lv-acciones{flex-direction:row}}
 `
   let _css = false
@@ -1474,9 +1617,15 @@
         dibujar()
       }
 
+      /* Las dudas del lector que siguen como él las leyó: mientras quede
+         alguna, el semáforo no puede decir "parece correcto". */
+      const dudasPendientes = v => lectura && lectura.dudas && v.length === 17
+        ? lectura.dudas.filter(d => v[d.i] === d.es) : []
       const color = () => {
         const v = limpiarVin(campo.value)
-        return v.length === 17 ? semaforo(v) : ''
+        if (v.length !== 17) return ''
+        const s = semaforo(v)
+        return s === 'verde' && dudasPendientes(v).length ? 'ambar' : s
       }
 
       const dibujar = () => {
@@ -1530,7 +1679,7 @@
         const v = limpiarVin(campo.value)
         $('.lv-n').textContent = v.length + '/17'
         const chip = $('.lv-chip')
-        const s = v.length === 17 ? semaforo(v) : (v.length ? 'rojo' : '')
+        const s = v.length === 17 ? color() : (v.length ? 'rojo' : '')
         chip.hidden = !v.length
         chip.dataset.s = s
         chip.textContent = v.length ? tx(s === 'rojo' && v.length < 17 ? 'vacio' : s) : ''
@@ -1550,6 +1699,15 @@
               <div class="lv-vin" style="margin-top:4px">${marcar(emparejado.vin, emparejado.cambios)}</div>
               ${lectura && lectura.vin && lectura.vin !== emparejado.vin ? `<a data-a="deshacer">${tx('deshacer')}</a>` : ''}</div>`)
           }
+        }
+        /* Lo que el lector no tuvo claro: marcado en el VIN y con la otra
+           opción a un toque. Sólo mientras ese carácter siga como lo leyó. */
+        const dudas = dudasPendientes(v)
+        if (dudas.length) {
+          notas.push(`<div class="lv-nota ojo">${tx('dudas')}
+            <div class="lv-vin" style="margin:4px 0 6px">${marcar(v, dudas.map(d => d.i))}</div>
+            <div class="lv-dudas">${dudas.map(d => d.otras.map(o =>
+              `<button class="lv-duda" data-a="duda" data-i="${d.i}" data-c="${o}">${tx('posicion', { n: d.i + 1 })}: ${d.es} → ${o}</button>`).join('')).join('')}</div></div>`)
         }
         if (aMano && lectura && lectura.vin && lectura.vin !== v) {
           notas.push(`<div class="lv-nota ojo">${tx('escrito', { v: `<span class="lv-vin">${lectura.vin}</span>` })}
@@ -1743,6 +1901,12 @@
         else if (a === 'zmas') zoomEn(1.4, escena.clientWidth / 2, escena.clientHeight / 2)
         else if (a === 'zmenos') zoomEn(1 / 1.4, escena.clientWidth / 2, escena.clientHeight / 2)
         else if (a === 'releer') { aMano = false; releer() }
+        else if (a === 'duda') {
+          const v = limpiarVin(campo.value), i = Number(b.dataset.i)
+          campo.value = v.slice(0, i) + b.dataset.c + v.slice(i + 1)
+          aMano = true
+          pintarPanel()
+        }
         else if (a === 'deshacer') { campo.value = lectura.vin; emparejado = null; pintarPanel() }
         else if (a === 'usarleido') { campo.value = lectura.vin; aMano = false; emparejado = emparejar(lectura.vin, conocidos); if (emparejado) campo.value = emparejado.vin; pintarPanel() }
         else if (a === 'usar' || a === 'solo') {
@@ -1784,7 +1948,12 @@
           if (mio !== turno || cerrado) return
           if (sitio) {
             cuartos = sitio.cuartos
-            trabajo = girarCuartos(base, cuartos)
+            /* Si la encontró enderezándola, el editor la enseña ya
+               enderezada y con el deslizador en su sitio. */
+            grados = -(sitio.enderezado || 0)
+            rango.value = String(grados)
+            $('.lv-endtxt').textContent = `${tx('enderezar')} ${grados}°`
+            trabajo = enderezar(girarCuartos(base, cuartos), -grados)
             caja = cajaDeFraccion(sitio.caja)
             acotar()
             encajar(true)
@@ -1808,7 +1977,10 @@
       }
     }
 
-    if (opc.archivo) editor(opc.archivo, { buscar: true })
+    /* Con caja (fracciones de la foto), el editor abre con ese recuadro y
+       lee: sirve para volver a una foto cuyo recuadro ya se conoce. */
+    if (opc.archivo && opc.caja) editor(opc.archivo, { caja: opc.caja })
+    else if (opc.archivo) editor(opc.archivo, { buscar: true })
     else if (opc.fuente === 'galeria') { camara(); elegirFoto() }
     else camara()
     return promesa
@@ -1819,6 +1991,7 @@
     semaforo, verificadorOk, limpiar: limpiarVin, emparejar, recordar, historial,
     get listo () { return _listo },
     /* Para la prueba de acierto: lo que necesita sin pasar por la pantalla. */
-    _interno: { cargarImagen, recortarYAmpliar, girarCuartos, aLienzo, VIN_CORE, VIN_LANG, cargarTesseract }
+    _interno: { cargarImagen, recortarYAmpliar, girarCuartos, aLienzo, VIN_CORE, VIN_LANG, cargarTesseract, prepararRecorte, variantes,
+      lineaDe: c => enFila(async () => renglonDelVin(await obtenerWorker(), c)) }
   }
 })()
