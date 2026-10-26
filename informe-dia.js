@@ -21,6 +21,10 @@
      InformeDia.guardarRecorte(clave, dataURL)  el recorte del VIN, en el teléfono
      InformeDia.leerRecorte(clave)              → dataURL | null
      InformeDia.porHora(instantes)              → datos del gráfico de autos por hora
+
+   VIN repetido: datos.alerta (un texto) pone un aviso rojo arriba, y
+   auto.repetido (true o el texto de con cuál coincide) pinta esa tarjeta
+   en rojo con "VIN REPETIDO".
    ============================================================ */
 ;(function () {
   'use strict'
@@ -204,6 +208,20 @@
       } })
     }
 
+    /* La alerta de VIN repetido, en rojo y antes de nada más: un auto
+       apuntado dos veces es un auto cobrado dos veces. */
+    if (d.alerta) {
+      const g0 = document.createElement('canvas').getContext('2d'); fuente(g0, 600, 24)
+      const ls = lineas(g0, d.alerta, W - 64)
+      out.push({ alto: 36 + 50 + ls.length * 34 + 44, dibujar (g, y) {
+        rect(g, M, y + 36, W, 50 + ls.length * 34 + 30, 18, C.rojo)
+        rect(g, M + 3, y + 39, W - 6, 50 + ls.length * 34 + 24, 16, '#fdecea')
+        g.fillStyle = C.rojo; fuente(g, 800, 28); g.fillText(L.repetido, M + 32, y + 36 + 50)
+        fuente(g, 600, 24)
+        ls.forEach((l, i) => g.fillText(l, M + 32, y + 36 + 50 + 38 + i * 34))
+      } })
+    }
+
     for (const gr of d.graficos || []) {
       if (!gr.datos || !gr.datos.length) continue
       if (gr.tipo === 'horas') {
@@ -255,7 +273,9 @@
       out.push({ alto: th + gap, fila: true, dibujar (g, y) {
         par.forEach((a, k) => {
           const x = M + k * (tw + gap), yy = y + gap / 2
-          rect(g, x, yy, tw, th, 20, C.panel)
+          /* Repetido: la tarjeta entera en rojo, para verla de un vistazo. */
+          if (a.repetido) { rect(g, x, yy, tw, th, 20, C.rojo); rect(g, x + 3, yy + 3, tw - 6, th - 6, 18, '#fdecea') }
+          else rect(g, x, yy, tw, th, 20, C.panel)
           /* La foto del VIN: entera y centrada, sin deformar. */
           const ix = x + 16, iy = yy + 16, iw = tw - 32, ih = 112
           rect(g, ix, iy, iw, ih, 12, '#dfe6e2')
@@ -274,10 +294,14 @@
           g.fillStyle = est; g.beginPath(); g.arc(x + 28, yy + 162, 8, 0, Math.PI * 2); g.fill()
           g.fillStyle = C.suave; fuente(g, 700, 20)
           g.fillText('#' + (i + k + 1) + (a.hora ? ' · ' + a.hora : ''), x + 46, yy + 169)
+          if (a.repetido) {
+            g.fillStyle = C.rojo; fuente(g, 800, 19); g.textAlign = 'right'
+            g.fillText(L.repetido, x + tw - 20, yy + 169); g.textAlign = 'left'
+          }
           /* El VIN con los seis últimos en negrita: es lo que se busca con
              la vista en una hoja con veinte. */
           const vin = String(a.vin || '')
-          g.fillStyle = C.tinta
+          g.fillStyle = a.repetido ? C.rojo : C.tinta
           if (vin.length > 6) {
             g.font = `500 25px ${MONO}`; const pre = vin.slice(0, -6)
             g.fillText(pre, x + 20, yy + 208)
@@ -286,8 +310,8 @@
           } else {
             g.font = `800 25px ${MONO}`; g.fillText(vin || '—', x + 20, yy + 208)
           }
-          g.fillStyle = C.suave; fuente(g, 500, 19)
-          g.fillText(recortarTexto(g, a.detalle || '', tw - 40), x + 20, yy + 240)
+          g.fillStyle = a.repetido ? C.rojo : C.suave; fuente(g, a.repetido ? 700 : 500, 19)
+          g.fillText(recortarTexto(g, (a.repetido && typeof a.repetido === 'string' ? a.repetido : a.detalle) || '', tw - 40), x + 20, yy + 240)
         })
       } })
     }
@@ -428,14 +452,14 @@
   /* ---------------- Pantalla ---------------- */
   const TEXTOS = {
     es: {
-      titulo: 'Resumen del día', vehiculos: 'Vehículos del día ({n})', ninguno: 'Ningún vehículo registrado este día.',
+      titulo: 'Resumen del día', repetido: 'VIN REPETIDO', vehiculos: 'Vehículos del día ({n})', ninguno: 'Ningún vehículo registrado este día.',
       sinFoto: 'Sin foto del VIN', pagina: 'Página {i} de {n}', preparando: 'Preparando el resumen…',
       fotos: 'Preparando las fotos del VIN {i} de {n}…', compartir: 'Compartir', descargar: 'Descargar',
       enFoto: 'en foto', enPdf: 'en PDF', cerrar: 'Cerrar', error: 'No se pudo preparar el resumen.',
       bajado: 'Guardado en Descargas'
     },
     en: {
-      titulo: 'Daily summary', vehiculos: 'Vehicles of the day ({n})', ninguno: 'No vehicles recorded this day.',
+      titulo: 'Daily summary', repetido: 'REPEATED VIN', vehiculos: 'Vehicles of the day ({n})', ninguno: 'No vehicles recorded this day.',
       sinFoto: 'No VIN photo', pagina: 'Page {i} of {n}', preparando: 'Preparing the summary…',
       fotos: 'Preparing the VIN photos {i} of {n}…', compartir: 'Share', descargar: 'Download',
       enFoto: 'as photo', enPdf: 'as PDF', cerrar: 'Close', error: 'The summary could not be prepared.',

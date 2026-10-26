@@ -12,7 +12,7 @@
    La pagina se pide primero a la red y solo si no hay señal se tira de la
    copia: asi cada arreglo que se sube llega en la siguiente apertura, en vez
    de quedarse el telefono con la version vieja hasta vaciar la memoria. */
-const CACHE = "registro-vin-v5";
+const CACHE = "registro-vin-v6";
 /* El programa que lee va aparte y con nombre fijo: si fuera en la cache de
    la carcasa se borraria con cada version nueva, y justo despues de
    actualizar el lector dejaria de funcionar sin señal hasta volver a bajar

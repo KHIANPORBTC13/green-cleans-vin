@@ -85,6 +85,17 @@ button.fila:active,label.fila:active,a.fila:active,.fila[data-id]:active{backgro
 .vrow.pending .vin6{color:var(--sec)}
 .punto{width:10px;height:10px;border-radius:50%;flex:none;background:var(--ter)}
 .punto.verde{background:var(--verde)}.punto.ambar{background:var(--ambar)}.punto.rojo{background:var(--rojo)}
+/* VIN repetido: en rojo y con su nombre, para verlo sin buscarlo. */
+.rep-et{display:inline-block;font-size:12px;line-height:18px;font-weight:700;letter-spacing:.3px;color:#fff;background:var(--rojo);
+  border-radius:5px;padding:0 6px;margin-right:6px;vertical-align:1px;white-space:nowrap}
+.fila.repetido .vin6,.fila.repetido .mas,.fila.repetido .sub{color:var(--rojo)}
+.fila.repetido .sub{white-space:normal;margin-top:2px}
+.rep-et,.reptable tr.repetido td,#rep_insightsList li.mal{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.reptable tr.repetido td{color:var(--rojo)}
+.aviso-rep{background:rgba(255,59,48,.12);color:var(--rojo);border-radius:12px;padding:12px 14px;margin:0 0 14px;font-size:15px;line-height:1.35}
+.aviso-rep b{display:block;font-size:17px;margin-bottom:2px}
+#rep_insightsList li.mal{color:var(--rojo);font-weight:600}
+#askScrim.repetido #ask_title{color:var(--rojo)}
 
 /* ---- Botones ---- */
 button.primary,.boton{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:50px;
@@ -437,6 +448,7 @@ nav.tabs button.active{color:var(--tinte)}
     <h3 id="rev_title">Confirmar registro</h3>
     <img id="rev_photo" hidden>
     <div id="rev_ocrHint" class="hint"></div>
+    <div id="rev_rep" class="aviso-rep" role="alert" hidden></div>
     <label class="f">Últimos 6 del VIN (opcional)<input class="inp" id="rev_vin6" maxlength="8" autocapitalize="characters"></label>
     <label class="f">VIN completo (opcional)<input class="inp" id="rev_vinFull" autocapitalize="characters"></label>
     <label class="f">Marca (opcional)<input class="inp" id="rev_make" placeholder="ej. Mazda"></label>
@@ -492,8 +504,68 @@ async function rpc(fn, body){
     headers: { "Content-Type": "application/json", "apikey": CLOUD.key, "Authorization": "Bearer " + CLOUD.key },
     body: JSON.stringify(body) });
   if (!r.ok) { throw new Error("HTTP " + r.status); }
+  /* Cualquier cambio en los registros deja viejo el historial de repetidos. */
+  if (/insert|update|delete|confirmar|borrar/.test(fn)) repHistEn = 0;
   const t = await r.text(); return t ? JSON.parse(t) : null;
 }
+
+/* ===================== VIN repetido ===================== */
+/* Dos registros con los mismos seis últimos del VIN son casi siempre el
+   mismo auto apuntado dos veces, y al dueño le pagan por auto: se marcan
+   en rojo con "VIN REPETIDO" en la lista del día, en Por confirmar, en el
+   reporte, en el CSV y en el resumen del día. No se impide guardar: un auto
+   puede volver de verdad, y eso lo decide una persona.
+
+   Se compara con los últimos 90 días, pedidos en tramos de un mes (el
+   servidor corta las respuestas largas), y se guarda tres minutos para no
+   bajarlo en cada vistazo. Sin señal no se marca nada: mejor callar que
+   avisar de un repetido que no existe. */
+const REP_TRAMOS = 3, REP_VIGENCIA = 3 * 60 * 1000;
+let repHist = null, repHistEn = 0, repHistPromesa = null;
+function claveVin(r){
+  const v = String((r && (r.vin_full || r.vin6)) || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return v.length >= 6 ? v.slice(-6) : null;
+}
+const repFresco = () => repHist && Date.now() - repHistEn < REP_VIGENCIA;
+function historialRepetidos(){
+  if (repFresco()) return Promise.resolve(repHist);
+  if (repHistPromesa) return repHistPromesa;
+  const fin = Date.now() + 86400000, mes = 30 * 86400000, tramos = [];
+  for (let k = 0; k < REP_TRAMOS; k++)
+    tramos.push(rpc("vin_log_lista", { p_from: new Date(fin - (k + 1) * mes).toISOString(), p_to: new Date(fin - k * mes).toISOString() }));
+  repHistPromesa = Promise.all(tramos).then(partes => {
+    repHist = [].concat(...partes.map(x => x || []));
+    repHistEn = Date.now();
+    return repHist;
+  }).catch(() => null).finally(() => { repHistPromesa = null; });
+  return repHistPromesa;
+}
+/* Para cada fila de "filas", los otros registros con sus mismos seis
+   últimos: id → [otros, del más antiguo al más nuevo]. */
+function repetidosDe(filas, hist){
+  const grupos = new Map();
+  const meter = r => {
+    const k = claveVin(r); if (!k || r.id == null) return;
+    let g = grupos.get(k); if (!g) grupos.set(k, g = new Map());
+    g.set(String(r.id), r);
+  };
+  (hist || []).forEach(meter); filas.forEach(meter);
+  const out = new Map();
+  for (const r of filas) {
+    const k = claveVin(r), g = k && r.id != null && grupos.get(k);
+    if (g && g.size > 1) out.set(String(r.id), [...g.values()].filter(x => String(x.id) !== String(r.id))
+      .sort((a, b) => new Date(a.client_at) - new Date(b.client_at)));
+  }
+  return out;
+}
+function textoRepetido(otros){
+  if (!otros || !otros.length) return "";
+  const o = otros[otros.length - 1];
+  const cuando = new Date(o.client_at).toLocaleString("es-AU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return "También el " + cuando + (o.worker_name ? " (" + String(o.worker_name).trim() + ")" : "") +
+    (otros.length > 1 ? " y " + (otros.length - 1) + " vez" + (otros.length > 2 ? "es" : "") + " más" : "");
+}
+const ETIQ_REP = '<span class="rep-et">VIN REPETIDO</span>';
 
 /* ===================== VIN ===================== */
 /* Leer, el semaforo y la pantalla de la camara estan en lector-vin.js. */
@@ -685,6 +757,19 @@ function openReview(data){
   }
   document.getElementById("rev_ocrHint").textContent = hint;
   const sc = document.getElementById("reviewScrim"); sc.classList.add("open");
+  revisarRepetidoEnFicha();
+}
+/* En la ficha, el aviso sale en cuanto hay seis caracteres, antes de
+   guardar: así se ve el repetido con la foto delante. */
+async function revisarRepetidoEnFicha(){
+  const caja = document.getElementById("rev_rep");
+  const fila = { id: editingId || "nuevo", vin_full: document.getElementById("rev_vinFull").value, vin6: document.getElementById("rev_vin6").value };
+  if (!claveVin(fila)) { caja.hidden = true; return; }
+  const hist = await historialRepetidos();
+  const otros = repetidosDe([fila], hist).get(String(fila.id));
+  if (claveVin(fila) !== claveVin({ vin_full: document.getElementById("rev_vinFull").value, vin6: document.getElementById("rev_vin6").value })) return;
+  caja.hidden = !otros;
+  if (otros) caja.innerHTML = "<b>VIN REPETIDO</b>Los últimos seis, " + esc(claveVin(fila)) + ", ya están registrados. " + esc(textoRepetido(otros)) + ".";
 }
 function closeReview(){ document.getElementById("reviewScrim").classList.remove("open"); pendingReview = null; editingId = null; }
 // Chrome bloquea la navegacion a data: URLs abiertas con window.open (medida anti-phishing) --
@@ -724,7 +809,11 @@ function preguntar(titulo, texto, textoOk){
 async function avisarSiRepetido(vinFull, vin6, excluir){
   let previo = null;
   try {
-    const r = await rpc("vin_log_repetidos", { p_vin_full: vinFull, p_vin6: vin6, p_excluir: excluir || null });
+    /* Por los seis últimos y no por el VIN entero: el lector puede leer mal
+       el principio, y lo que se busca a ojo en la placa es el final. */
+    const seis = claveVin({ vin_full: vinFull, vin6 });
+    if (!seis) return true;
+    const r = await rpc("vin_log_repetidos", { p_vin_full: null, p_vin6: seis, p_excluir: excluir || null });
     previo = Array.isArray(r) ? r[0] : r;
   } catch (e) { return true; }
   if (!previo || !previo.veces) return true;
@@ -732,11 +821,15 @@ async function avisarSiRepetido(vinFull, vin6, excluir){
     ? new Date(previo.ultima).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
     : "antes";
   const quien = previo.quien ? " por " + previo.quien : "";
-  return preguntar(
-    "Este auto ya estaba registrado",
-    "Ese chasis ya se registró " + (previo.veces > 1 ? previo.veces + " veces, la última " : "") +
+  const scrim = document.getElementById("askScrim");
+  scrim.classList.add("repetido");
+  const seguir = await preguntar(
+    "VIN REPETIDO",
+    "Los últimos seis del VIN ya se registraron " + (previo.veces > 1 ? previo.veces + " veces, la última " : "") +
     "el " + cuando + quien + ". Si el auto ha vuelto, regístralo igual. Si es por error, cancela.",
     "Registrarlo igual");
+  scrim.classList.remove("repetido");
+  return seguir;
 }
 
 async function saveReview(){
@@ -878,6 +971,7 @@ async function generarResumen(dia, clave, formato){
   for (const r of filas) if (r.make) { const m = String(r.make).trim(); marcas[m] = (marcas[m] || 0) + 1; }
   const dif = media == null ? null : Math.round((n - media) * 10) / 10;
   const ritmo = n > 1 ? Math.round(minutos / (n - 1)) : null;
+  const reps = repetidosDe(filas, (await historialRepetidos()) || resFilas);
   InformeDia.abrir({
     idioma: "es",
     marca: { nombre: "Green & Clean", color: "#2f8f2a", logo: "icon-192.png" },
@@ -895,6 +989,8 @@ async function generarResumen(dia, clave, formato){
         nota: estados.verde + " en verde" + (estados.ambar ? " · " + estados.ambar + " a revisar" : ""),
         tono: completos.length === n ? "bien" : null }
     ],
+    alerta: reps.size ? reps.size + (reps.size === 1 ? " auto de este día tiene" : " autos de este día tienen") +
+      " los mismos seis últimos del VIN que otro registro. Revisa que no sea el mismo auto apuntado dos veces." : null,
     frase: nombre + " registró " + n + " auto" + (n === 1 ? "" : "s") +
       (n > 1 ? " entre las " + hora(t0) + " y las " + hora(t1) + (ritmo ? ": uno cada " + ritmo + " minutos" : "") : " a las " + hora(t0)) +
       ". " + (completos.length === n ? "Todos tienen el VIN completo." : (n - completos.length) + " sin el VIN completo: se puede completar mirando la foto."),
@@ -912,6 +1008,7 @@ async function generarResumen(dia, clave, formato){
       vin: r.vin_full || (r.vin6 ? "…" + r.vin6 : "—"),
       hora: hora(new Date(r.client_at)),
       estado: r.vin_full && r.vin_full.length === 17 ? vinSemaforo(r.vin_full) : null,
+      repetido: reps.has(String(r.id)) ? textoRepetido(reps.get(String(r.id))) : null,
       detalle: [r.make, r.model, r.color].filter(Boolean).join(" ") || (r.supervisor_name ? "Supervisor: " + r.supervisor_name : ""),
       /* Primero el recorte guardado al escanear; si no está en este
          teléfono, se saca de la foto guardada y se guarda para la próxima. */
@@ -940,23 +1037,27 @@ async function loadToday(){
   } catch (e) { document.getElementById("todayList").innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">No se pudo cargar. Revisa la conexión.</span></div>'; }
 }
 function renderTodayList(rows){
-  const pend = getQueue().map(q => ({ vin6: q.p_vin6, make: q.p_make, model: q.p_model, worker_name: q.p_worker_name, client_at: q.p_client_at, _pending: true }));
+  const pend = getQueue().map((q, i) => ({ id: "cola-" + i, vin_full: q.p_vin_full, vin6: q.p_vin6, make: q.p_make, model: q.p_model, worker_name: q.p_worker_name, client_at: q.p_client_at, _pending: true }));
   const list = pend.concat(rows);
+  const reps = repetidosDe(list, repHist);
   document.getElementById("todayCount").textContent = list.length;
-  document.getElementById("todayList").innerHTML = list.length ? list.map(rowHTML).join("")
+  document.getElementById("todayList").innerHTML = list.length ? list.map(r => rowHTML(r, reps.get(String(r.id)))).join("")
     : '<div class="fila"><span class="mas" style="color:var(--sec)">Todavía no hay autos hoy. Escanea el primero.</span></div>';
   document.querySelectorAll("#todayList .vrow[data-id]").forEach(el => el.onclick = () => openEditFromId(el.dataset.id, todayRows));
+  if (!repFresco()) historialRepetidos().then(h => { if (h) renderTodayList(todayRows); });
 }
 /* Una fila por auto: los seis últimos del VIN delante, grandes, que es lo
    que se busca; marca y modelo, y debajo quién y a qué hora. */
-function rowHTML(r){
+function rowHTML(r, repetido){
   const time = new Date(r.client_at).toLocaleTimeString("es-AU", { hour: "2-digit", minute: "2-digit" });
   const makeModel = [r.make, r.model].filter(Boolean).join(" ");
   const idAttr = r._pending ? "" : ' data-id="' + esc(r.id) + '" role="button" tabindex="0"';
-  return '<div class="fila vrow' + (r._pending ? " pending" : "") + '"' + idAttr + '>' +
+  const sub = repetido ? ETIQ_REP + esc(textoRepetido(repetido))
+    : r._pending ? "Pendiente de subir" : esc(makeModel || "Sin marca ni modelo");
+  return '<div class="fila vrow' + (r._pending ? " pending" : "") + (repetido ? " repetido" : "") + '"' + idAttr + '>' +
     '<span class="vin6">' + esc(r.vin6 || "—") + '</span>' +
     '<span class="mas">' + esc(r.worker_name || "") +
-      '<span class="sub">' + (r._pending ? "Pendiente de subir" : esc(makeModel || "Sin marca ni modelo")) + '</span></span>' +
+      '<span class="sub">' + sub + '</span></span>' +
     '<span class="val">' + time + '</span>' + (r._pending ? "" : CHEV) + '</div>';
 }
 async function openEditFromId(id, source){
@@ -999,12 +1100,16 @@ async function loadReport(){
   const range = periodRange(repPeriod, repAnchor);
   document.getElementById("rep_range").textContent = fmtRange(range);
   const box = document.getElementById("rep_table"); box.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">Cargando…</span></div>';
-  try { repRows = await rpc("vin_log_lista", { p_from: range.from.toISOString(), p_to: range.to.toISOString() }) || []; renderReport(); }
+  try {
+    repRows = await rpc("vin_log_lista", { p_from: range.from.toISOString(), p_to: range.to.toISOString() }) || []; renderReport();
+    if (!repFresco()) historialRepetidos().then(h => { if (h) renderReport(); });
+  }
   catch (e) { box.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">No se pudo cargar el reporte. Revisa la conexión.</span></div>'; }
 }
-let repChartInstance = null;
+let repChartInstance = null, repMarcas = new Map();
 function renderReport(){
   const total = repRows.length;
+  repMarcas = repetidosDe(repRows, repHist);
   const byWorker = {};
   repRows.forEach(r => { byWorker[r.worker_name] = (byWorker[r.worker_name] || 0) + 1; });
   const workerEntries = Object.entries(byWorker).sort((a, b) => b[1] - a[1]);
@@ -1023,14 +1128,14 @@ function renderReport(){
     || '<div class="fila"><span class="mas" style="color:var(--sec)">Sin registros en este período.</span></div>';
 
   renderReportChart();
-  renderReportInsights(workerEntries, missing, total);
+  renderReportInsights(workerEntries, missing, total, repMarcas.size);
 
   const box = document.getElementById("rep_table");
   if (!total) { box.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">Sin registros en este período.</span></div>'; return; }
   box.innerHTML = '<table class="reptable"><thead><tr><th>Fecha</th><th>VIN (6)</th><th>VIN completo</th><th>Marca</th><th>Modelo</th><th>Color</th><th>Trabajador</th><th>Supervisor</th><th></th></tr></thead><tbody>' +
-    repRows.map(r => '<tr data-id="' + esc(r.id) + '"><td>' + new Date(r.client_at).toLocaleString("es-AU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) +
-      '</td><td><b>' + esc(r.vin6 || "—") + '</b></td><td>' + esc(r.vin_full || "—") + '</td><td>' + esc(r.make || "—") + '</td><td>' + esc(r.model || "—") + '</td><td>' + esc(r.color || "—") + '</td><td>' + esc(r.worker_name) + '</td><td>' + esc(r.supervisor_name || "—") + '</td><td>' +
-      (r.tiene_foto ? '<a href="#" class="photolink" data-id="' + esc(r.id) + '">Ver foto</a>' : "") + '</td></tr>').join("") + '</tbody></table>';
+    repRows.map(r => { const rp = repMarcas.get(String(r.id)); return '<tr data-id="' + esc(r.id) + '"' + (rp ? ' class="repetido"' : '') + '><td>' + new Date(r.client_at).toLocaleString("es-AU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) +
+      '</td><td><b>' + esc(r.vin6 || "—") + '</b>' + (rp ? '<br>' + ETIQ_REP + '<br><small>' + esc(textoRepetido(rp)) + '</small>' : '') + '</td><td>' + esc(r.vin_full || "—") + '</td><td>' + esc(r.make || "—") + '</td><td>' + esc(r.model || "—") + '</td><td>' + esc(r.color || "—") + '</td><td>' + esc(r.worker_name) + '</td><td>' + esc(r.supervisor_name || "—") + '</td><td>' +
+      (r.tiene_foto ? '<a href="#" class="photolink" data-id="' + esc(r.id) + '">Ver foto</a>' : "") + '</td></tr>'; }).join("") + '</tbody></table>';
   /* La foto se pide al tocarla, no antes. Venia dentro de la lista, asi que
      abrir el informe de un mes descargaba todas las fotos del periodo para
      enseñar una tabla de texto. */
@@ -1073,9 +1178,11 @@ function renderReportChart(){
     },
   });
 }
-function renderReportInsights(workerEntries, missing, total){
+function renderReportInsights(workerEntries, missing, total, repetidos){
   const list = document.getElementById("rep_insightsList");
   const bullets = [];
+  const alerta = repetidos ? "VIN REPETIDO en " + repetidos + (repetidos === 1 ? " registro" : " registros") +
+    " de este período: revisa que no sea el mismo auto apuntado dos veces. Están en rojo en la lista de abajo." : null;
   if (!total) {
     bullets.push("Sin registros en este período todavía.");
   } else {
@@ -1092,11 +1199,13 @@ function renderReportInsights(workerEntries, missing, total){
       bullets.push("Todos los autos de este período ya tienen el VIN cargado.");
     }
   }
-  list.innerHTML = bullets.map(b => "<li>" + esc(b) + "</li>").join("");
+  list.innerHTML = (alerta ? '<li class="mal">' + esc(alerta) + "</li>" : "") + bullets.map(b => "<li>" + esc(b) + "</li>").join("");
 }
 function exportReportCSV(){
-  const rows = [["fecha_hora", "vin_ultimos6", "vin_completo", "marca", "modelo", "color", "trabajador", "supervisor"]];
-  repRows.forEach(r => rows.push([new Date(r.client_at).toLocaleString("es-AU"), r.vin6 || "", r.vin_full || "", r.make || "", r.model || "", r.color || "", r.worker_name, r.supervisor_name || ""]));
+  const rows = [["fecha_hora", "vin_ultimos6", "vin_completo", "marca", "modelo", "color", "trabajador", "supervisor", "alerta"]];
+  repRows.forEach(r => { const rp = repMarcas.get(String(r.id));
+    rows.push([new Date(r.client_at).toLocaleString("es-AU"), r.vin6 || "", r.vin_full || "", r.make || "", r.model || "", r.color || "", r.worker_name, r.supervisor_name || "",
+      rp ? "VIN REPETIDO: " + textoRepetido(rp) : ""]); });
   const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
@@ -1228,12 +1337,16 @@ async function loadPendientes(){
     pendientes = Array.isArray(r) ? r : [];
     if (!pendientes.length) { caja.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">Nada pendiente. Todos los autos tienen el chasis confirmado.</span></div>'; renderPendientesBadge(); return; }
     const ESTADO = { verde: "Parece correcto", ambar: "Revísalo", rojo: "No se pudo leer" };
+    const hist = await historialRepetidos();
+    const reps = repetidosDe(pendientes, hist);
     caja.innerHTML = pendientes.map(e => {
       const cuando = new Date(e.client_at).toLocaleString("es-AU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-      return '<div class="fila" data-id="' + esc(e.id) + '" role="button" tabindex="0">' +
+      const rp = reps.get(String(e.id));
+      return '<div class="fila' + (rp ? " repetido" : "") + '" data-id="' + esc(e.id) + '" role="button" tabindex="0">' +
         '<span class="punto ' + (ESTADO[e.vin_estado] ? e.vin_estado : "") + '"></span>' +
         '<span class="mas">' + esc(e.vin_full || (e.vin6 ? "…" + e.vin6 : "Sin chasis")) +
-          '<span class="sub">' + (ESTADO[e.vin_estado] || "Sin leer todavía") + (e.worker_name ? ", " + esc(e.worker_name) : "") + '</span></span>' +
+          '<span class="sub">' + (rp ? ETIQ_REP + esc(textoRepetido(rp))
+            : (ESTADO[e.vin_estado] || "Sin leer todavía") + (e.worker_name ? ", " + esc(e.worker_name) : "")) + '</span></span>' +
         '<span class="val">' + cuando + '</span>' + CHEV + '</div>';
     }).join("");
     caja.querySelectorAll("[data-id]").forEach(el => el.onclick = () => abrirConfirmacion(el.dataset.id));
@@ -1341,6 +1454,8 @@ document.addEventListener("DOMContentLoaded", () => {
      mientras se mira la lista, para que al pulsar Escanear este listo. */
   setTimeout(() => LectorVIN.precargar(), 1200);
   document.getElementById("rev_save").onclick = saveReview;
+  document.getElementById("rev_vin6").addEventListener("input", revisarRepetidoEnFicha);
+  document.getElementById("rev_vinFull").addEventListener("input", revisarRepetidoEnFicha);
   document.getElementById("rev_delete").onclick = deleteEntry;
   document.getElementById("rev_cancel").onclick = closeReview;
   document.getElementById("photoScrim_close").onclick = closePhotoLightbox;
