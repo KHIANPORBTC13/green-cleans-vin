@@ -1231,7 +1231,7 @@ async function loadPendientes(){
     caja.innerHTML = pendientes.map(e => {
       const cuando = new Date(e.client_at).toLocaleString("es-AU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
       return '<div class="fila" data-id="' + esc(e.id) + '" role="button" tabindex="0">' +
-        '<span class="punto ' + (e.vin_estado || "") + '"></span>' +
+        '<span class="punto ' + (ESTADO[e.vin_estado] ? e.vin_estado : "") + '"></span>' +
         '<span class="mas">' + esc(e.vin_full || (e.vin6 ? "…" + e.vin6 : "Sin chasis")) +
           '<span class="sub">' + (ESTADO[e.vin_estado] || "Sin leer todavía") + (e.worker_name ? ", " + esc(e.worker_name) : "") + '</span></span>' +
         '<span class="val">' + cuando + '</span>' + CHEV + '</div>';

@@ -444,20 +444,36 @@
   }
 
   const CSS = `
-.ifd{position:fixed;inset:0;z-index:2147482000;background:#0e110f;color:#fff;display:flex;flex-direction:column;font-family:inherit}
+.ifd{position:fixed;inset:0;z-index:2147482000;display:flex;flex-direction:column;
+  --ifd-fondo:#f2f2f7;--ifd-barra:rgba(249,249,249,.94);--ifd-texto:#000;--ifd-sec:rgba(60,60,67,.6);--ifd-sep:rgba(60,60,67,.29);
+  --ifd-gris:rgba(118,118,128,.12);--ifd-pri:var(--ifd-acento,#1f8a3b);--ifd-tinte:var(--ifd-acento,#1f8a3b);
+  background:var(--ifd-fondo);color:var(--ifd-texto);
+  font:17px/1.29 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  letter-spacing:-.41px;-webkit-font-smoothing:antialiased}
+@media (prefers-color-scheme:dark){.ifd{--ifd-fondo:#000;--ifd-barra:rgba(22,22,23,.94);--ifd-texto:#fff;--ifd-sec:rgba(235,235,245,.6);
+  --ifd-sep:rgba(84,84,88,.65);--ifd-gris:rgba(118,118,128,.24);--ifd-pri:var(--ifd-acento,#248a3d);--ifd-tinte:#30d158}}
 .ifd *{box-sizing:border-box}
-:where(.ifd) button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
-.ifd-cab{display:flex;align-items:center;gap:10px;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top));flex:none}
-.ifd-cab h2{flex:1;margin:0;font-size:17px}
-.ifd-x{width:44px;height:44px;border-radius:50%;background:#2a2e2c;display:grid;place-items:center;font-size:20px}
-.ifd-vista{flex:1;overflow:auto;padding:0 14px;-webkit-overflow-scrolling:touch}
-.ifd-vista img{display:block;width:100%;max-width:620px;margin:0 auto 12px;border-radius:12px;background:#fff}
-.ifd-estado{text-align:center;padding:40px 16px;opacity:.85}
-.ifd-pie{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center;padding:10px 14px max(14px,env(safe-area-inset-bottom));border-top:1px solid #222}
-.ifd-pie button{min-height:50px;border-radius:12px;font-weight:700;font-size:15px;background:#2a2e2c}
-.ifd-pie button.ifd-pri{background:var(--ifd-acento,#2A7F26)}
-.ifd-pie button:disabled{opacity:.4}
-.ifd-nota{grid-column:1/-1;text-align:center;font-size:13px;opacity:.8;min-height:16px}
+:where(.ifd) button{font:inherit;letter-spacing:inherit;color:inherit;border:0;background:none;cursor:pointer;-webkit-appearance:none}
+.ifd button:focus-visible{outline:2px solid #0a84ff;outline-offset:2px}
+.ifd-cab{display:flex;align-items:center;gap:12px;padding:8px 16px;padding-top:max(8px,env(safe-area-inset-top));flex:none;min-height:60px;
+  background:var(--ifd-barra);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:0 .5px 0 var(--ifd-sep)}
+.ifd-cab h2{flex:1;margin:0;min-width:0;font-size:17px;font-weight:600;line-height:1.2}
+.ifd-cab h2 small{display:block;font-size:13px;font-weight:400;letter-spacing:-.08px;color:var(--ifd-sec);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ifd-x{width:30px;height:30px;border-radius:50%;background:var(--ifd-gris);color:var(--ifd-sec);display:grid;place-items:center;flex:none}
+.ifd-vista{flex:1;overflow:auto;padding:16px;-webkit-overflow-scrolling:touch}
+.ifd-vista img{display:block;width:100%;max-width:620px;margin:0 auto 16px;border-radius:12px;background:#fff;
+  box-shadow:0 0 0 .5px var(--ifd-sep)}
+.ifd-estado{text-align:center;padding:48px 16px;font-size:15px;letter-spacing:-.24px;color:var(--ifd-sec)}
+.ifd-pie{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center;padding:10px 16px max(12px,env(safe-area-inset-bottom));
+  background:var(--ifd-barra);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:0 -.5px 0 var(--ifd-sep)}
+.ifd-pie button{min-height:50px;border-radius:14px;font-weight:600;font-size:17px;background:var(--ifd-gris);color:var(--ifd-tinte)}
+.ifd-pie button.ifd-pri{background:var(--ifd-pri);color:#fff}
+.ifd-pie button:active{opacity:.75}
+.ifd-pie button:disabled{opacity:.35}
+.ifd-nota{grid-column:1/-1;text-align:center;font-size:13px;letter-spacing:-.08px;color:var(--ifd-sec);min-height:16px}
+.ifd-nota:empty{display:none}
+@media (min-width:700px){.ifd-pie{grid-template-columns:repeat(2,minmax(0,220px));justify-content:center}}
 `
   let _css = false
   const ponerCss = () => { if (_css) return; _css = true; const s = document.createElement('style'); s.textContent = CSS; document.head.appendChild(s) }
@@ -497,15 +513,18 @@
     raiz.className = 'ifd'
     raiz.setAttribute('role', 'dialog'); raiz.setAttribute('aria-modal', 'true')
     raiz.innerHTML = `
-      <div class="ifd-cab"><button class="ifd-x" data-a="x" aria-label="${L.cerrar}">✕</button><h2></h2></div>
+      <div class="ifd-cab"><h2></h2><button class="ifd-x" data-a="x" aria-label="${L.cerrar}"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
       <div class="ifd-vista"><div class="ifd-estado">${L.preparando}</div></div>
       <div class="ifd-pie">
         <button class="ifd-pri" data-a="compartir" disabled>${L.compartir}</button>
         <button data-a="descargar" disabled>${L.descargar}</button>
         <div class="ifd-nota" aria-live="polite"></div>
       </div>`
-    const titulo = (d.titulo || L.titulo) + ' ' + (formato === 'pdf' ? L.enPdf : L.enFoto) + ' · ' + (d.persona || '')
-    raiz.querySelector('h2').textContent = titulo
+    const titulo = (d.titulo || L.titulo) + ' ' + (formato === 'pdf' ? L.enPdf : L.enFoto) + (d.persona ? ', ' + d.persona : '')
+    /* En la cabecera, el qué arriba y de quién debajo, como un título de iOS. */
+    const h2 = raiz.querySelector('h2')
+    h2.textContent = (d.titulo || L.titulo) + ' ' + (formato === 'pdf' ? L.enPdf : L.enFoto)
+    if (d.persona) { const sm = document.createElement('small'); sm.textContent = d.persona; h2.appendChild(sm) }
     document.body.appendChild(raiz)
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
