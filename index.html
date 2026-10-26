@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>Green & Clean · Registro VIN</title>
-<meta name="theme-color" content="#0b120e">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <!-- Lo que necesita el telefono para tratar esto como una aplicacion y no
      como una pagina: el manifiesto para Android, y para el iPhone el icono y
      las tres etiquetas que hacen que se abra a pantalla completa, sin la barra
@@ -14,178 +15,221 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Registro VIN">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
+/* ============================================================
+   Aspecto: el de las apps del propio teléfono, no el de una web.
+
+   La letra es la del sistema (SF en iPhone, Roboto en Android): es lo que
+   más hace que algo se sienta "del teléfono". Fondo gris de lista agrupada,
+   filas blancas con separadores finos que no llegan al borde, un solo color
+   de acento —el verde de Green & Clean— para lo que se puede tocar, y nada
+   de sombras, degradados ni etiquetas en mayúsculas. Lo único que destaca
+   son los seis últimos del VIN, que es lo que se busca con la vista.
+   ============================================================ */
 :root{
-  --bg:#0b120e; --panel:#141d18; --panel2:#1c2721; --line:#26352c; --text:#eef4f0; --muted:#8fa096;
-  --green:#3fa939; --green-dark:#0E5C2F; --mint:#00D084; --amber:#ffb020; --red:#e5484d; --pillbg:#172a18;
+  color-scheme:light dark;
+  --fondo:#f2f2f7; --celda:#fff; --campo:#fff; --hoja:#f2f2f7;
+  --texto:#000; --sec:rgba(60,60,67,.6); --ter:rgba(60,60,67,.3);
+  --sep:rgba(60,60,67,.29); --relleno:rgba(118,118,128,.12); --relleno2:rgba(118,118,128,.2);
+  --tinte:#1f8a3b; --boton:#1f8a3b; --rojo:#ff3b30; --ambar:#c27800; --verde:#28a745;
+  --barra:rgba(249,249,249,.92); --segon:#fff;
+  --letra:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
 }
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:'Poppins',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding-bottom:70px}
-header{padding:16px 16px 10px;display:flex;align-items:center;gap:10px;max-width:640px;margin:0 auto;box-sizing:border-box}
-header .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--green),var(--mint));display:flex;align-items:center;justify-content:center;font-weight:800;color:#04210f}
-header h1{font-size:16px;margin:0;font-weight:700}
-header p{margin:0;font-size:11px;color:var(--muted)}
-/* Hueco al final para que la barra fija de abajo no tape la ultima tarjeta.
-   Con 24px, el ultimo boton de Ajustes quedaba debajo de la barra y no se
-   podia ni leer ni pulsar. */
-main{padding:0 16px calc(104px + env(safe-area-inset-bottom));max-width:640px;margin:0 auto}
-nav.tabs{position:fixed;bottom:0;left:0;right:0;display:flex;gap:4px;background:var(--panel);border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom));z-index:20}
-nav.tabs button{flex:1;background:none;border:none;color:var(--muted);font-size:11px;font-weight:600;padding:10px 4px;min-height:48px;border-radius:999px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;transition:background .15s,color .15s}
-nav.tabs button .ic{width:19px;height:19px}
-/* Escritorio (≥1080px): barra lateral fija en vez de la barra inferior. Oculta por
-   defecto -- la regla que la muestra vive al FINAL de la hoja, dentro del media
-   query, para ganarle a estas reglas de móvil en la cascada (si se mueve arriba,
-   deja de aplicarse, ya paso una vez con el mismo patron en el sistema SOO). */
-.siderail{display:none;flex-direction:column;gap:4px;width:248px;position:fixed;top:0;left:0;
-  height:100vh;padding:22px 16px;background:var(--panel);border-right:1px solid var(--line);
-  z-index:20;box-sizing:border-box}
-.siderail .brand{display:flex;align-items:center;gap:10px;padding:0 6px;margin-bottom:26px}
-.siderail .brand h1{font-size:16px;margin:0;font-weight:700}
-.siderail .brand p{margin:0;font-size:11px;color:var(--muted)}
-.rail-item{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:12px;background:none;
-  border:none;color:var(--muted);font-size:14px;font-weight:600;width:100%;text-align:left;cursor:pointer;
-  transition:background .15s,color .15s}
-.rail-item .ic{width:19px;height:19px;flex:none}
-.rail-item.active{background:var(--green);color:#04210f;font-weight:700}
-.gcico{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;display:block;flex:none}
-.icobtn{width:16px;height:16px;display:inline-block;vertical-align:-3px;margin-right:6px}
-.badgeic{width:14px;height:14px;display:inline-block;vertical-align:-2px;margin-right:5px}
-nav.tabs button.active{color:#04210f;background:var(--green);font-weight:700}
-.segctrl{display:flex;gap:2px;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:4px;overflow-x:auto;-webkit-overflow-scrolling:touch}
-.segctrl::-webkit-scrollbar{display:none}
-.segctrl button{flex:0 0 auto;background:none;border:none;color:var(--muted);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:999px;cursor:pointer;white-space:nowrap}
-.segctrl button.on{background:var(--pillbg);color:var(--text);border:1px solid var(--green)}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
-.card h3{margin:0 0 12px;font-size:14px}
-.statcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:10px}
-.statq{font-size:13px;color:var(--muted);font-weight:600;margin-bottom:6px}
-.statnum{font-size:30px;font-weight:800;color:var(--text);line-height:1.1}
-.statnum .unit{font-size:15px;font-weight:600;color:var(--muted);margin-left:4px}
-.statsub{font-size:12px;color:var(--muted);margin-top:4px}
-/* Borrar no puede parecerse a guardar. Rojo apagado: se ve que es distinto
-   sin gritar, porque tampoco es una accion que se haga todos los dias. */
-button.danger{color:#ff8d7a;border-color:#5a2a22}
-button.danger:disabled,button.secondary:disabled,button.primary:disabled{opacity:.4}
-/* Los numeros del espacio en fila, que es como se leen de un vistazo. */
-.espgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
-.espgrid>div{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 8px;text-align:center}
-.espnum{font-size:20px;font-weight:800;line-height:1.1}
-.esplbl{font-size:11px;color:var(--muted);margin-top:3px}
-.sep{border:none;border-top:1px solid var(--line);margin:18px 0 14px}
-.blabel{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+@media (prefers-color-scheme:dark){
+  :root{
+    --fondo:#000; --celda:#1c1c1e; --campo:#2c2c2e; --hoja:#1c1c1e;
+    --texto:#fff; --sec:rgba(235,235,245,.6); --ter:rgba(235,235,245,.3);
+    --sep:rgba(84,84,88,.65); --relleno:rgba(118,118,128,.24); --relleno2:rgba(118,118,128,.36);
+    --tinte:#30d158; --boton:#248a3d; --rojo:#ff453a; --ambar:#ff9f0a; --verde:#30d158;
+    --barra:rgba(22,22,24,.9); --segon:#636366;
+  }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--fondo);color:var(--texto);font:17px/1.29 var(--letra);letter-spacing:-.41px;
+  -webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;letter-spacing:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--tinte);outline-offset:2px}
+[hidden]{display:none!important}
+
+main{padding:max(12px,env(safe-area-inset-top)) 16px calc(96px + env(safe-area-inset-bottom));max-width:680px;margin:0 auto}
+.titulo{font-size:34px;line-height:41px;font-weight:700;letter-spacing:.37px;margin:6px 4px 14px}
+
+/* ---- Listas agrupadas ---- */
+.grupo-cab{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;line-height:18px;
+  letter-spacing:-.08px;color:var(--sec);margin:0 16px 7px}
+.grupo{background:var(--celda);border-radius:12px;overflow:hidden;margin:0 0 30px}
+.grupo-pie{font-size:13px;line-height:18px;letter-spacing:-.08px;color:var(--sec);margin:-23px 16px 30px}
+.fila{position:relative;display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:11px 16px;
+  background:none;border:0;text-align:left;text-decoration:none;color:var(--texto)}
+.fila+.fila::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--sep)}
+.fila.con-icono+.fila::before,.fila+.fila.con-icono::before{left:54px}
+button.fila:active,label.fila:active,a.fila:active,.fila[data-id]:active{background:var(--relleno2)}
+.fila .val{margin-left:auto;color:var(--sec);text-align:right;flex:none}
+.fila .mas{flex:1;min-width:0}
+.fila .sub{display:block;font-size:15px;line-height:20px;color:var(--sec);letter-spacing:-.24px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fila.accion{color:var(--tinte)}
+.fila.peligro{color:var(--rojo)}
+.fila:disabled{opacity:.4}
+.chev{width:8px;height:13px;flex:none;color:var(--ter);margin-left:4px}
+.ico-fila{width:30px;height:30px;border-radius:7px;background:var(--boton);color:#fff;display:grid;place-items:center;flex:none}
+.ico-fila svg{width:19px;height:19px}
+
+/* Lo único que destaca: los seis últimos del VIN, en cifras alineadas. */
+.vin6{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.5px;min-width:84px;flex:none}
+.vrow{cursor:pointer}
+.vrow.pending .vin6{color:var(--sec)}
+.punto{width:10px;height:10px;border-radius:50%;flex:none;background:var(--ter)}
+.punto.verde{background:var(--verde)}.punto.ambar{background:var(--ambar)}.punto.rojo{background:var(--rojo)}
+
+/* ---- Botones ---- */
+button.primary,.boton{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:50px;
+  border:0;border-radius:14px;background:var(--boton);color:#fff;font-size:17px;font-weight:600;margin:0}
+button.secondary{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:50px;
+  border:0;border-radius:14px;background:var(--relleno);color:var(--tinte);font-size:17px;font-weight:600;margin:8px 0 0}
+button.danger{color:var(--rojo)}
+button.primary:disabled,button.secondary:disabled{opacity:.4}
+button.primary:active,button.secondary:active{filter:brightness(.92)}
+.escanear{min-height:56px;font-size:18px;margin-bottom:12px}
+.escanear svg{width:24px;height:24px}
+.icobtn{width:20px;height:20px;flex:none}
+.gcico{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;display:block;flex:none}
+
+/* ---- Campos ---- */
+label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--sec);margin:0 0 14px;letter-spacing:-.08px}
+input.inp,select.inp{width:100%;background:var(--campo);border:0;border-radius:10px;padding:12px 14px;
+  font-size:17px;color:var(--texto);letter-spacing:-.41px;-webkit-appearance:none;appearance:none}
+input.inp::placeholder{color:var(--ter)}
+/* En una fila, el campo va a la derecha y sin caja, como en Ajustes. */
+.fila input.inp,.fila select.inp{background:none;padding:0;text-align:right;color:var(--sec);border-radius:0;width:auto;flex:1;min-width:0}
+.fila select.inp{flex:none;padding-right:18px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 16'%3E%3Cpath d='M2 6l3-3 3 3M2 10l3 3 3-3' fill='none' stroke='%238e8e93' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right center;background-size:9px 15px;direction:rtl}
+.fila select.inp option{direction:ltr}
+
+/* ---- Control segmentado ---- */
+.segctrl{display:flex;background:var(--relleno);border-radius:9px;padding:2px;margin:0 0 14px}
+.segctrl button{flex:1;border:0;background:none;border-radius:7px;padding:6px 2px;font-size:13px;font-weight:500;
+  letter-spacing:-.08px;color:var(--texto);white-space:nowrap}
+.segctrl button.on{background:var(--segon);font-weight:600;box-shadow:0 3px 8px rgba(0,0,0,.12),0 3px 1px rgba(0,0,0,.04)}
+.repnav{display:flex;align-items:center;justify-content:space-between;margin:0 0 22px}
+.repnav button{width:44px;height:44px;border:0;border-radius:50%;background:none;color:var(--tinte);font-size:24px;display:grid;place-items:center}
+.repnav button:active{background:var(--relleno)}
+#rep_range{font-size:15px;font-weight:600;color:var(--texto)}
+
+/* ---- Reportes ---- */
+.resumen-num{font-size:34px;line-height:41px;font-weight:700;font-variant-numeric:tabular-nums}
+/* Alto fijo y no proporcional: en el ordenador el gráfico ocupaba media
+   pantalla con siete barras. */
+.grafico{position:relative;height:210px;padding:12px 12px 8px}
 #rep_insightsList{list-style:none;margin:0;padding:0}
-#rep_insightsList li{position:relative;padding:9px 0 9px 20px;font-size:13.5px;color:var(--text);border-bottom:1px solid var(--line)}
-#rep_insightsList li:last-child{border-bottom:none;padding-bottom:0}
-#rep_insightsList li::before{content:"";position:absolute;left:2px;top:16px;width:7px;height:7px;border-radius:50%;background:var(--amber)}
+#rep_insightsList li{position:relative;padding:11px 16px;font-size:15px;line-height:20px;letter-spacing:-.24px}
+#rep_insightsList li+li::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--sep)}
+.tablewrap{overflow-x:auto}
+table.reptable{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+table.reptable th{text-align:left;color:var(--sec);font-weight:500;padding:10px 12px;border-bottom:.5px solid var(--sep);white-space:nowrap}
+table.reptable td{padding:10px 12px;border-bottom:.5px solid var(--sep);white-space:nowrap}
+table.reptable tr[data-id]{cursor:pointer}
+table.reptable tr[data-id]:active{background:var(--relleno2)}
+.photolink{color:var(--tinte);text-decoration:none}
+
+/* ---- Barra de pestañas ---- */
+nav.tabs{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--barra);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border-top:.5px solid var(--sep);padding:6px 0 max(6px,env(safe-area-inset-bottom));z-index:20}
+nav.tabs button{position:relative;flex:1;border:0;background:none;color:#8e8e93;font-size:10px;font-weight:500;
+  letter-spacing:.1px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:2px 0;min-height:48px}
+nav.tabs button .ic{width:26px;height:26px}
+nav.tabs button.active{color:var(--tinte)}
+.cuenta{position:absolute;top:0;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;
+  background:var(--rojo);color:#fff;font-size:12px;font-weight:600;line-height:18px;text-align:center}
+
+/* ---- Barra lateral (ordenador) ---- */
+.siderail{display:none;flex-direction:column;gap:2px;width:260px;position:fixed;top:0;left:0;height:100vh;
+  padding:28px 12px;background:var(--celda);border-right:.5px solid var(--sep);z-index:20}
+.siderail .marca{font-size:22px;font-weight:700;margin:0 10px 18px}
+.rail-item{position:relative;display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;border-radius:8px;
+  background:none;color:var(--texto);font-size:15px;text-align:left}
+.rail-item .ic{width:20px;height:20px;color:var(--tinte)}
+.rail-item.active{background:var(--boton);color:#fff}
+.rail-item.active .ic{color:#fff}
+
+/* ---- Ventanas que suben desde abajo ---- */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;opacity:0;pointer-events:none;
+  transition:opacity .25s;z-index:30}
+.scrim.open{opacity:1;pointer-events:auto}
+.sheet{position:relative;background:var(--hoja);width:100%;max-width:680px;margin:0 auto;max-height:94vh;max-height:94dvh;
+  overflow:auto;border-radius:12px 12px 0 0;padding:20px 16px calc(20px + env(safe-area-inset-bottom));
+  transform:translateY(100%);transition:transform .38s cubic-bezier(.32,.72,0,1);scroll-padding-top:64px}
+.scrim.open .sheet{transform:none}
+.sheet::before{content:"";position:absolute;top:6px;left:50%;width:36px;height:5px;margin-left:-18px;border-radius:3px;background:var(--ter)}
+/* La barra de arriba, con el título y la X, se queda pegada al desplazar:
+   la salida tiene que estar siempre a mano. top negativo para compensar el
+   relleno de la ventana y que no tape la primera línea. */
+.sheetTop{position:sticky;top:-20px;z-index:3;display:flex;align-items:center;justify-content:center;
+  background:var(--hoja);margin:-20px -16px 14px;padding:18px 56px 10px;min-height:56px}
+.sheet h3{margin:0 0 14px;font-size:17px;font-weight:600;text-align:center}
+.sheetTop h3{margin:0}
+.cerrarX{position:absolute;right:14px;top:14px;width:30px;height:30px;border-radius:50%;border:0;background:var(--relleno);
+  color:var(--sec);font-size:13px;font-weight:700;line-height:30px;padding:0}
+.sheet img{display:block;width:100%;border-radius:12px;margin:0 0 14px;max-height:230px;object-fit:cover;background:#000}
+.sheet .hint{margin:0 0 14px}
+#rev_vin6{font-size:28px;font-weight:600;text-align:center;letter-spacing:4px;font-variant-numeric:tabular-nums}
+#photoScrim .sheet{background:transparent;padding:12px}
+#photoScrim .sheet::before{display:none}
+#photoScrim img{max-height:80vh;object-fit:contain}
+
+.hint{color:var(--sec);font-size:15px;line-height:20px;letter-spacing:-.24px;margin:6px 4px}
+.aviso-cola{color:var(--ambar);font-size:13px;margin:-20px 16px 26px}
+
+/* ---- Instalar como app ---- */
+.instalar{padding:14px 16px}
+.instalar-top{display:flex;align-items:center;gap:12px}
+.instalar-ico{width:52px;height:52px;border-radius:12px;flex:none}
+.instalar-tit{font-weight:600}
+.instalar-top>div{flex:1;min-width:0}
+.instalar .cerrarX{position:static}
+.pasos{margin:14px 0 0;padding:0;list-style:none;counter-reset:p}
+.pasos li{counter-increment:p;position:relative;padding:10px 0 10px 36px;font-size:15px;line-height:20px;border-top:.5px solid var(--sep)}
+.pasos li::before{content:counter(p);position:absolute;left:0;top:9px;width:24px;height:24px;border-radius:50%;
+  background:var(--relleno);font-size:13px;font-weight:600;display:grid;place-items:center}
+
+/* ---- Resumen del día por trabajador ---- */
+.resfila{display:flex;align-items:center;gap:8px;padding:10px 16px;position:relative}
+.resfila+.resfila::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--sep)}
+.resnom{flex:1;min-width:0;display:flex;flex-direction:column}
+.resnom b{font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.resfila button{width:auto;min-height:34px;padding:0 14px;border:0;border-radius:17px;background:var(--relleno);
+  color:var(--tinte);font-size:15px;font-weight:600;margin:0}
+
+/* ---- Aviso breve ---- */
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translate(-50%,12px);
+  background:rgba(28,28,30,.94);color:#fff;padding:12px 18px;border-radius:14px;font-size:15px;line-height:20px;
+  opacity:0;transition:opacity .2s,transform .2s;z-index:50;max-width:min(88vw,420px);text-align:center;pointer-events:none}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.mal{background:rgba(180,30,24,.95)}
+
+/* El lector y el resumen del día (archivos compartidos con SOO) con el
+   verde de la app. */
+.lv{--lv-acento:var(--boton)}
+.ifd{--ifd-acento:var(--boton)}
+
+@media (prefers-reduced-motion:reduce){.sheet,.scrim,.toast{transition:none}}
 @media print{
   body *{visibility:hidden}
-  #rep_printArea, #rep_printArea *{visibility:visible}
+  #rep_printArea,#rep_printArea *{visibility:visible}
   #rep_printArea{position:absolute;left:0;top:0;width:100%;padding:0}
 }
-.cap-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 6px}
-.btn-big{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:linear-gradient(160deg,var(--green),var(--green-dark));color:#fff;border-radius:16px;padding:22px 10px;font-weight:700;font-size:14px;cursor:pointer;border:1px solid rgba(255,255,255,.08)}
-.btn-big.alt{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
-.btn-big .emoji{width:26px;height:26px}
-.hint{color:var(--muted);font-size:12.5px;margin:6px 0}
-h3{font-size:14px;margin:18px 0 8px;display:flex;align-items:center;gap:8px}
-.badge{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--mint)}
-.qbadge{display:inline-block;background:rgba(255,176,32,.14);color:var(--amber);border:1px solid rgba(255,176,32,.3);border-radius:999px;padding:3px 10px;font-size:11.5px;margin:4px 0}
-.qbadge[hidden]{display:none}
-.vrow{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px}
-.vrow[data-id]{cursor:pointer}
-table.reptable tr[data-id]{cursor:pointer}
-table.reptable tr[data-id]:hover{background:var(--panel2)}
-.vrow.pending{border-style:dashed;opacity:.8}
-.vrow-vin{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:18px;font-weight:800;letter-spacing:1px;background:var(--panel2);border-radius:8px;padding:6px 10px;min-width:76px;text-align:center}
-.vrow-meta{display:flex;flex-direction:column;gap:2px;font-size:12.5px;color:var(--muted)}
-.vrow-meta b{color:var(--text);font-size:13px}
-.chips{display:flex;flex-wrap:wrap;gap:6px}
-.chip{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:999px;padding:6px 12px;font-size:12.5px;cursor:pointer}
-.chip.on{background:var(--green);border-color:var(--green);color:#04210f;font-weight:700}
-.repnav{display:flex;align-items:center;justify-content:space-between;margin:12px 0 4px}
-.repnav button{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:6px 10px;font-size:14px}
-.rephead{display:flex;align-items:baseline;justify-content:space-between;margin:6px 0 10px}
-.rephead .tot{font-size:26px;font-weight:800;color:var(--mint)}
-table.reptable{width:100%;border-collapse:collapse;font-size:12px}
-table.reptable th{text-align:left;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg)}
-table.reptable td{padding:7px 8px;border-bottom:1px solid var(--line)}
-.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
-label.f{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:12px}
-/* El selector tambien: el estilo estaba escrito solo para input, asi que el
-   desplegable salia blanco del navegador en medio de una pantalla oscura.
-   appearance:none quita el aspecto del sistema y la flecha se dibuja aparte. */
-select.inp{background:var(--panel2);border:1px solid var(--line);color:var(--text);
-  border-radius:10px;padding:11px 12px;font-size:15px;font-family:inherit;width:100%;
-  appearance:none;-webkit-appearance:none;
-  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
-  background-position:calc(100% - 18px) 50%,calc(100% - 12px) 50%;
-  background-size:6px 6px,6px 6px;background-repeat:no-repeat}
-input.inp{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:11px 12px;font-size:15px;font-family:inherit}
-button.primary{width:100%;background:var(--green);color:#04210f;font-weight:800;border:none;border-radius:12px;padding:13px;font-size:15px;margin-top:6px}
-button.secondary{width:100%;background:none;color:var(--muted);border:1px solid var(--line);border-radius:12px;padding:11px;font-size:14px;margin-top:8px}
-.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .2s;z-index:30}
-.scrim.open{opacity:1;pointer-events:auto}
-/* dvh antes que vh: en el movil vh mide la pantalla entera incluida la barra
-   del navegador, asi que una ventana de 92vh se sale por abajo y sus botones
-   quedan fuera de alcance. dvh mide lo que de verdad se ve. El vh se deja
-   delante como respaldo para los navegadores que no entienden dvh. */
-.sheet{background:var(--panel);width:100%;max-height:92vh;max-height:92dvh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom));margin:0 auto;max-width:640px}
-.sheet h3{margin-top:0}
-/* La X va pegada arriba y se queda ahi aunque la ventana se desplace: es la
-   salida que siempre tiene que estar a mano, pase lo que pase con el alto de
-   la pantalla. */
-/* top:-18px y no 0: la barra lleva un margen negativo de 18px para ocupar
-   todo el ancho, y anclandola en 0 el navegador la empuja hacia abajo esos
-   18px y tapa la primera linea del contenido. Anclada en -18px se queda
-   quieta en reposo y al desplazar se pega justo al borde. */
-.sheetTop{position:sticky;top:-18px;z-index:3;display:flex;align-items:center;justify-content:space-between;
-  gap:10px;background:var(--panel);margin:-18px -18px 10px;padding:14px 18px 8px}
-.sheetTop h3{margin:0}
-/* Que nada quede escondido debajo de la barra al desplazar hacia un campo. */
-.sheet{scroll-padding-top:62px}
-.cerrarX{flex:none;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);
-  background:transparent;color:var(--text);font-size:19px;line-height:1;cursor:pointer}
-.cerrarX:active{background:var(--line)}
-.sheet img{width:100%;border-radius:12px;margin-bottom:12px;max-height:220px;object-fit:cover}
-#rev_vin6{font-size:26px;text-align:center;letter-spacing:3px;font-family:ui-monospace,Menlo,monospace}
-.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);background:#1c2320;border:1px solid var(--line);color:var(--text);padding:10px 16px;border-radius:12px;font-size:13px;opacity:0;transition:.25s;z-index:50;max-width:88vw;text-align:center}
-.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-.photolink{color:var(--mint);text-decoration:none;font-size:15px}
-#photoScrim .sheet{max-width:520px;padding:12px;background:transparent}
-#photoScrim img{width:100%;max-height:80vh;object-fit:contain;border-radius:12px;margin-bottom:10px;background:#000}
-.instalar{border-color:var(--green)}
-.instalar-top{display:flex;align-items:center;gap:12px}
-.instalar-ico{width:46px;height:46px;border-radius:11px;flex:none;margin:0;max-height:none;object-fit:cover}
-.instalar-tit{font-weight:700;font-size:15px}
-.instalar-top>div{flex:1;min-width:0}
-.pasos{margin:12px 0 0;padding:0;list-style:none;counter-reset:p}
-.pasos li{counter-increment:p;position:relative;padding:8px 0 8px 34px;font-size:14px;line-height:1.4;border-top:1px solid var(--line)}
-.pasos li::before{content:counter(p);position:absolute;left:0;top:8px;width:24px;height:24px;border-radius:50%;
-  background:var(--pillbg);border:1px solid var(--green);color:var(--text);font-size:12px;font-weight:700;
-  display:flex;align-items:center;justify-content:center}
-/* El lector de VIN (lector-vin.js, el mismo que usa SOO) con el verde de
-   la app. */
-.lv{--lv-acento:var(--green)}
-.ifd{--ifd-acento:var(--green)}
-.resfila{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
-.resfila button{width:auto;margin:0;padding:11px 14px}
-.resnom{display:flex;flex-direction:column;min-width:0}
-.resnom b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media(min-width:1080px){
-  header{display:none}
+/* Ordenador: barra lateral y contenido a la derecha. Al final de la hoja
+   para ganar a las reglas de móvil. */
+@media (min-width:1080px){
   nav.tabs{display:none}
-  body{padding-bottom:0}
   .siderail{display:flex}
-  main{max-width:none;margin:0 0 0 248px;padding:32px 40px 48px}
-  /* Las 3 tarjetas de estadistica se acomodan solas en una fila; el resto
-     (grafico, insights, chips, tabla) sigue de ancho completo -- se ven mal
-     angostadas a una columna de grilla junto a las tarjetas cortas. */
-  #rep_printArea{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;align-items:start}
-  #rep_printArea .card,#rep_printArea .chips,#rep_printArea .tablewrap{grid-column:1/-1}
+  main{max-width:820px;margin:0 0 0 260px;padding:36px 48px 48px}
+  .toast{bottom:32px}
 }
 </style>
 </head>
@@ -207,149 +251,142 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 <symbol id="ico-tag" viewBox="0 0 24 24"><path d="M12.9 3.4h6.3a1.4 1.4 0 0 1 1.4 1.4v6.3a1.4 1.4 0 0 1-.4 1l-8.1 8.1a1.4 1.4 0 0 1-2 0l-7.3-7.3a1.4 1.4 0 0 1 0-2l8.1-8.1a1.4 1.4 0 0 1 1-.4Z"/><path d="M16.9 7.1h.01"/><path d="M7.6 12.2l4 4"/></symbol>
 <symbol id="ico-datetime" viewBox="0 0 24 24"><rect x="3" y="5.2" width="18" height="15.4" rx="3"/><path d="M8.2 3.4v3.6M15.8 3.4v3.6M3 10.2h18"/><path d="M7.8 14.2h.01M12 14.2h.01M7.8 17.4h.01M12 17.4h.01"/><circle cx="16.4" cy="16" r="2.6"/><path d="M16.4 14.8v1.3l.9.6"/></symbol>
 </defs></svg>
-<nav class="siderail">
-  <div class="brand">
-    <div class="logo">GC</div>
-    <div><h1>Registro VIN</h1><p>Green & Clean · respaldo diario</p></div>
-  </div>
+<nav class="siderail" aria-label="Secciones">
+  <div class="marca">Registro VIN</div>
   <button class="rail-item active" data-tab="registrar" type="button"><svg class="ic gcico" viewBox="0 0 24 24"><use href="#ico-camera"/></svg>Registrar</button>
+  <button class="rail-item" data-tab="pendientes" type="button"><svg class="ic gcico" viewBox="0 0 24 24"><use href="#ico-check"/></svg>Por confirmar</button>
   <button class="rail-item" data-tab="reportes" type="button"><svg class="ic gcico" viewBox="0 0 24 24"><use href="#ico-report"/></svg>Reportes</button>
   <button class="rail-item" data-tab="ajustes" type="button"><svg class="ic gcico" viewBox="0 0 24 24"><use href="#ico-settings"/></svg>Ajustes</button>
 </nav>
-<header>
-  <div class="logo">GC</div>
-  <div><h1>Registro VIN</h1><p>Green & Clean · respaldo diario</p></div>
-</header>
 <main>
   <section id="tab-registrar">
-    <div class="card instalar" id="instalar" hidden>
+    <h1 class="titulo">Registrar</h1>
+    <div class="grupo instalar" id="instalar" hidden>
       <div class="instalar-top">
         <img src="icon-192.png" alt="" class="instalar-ico">
         <div>
-          <div class="instalar-tit">Tenla como una app en el teléfono</div>
-          <div class="hint" style="margin:2px 0 0">Con su icono, a pantalla completa y sin buscar el enlace.</div>
+          <div class="instalar-tit">Tenla como una app</div>
+          <div class="sub hint" style="margin:2px 0 0">Con su icono y a pantalla completa, sin buscar el enlace.</div>
         </div>
         <button class="cerrarX" id="instalar_cerrar" type="button" aria-label="Ahora no">&#10005;</button>
       </div>
       <div id="instalar_pasos"></div>
     </div>
-    <div class="cap-buttons">
-      <!-- La camara de la propia app, con marco: se apunta al VIN, se ve en
-           verde cuando se lee bien y se captura. Ya no hay que dibujar el
-           recuadro despues. -->
-      <button class="btn-big" id="btnCamara" type="button"><svg class="emoji gcico" viewBox="0 0 24 24"><use href="#ico-camera"/></svg>Escanear VIN</button>
-      <label class="btn-big alt" for="galInput"><svg class="emoji gcico" viewBox="0 0 24 24"><use href="#ico-gallery"/></svg>Desde galería</label>
-      <input type="file" id="galInput" accept="image/*" hidden>
+    <!-- La cámara de la propia app, con marco: se apunta al VIN, se ve en
+         verde cuando se lee bien y se captura. -->
+    <button class="boton escanear" id="btnCamara" type="button"><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-camera"/></svg>Escanear VIN</button>
+    <div class="grupo">
+      <label class="fila con-icono" for="galInput"><span class="ico-fila"><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-gallery"/></svg></span><span class="mas">Elegir foto de la galería</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></label>
+      <!-- Al acabar el día, la hoja de cada trabajador: sus autos con la
+           foto del VIN y los números del día, para mandarla por WhatsApp. -->
+      <button class="fila con-icono" id="btnResumen" type="button"><span class="ico-fila"><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-report"/></svg></span><span class="mas">Resumen del día por trabajador</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </div>
-    <!-- Al acabar el día, la hoja de cada trabajador: sus autos con la foto
-         del VIN y los números del día, para mandarla por WhatsApp. -->
-    <button class="secondary" id="btnResumen" type="button" style="margin-top:10px"> 📄 Resumen del día por trabajador</button>
+    <input type="file" id="galInput" accept="image/*" hidden>
     <div id="ocrStatus" class="hint"></div>
-    <span id="queueBadge" class="qbadge" hidden></span>
-    <h3>Hoy <span id="todayCount" class="badge">0</span></h3>
-    <div id="todayList"></div>
+    <div class="grupo-cab"><span>Hoy</span><span><span id="todayCount">0</span> autos</span></div>
+    <div class="grupo" id="todayList"></div>
+    <p class="aviso-cola" id="queueBadge" hidden></p>
+  </section>
+
+  <section id="tab-pendientes" hidden>
+    <h1 class="titulo">Por confirmar</h1>
+    <p class="hint" style="margin:-6px 4px 18px">Autos guardados con el chasis sin confirmar. Se resuelven aquí o desde el ordenador, el que llegue antes.</p>
+    <div class="grupo" id="pend_lista"></div>
   </section>
 
   <section id="tab-reportes" hidden>
-    <div class="segctrl" id="rep_periodChips">
-      <button class="seg" data-period="day" type="button">Hoy</button>
+    <h1 class="titulo">Reportes</h1>
+    <div class="segctrl" id="rep_periodChips" role="tablist">
+      <button class="seg" data-period="day" type="button">Día</button>
       <button class="seg on" data-period="week" type="button">Semana</button>
       <button class="seg" data-period="fortnight" type="button">Quincena</button>
       <button class="seg" data-period="month" type="button">Mes</button>
       <button class="seg" data-period="semester" type="button">Semestre</button>
     </div>
     <div class="repnav">
-      <button id="rep_prev" type="button">‹ Anterior</button>
-      <span id="rep_range" class="hint" style="margin:0"></span>
-      <button id="rep_next" type="button">Siguiente ›</button>
+      <button id="rep_prev" type="button" aria-label="Período anterior">&#8249;</button>
+      <span id="rep_range"></span>
+      <button id="rep_next" type="button" aria-label="Período siguiente">&#8250;</button>
     </div>
-    <button class="secondary" id="btnResumenRep" type="button" style="margin-bottom:8px">📄 Resumen del día por trabajador</button>
-    <button class="primary" id="rep_pdf" type="button"><svg class="icobtn gcico" viewBox="0 0 24 24"><use href="#ico-print"/></svg>Imprimir o guardar en PDF</button>
 
     <div id="rep_printArea">
-      <div class="statcard">
-        <div class="statq">¿Cuántos autos se lavaron?</div>
-        <div class="statnum" id="stat_total">0</div>
-        <div class="statsub" id="stat_totalsub"></div>
-      </div>
-      <div class="statcard">
-        <div class="statq">¿Quién lavó más?</div>
-        <div class="statnum" id="stat_top">—</div>
-        <div class="statsub" id="stat_topsub"></div>
-      </div>
-      <div class="statcard">
-        <div class="statq">¿A cuántos les falta el VIN?</div>
-        <div class="statnum" id="stat_missing">0</div>
-        <div class="statsub">se puede completar mirando la foto, guardada por 3 semanas</div>
+      <div class="grupo">
+        <div class="fila" style="flex-direction:column;align-items:flex-start;gap:2px;padding:14px 16px">
+          <span class="sub">Autos lavados</span>
+          <span class="resumen-num" id="stat_total">0</span>
+          <span class="sub" id="stat_totalsub"></span>
+        </div>
+        <div class="fila"><span class="mas">Más autos<span class="sub" id="stat_topsub"></span></span><span class="val" id="stat_top">—</span></div>
+        <div class="fila"><span class="mas">Sin VIN completo<span class="sub">Se completa mirando la foto</span></span><span class="val" id="stat_missing">0</span></div>
       </div>
 
-      <div class="card">
-        <h3>Cómo viene la cosa</h3>
-        <canvas id="rep_chart" height="160"></canvas>
-      </div>
+      <div class="grupo-cab"><span>Autos por día</span></div>
+      <div class="grupo grafico"><canvas id="rep_chart"></canvas></div>
 
-      <div class="card">
-        <h3>Qué dicen los números</h3>
-        <ul id="rep_insightsList"></ul>
-      </div>
+      <div class="grupo-cab"><span>Lo que dicen los números</span></div>
+      <div class="grupo"><ul id="rep_insightsList"></ul></div>
 
-      <div class="chips" id="rep_byWorker" style="margin-bottom:12px"></div>
-      <div class="tablewrap"><div id="rep_table"></div></div>
+      <div class="grupo-cab"><span>Por trabajador</span></div>
+      <div class="grupo" id="rep_byWorker"></div>
+
+      <div class="grupo-cab"><span>Registros</span></div>
+      <div class="grupo tablewrap"><div id="rep_table"></div></div>
     </div>
-    <button class="secondary" id="rep_export" type="button"><svg class="icobtn gcico" viewBox="0 0 24 24"><use href="#ico-export"/></svg>Exportar CSV</button>
-  </section>
 
-  <section id="tab-pendientes" hidden>
-    <p class="hint">Autos guardados cuyo chasis todavía no está confirmado. Se puede resolver desde aquí o desde el ordenador, el que pille antes.</p>
-    <div id="pend_lista"></div>
+    <div class="grupo">
+      <button class="fila accion" id="btnResumenRep" type="button"><span class="mas">Resumen del día por trabajador</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="fila accion" id="rep_pdf" type="button"><span class="mas">Imprimir o guardar en PDF</span></button>
+      <button class="fila accion" id="rep_export" type="button"><span class="mas">Exportar CSV</span></button>
+    </div>
   </section>
 
   <section id="tab-ajustes" hidden>
-    <div class="card">
-      <h3>Quién sube las fotos desde este teléfono</h3>
-      <label class="f">Tu nombre<input class="inp" id="set_supervisor" placeholder="ej. Raúl"></label>
-      <button class="primary" id="set_supervisorSave" type="button">Guardar</button>
-      <p class="hint" style="margin-top:12px">Los registros se sincronizan solos entre los teléfonos del equipo. Sin señal se guardan aquí y se suben en cuanto vuelva.</p>
-      <button class="secondary" id="set_instalar" type="button" style="margin-top:12px">Cómo tenerla como app en el teléfono</button>
+    <h1 class="titulo">Ajustes</h1>
+    <div class="grupo-cab"><span>Este teléfono</span></div>
+    <div class="grupo">
+      <label class="fila"><span>Tu nombre</span><input class="inp" id="set_supervisor" placeholder="ej. Raúl" autocomplete="name"></label>
+      <button class="fila accion" id="set_supervisorSave" type="button">Guardar nombre</button>
+    </div>
+    <p class="grupo-pie">Sale como supervisor en lo que registras. Los registros se sincronizan solos entre los teléfonos del equipo; sin señal se guardan aquí y se suben al volver.</p>
+
+    <div class="grupo">
+      <button class="fila" id="set_instalar" type="button"><span class="mas">Tenerla como app en el teléfono</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </div>
 
-    <div class="card">
-      <h3>Espacio y limpieza</h3>
-      <p class="hint">Las fotos son el respaldo de que el auto se hizo, y ocupan casi todo el espacio. Se borran solas pasado el plazo que elijas; el registro —chasis, fecha y quién lo hizo— se conserva siempre.</p>
-
-      <div class="espgrid">
-        <div><div class="espnum" id="esp_reg">—</div><div class="esplbl">registros</div></div>
-        <div><div class="espnum" id="esp_fotos">—</div><div class="esplbl">con foto</div></div>
-        <div><div class="espnum" id="esp_mb">—</div><div class="esplbl">MB en fotos</div></div>
-      </div>
-
-      <div class="blabel">Borrado automático</div>
-      <label class="f">Guardar las fotos durante<select class="inp" id="esp_dias"></select></label>
-      <button class="primary" id="esp_guardar" type="button">Guardar el plazo</button>
-      <p class="hint" style="margin-top:10px">Cada noche se sueltan solas las fotos que pasen de ese plazo. No hay que hacer nada.</p>
-
-      <hr class="sep">
-
-      <div class="blabel">Liberar espacio ahora</div>
-      <p class="hint" style="margin:-4px 0 10px">Para cuando hace falta sitio antes de que llegue el plazo.</p>
-      <label class="f">Soltar las fotos de más de<select class="inp" id="esp_libDias"></select></label>
-      <button class="secondary" id="esp_liberar" type="button">Liberar</button>
-      <p class="hint" id="esp_liberarNota"></p>
-
-      <hr class="sep">
-
-      <div class="blabel">Borrar registros</div>
-      <p class="hint" style="margin:-4px 0 10px">Se borra todo: chasis, fecha y quién lo hizo. No se puede deshacer.</p>
-      <label class="f">Los anteriores a<select class="inp" id="esp_borrarDias"></select></label>
-      <button class="secondary danger" id="esp_borrar" type="button">Borrar</button>
-      <p class="hint" id="esp_borrarNota"></p>
+    <div class="grupo-cab"><span>Espacio</span></div>
+    <div class="grupo">
+      <div class="fila"><span class="mas">Registros</span><span class="val" id="esp_reg">—</span></div>
+      <div class="fila"><span class="mas">Con foto</span><span class="val" id="esp_fotos">—</span></div>
+      <div class="fila"><span class="mas">Fotos</span><span class="val"><span id="esp_mb">—</span> MB</span></div>
     </div>
+    <p class="grupo-pie">Las fotos son el respaldo de que el auto se hizo y ocupan casi todo. El registro —chasis, fecha y quién— se conserva siempre.</p>
+
+    <div class="grupo-cab"><span>Borrado automático</span></div>
+    <div class="grupo">
+      <label class="fila"><span class="mas">Guardar las fotos</span><select class="inp" id="esp_dias"></select></label>
+      <button class="fila accion" id="esp_guardar" type="button">Guardar el plazo</button>
+    </div>
+    <p class="grupo-pie">Cada noche se sueltan solas las fotos que pasen de ese plazo.</p>
+
+    <div class="grupo-cab"><span>Liberar espacio ahora</span></div>
+    <div class="grupo">
+      <label class="fila"><span class="mas">Fotos de más de</span><select class="inp" id="esp_libDias"></select></label>
+      <button class="fila accion" id="esp_liberar" type="button">Liberar</button>
+    </div>
+    <p class="grupo-pie" id="esp_liberarNota"></p>
+
+    <div class="grupo-cab"><span>Borrar registros</span></div>
+    <div class="grupo">
+      <label class="fila"><span class="mas">Anteriores a</span><select class="inp" id="esp_borrarDias"></select></label>
+      <button class="fila peligro" id="esp_borrar" type="button">Borrar</button>
+    </div>
+    <p class="grupo-pie" id="esp_borrarNota"></p>
   </section>
 </main>
 
-<nav class="tabs">
+<nav class="tabs" aria-label="Secciones">
   <button data-tab="registrar" class="active" type="button"><svg class="ic gcico" viewBox="0 0 24 24"><use href="#ico-camera"/></svg>Registrar</button>
-  <button data-tab="pendientes" type="button"><svg class="ic gcico" viewBox="0 0 24 24"><use href="#ico-check"/></svg>Por confirmar<span id="pendBadge" class="badge" hidden></span></button>
+  <button data-tab="pendientes" type="button"><svg class="ic gcico" viewBox="0 0 24 24"><use href="#ico-check"/></svg>Por confirmar<span id="pendBadge" class="cuenta" hidden></span></button>
   <button data-tab="reportes" type="button"><svg class="ic gcico" viewBox="0 0 24 24"><use href="#ico-report"/></svg>Reportes</button>
   <button data-tab="ajustes" type="button"><svg class="ic gcico" viewBox="0 0 24 24"><use href="#ico-settings"/></svg>Ajustes</button>
 </nav>
@@ -362,11 +399,11 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 <div class="scrim" id="capScrim">
   <div class="sheet">
     <h3>Guardar sólo la foto</h3>
-    <img id="cap_foto" style="width:100%;border-radius:10px;margin-bottom:10px">
+    <img id="cap_foto" alt="Foto del VIN">
     <label class="f">Trabajador<input class="inp" id="cap_worker" placeholder="ej. Dani"></label>
     <label class="f">Supervisor<input class="inp" id="cap_supervisor" placeholder="ej. Raúl"></label>
+    <p class="hint">El lector intenta leerla por su cuenta; lo que no consiga queda en Por confirmar.</p>
     <button class="primary" id="cap_save" type="button">Guardar y escanear otro</button>
-    <p class="hint" style="margin:8px 0 14px">El lector intenta leerla por su cuenta; lo que no consiga queda en «Por confirmar».</p>
     <button class="secondary" id="cap_cancel" type="button">Cancelar</button>
   </div>
 </div>
@@ -376,22 +413,22 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 <div class="scrim" id="confScrim">
   <div class="sheet">
     <h3>Confirmar el chasis</h3>
-    <img id="conf_foto" style="width:100%;border-radius:10px;margin-bottom:10px" hidden>
-    <div id="conf_estado" class="hint" style="margin-bottom:8px"></div>
+    <img id="conf_foto" alt="Foto del VIN" hidden>
+    <div id="conf_estado" class="hint"></div>
     <label class="f">VIN completo<input class="inp" id="conf_vinFull" autocapitalize="characters" maxlength="17"></label>
     <label class="f">Últimos 6 dígitos<input class="inp" id="conf_vin6" autocapitalize="characters" maxlength="8"></label>
     <button class="primary" id="conf_ok" type="button">Correcto, confirmar</button>
-    <button class="secondary" id="conf_recortar" type="button" style="margin-top:8px">Recortar y volver a leer</button>
-    <button class="secondary" id="conf_cerrar" type="button" style="margin-top:8px">Cerrar</button>
+    <button class="secondary" id="conf_recortar" type="button">Volver a leer la foto</button>
+    <button class="secondary" id="conf_cerrar" type="button">Cerrar</button>
   </div>
 </div>
 
 <div class="scrim" id="askScrim">
   <div class="sheet">
     <h3 id="ask_title">Aviso</h3>
-    <p class="hint" id="ask_text" style="font-size:15px;line-height:1.5"></p>
+    <p class="hint" id="ask_text"></p>
     <button class="primary" id="ask_ok" type="button">Continuar</button>
-    <button class="secondary" id="ask_cancel" type="button" style="margin-top:8px">Cancelar</button>
+    <button class="secondary" id="ask_cancel" type="button">Cancelar</button>
   </div>
 </div>
 
@@ -400,16 +437,16 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
     <h3 id="rev_title">Confirmar registro</h3>
     <img id="rev_photo" hidden>
     <div id="rev_ocrHint" class="hint"></div>
-    <label class="f">Últimos 6 dígitos del VIN (opc.)<input class="inp" id="rev_vin6" maxlength="8" autocapitalize="characters"></label>
-    <label class="f">VIN completo (opc.)<input class="inp" id="rev_vinFull" autocapitalize="characters"></label>
-    <label class="f">Marca (opc.)<input class="inp" id="rev_make" placeholder="ej. Mazda"></label>
-    <label class="f">Modelo (opc.)<input class="inp" id="rev_model" placeholder="ej. CX-5"></label>
-    <label class="f">Color (opc.)<input class="inp" id="rev_color" placeholder="ej. Blanco"></label>
-    <label class="f">Trabajador *<input class="inp" id="rev_worker" placeholder="Quién lavó el auto"></label>
-    <label class="f">Supervisor *<input class="inp" id="rev_supervisor" placeholder="Quién sube esta foto"></label>
+    <label class="f">Últimos 6 del VIN (opcional)<input class="inp" id="rev_vin6" maxlength="8" autocapitalize="characters"></label>
+    <label class="f">VIN completo (opcional)<input class="inp" id="rev_vinFull" autocapitalize="characters"></label>
+    <label class="f">Marca (opcional)<input class="inp" id="rev_make" placeholder="ej. Mazda"></label>
+    <label class="f">Modelo (opcional)<input class="inp" id="rev_model" placeholder="ej. CX-5"></label>
+    <label class="f">Color (opcional)<input class="inp" id="rev_color" placeholder="ej. Blanco"></label>
+    <label class="f">Trabajador<input class="inp" id="rev_worker" placeholder="Quién lavó el auto"></label>
+    <label class="f">Supervisor<input class="inp" id="rev_supervisor" placeholder="Quién sube esta foto"></label>
     <label class="f">Fecha y hora<input class="inp" type="datetime-local" id="rev_when"></label>
     <button class="primary" id="rev_save" type="button">Guardar</button>
-    <button class="secondary" id="rev_delete" type="button" hidden style="color:var(--red);border-color:var(--red)"><svg class="icobtn gcico" viewBox="0 0 24 24"><use href="#ico-delete"/></svg>Eliminar registro</button>
+    <button class="secondary danger" id="rev_delete" type="button" hidden>Eliminar registro</button>
     <button class="secondary" id="rev_cancel" type="button">Cancelar</button>
   </div>
 </div>
@@ -417,10 +454,10 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 <div class="scrim" id="resScrim">
   <div class="sheet">
     <h3>Resumen del día</h3>
-    <p class="hint" style="margin-top:0">Elige el día y, en cada trabajador, si lo quieres en foto (para WhatsApp) o en PDF (para imprimir). Lleva la foto del VIN de cada auto.</p>
+    <p class="hint">Elige el día y, para cada trabajador, la foto (para WhatsApp) o el PDF (para imprimir). Lleva la foto del VIN de cada auto.</p>
     <label class="f">Día<input class="inp" type="date" id="res_dia"></label>
-    <div id="res_gente"></div>
-    <button class="secondary" id="res_cancel" type="button" style="margin-top:8px">Cerrar</button>
+    <div class="grupo" id="res_gente"></div>
+    <button class="secondary" id="res_cancel" type="button">Cerrar</button>
   </div>
 </div>
 
@@ -440,6 +477,7 @@ button.secondary{width:100%;background:none;color:var(--muted);border:1px solid 
 <script src="informe-dia.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
+const CHEV = '<svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const CLOUD = {
   url: "https://orajysldssgztignuist.supabase.co",
   key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9yYWp5c2xkc3NnenRpZ251aXN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwMjAxNDYsImV4cCI6MjEwMDU5NjE0Nn0.PwFvcUD8-Kj1nw8OKrcZ2oSqY9WYNN4qcssHkqYHQO8"
@@ -475,7 +513,16 @@ async function vinesConocidos(){
 
 /* ===================== Utilidades ===================== */
 function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
-let tT; function toast(m){ const t = document.getElementById("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(tT); tT = setTimeout(() => t.classList.remove("show"), 2400); }
+/* El aviso breve. Los mensajes del código empiezan con un signo (✓, ⚠︎,
+   📶): aquí decide el color y se quita, para que en pantalla quede sólo
+   la frase, como en los avisos del sistema. */
+let tT; function toast(m){
+  const t = document.getElementById("toast");
+  const mal = /^\s*⚠/.test(m);
+  t.textContent = String(m).replace(/^\s*(✓|⚠︎?|📶)\s*/u, "");
+  t.classList.toggle("mal", mal);
+  t.classList.add("show"); clearTimeout(tT); tT = setTimeout(() => t.classList.remove("show"), 2600);
+}
 function getSupervisorName(){ try { return localStorage.getItem(LSKEY_SUPERVISOR) || ""; } catch (e) { return ""; } }
 function setSupervisorName(n){ try { localStorage.setItem(LSKEY_SUPERVISOR, n); } catch (e) {} }
 function getLastWorkerName(){ try { return localStorage.getItem(LSKEY_LASTWORKER) || ""; } catch (e) { return ""; } }
@@ -522,7 +569,7 @@ function renderQueueBadge(){
   const n = getQueue().length;
   const el = document.getElementById("queueBadge");
   el.hidden = n === 0;
-  el.innerHTML = '<svg class="badgeic gcico" viewBox="0 0 24 24"><use href="#ico-sync"/></svg>' + n + " pendiente(s) de subir";
+  el.textContent = n === 1 ? "1 registro guardado en el teléfono, pendiente de subir." : n + " registros guardados en el teléfono, pendientes de subir.";
 }
 window.addEventListener("online", flushQueue);
 setInterval(flushQueue, 45000);
@@ -782,24 +829,24 @@ function abrirResumen(){
 async function cargarGenteDelDia(){
   const dia = document.getElementById("res_dia").value;
   const caja = document.getElementById("res_gente");
-  caja.innerHTML = '<p class="hint">Cargando…</p>';
+  caja.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">Cargando…</span></div>';
   try {
     const d0 = new Date(dia + "T00:00");
     resFilas = await rpc("vin_log_lista", { p_from: startOfDay(d0).toISOString(), p_to: endOfDayExclusive(d0).toISOString() }) || [];
-  } catch (e) { caja.innerHTML = '<p class="hint">⚠︎ No se pudo cargar. Revisa la conexión.</p>'; return; }
+  } catch (e) { caja.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">No se pudo cargar. Revisa la conexión.</span></div>'; return; }
   const gente = new Map();
   for (const r of resFilas) {
     const k = normNombre(r.worker_name); if (!k) continue;
     const g = gente.get(k) || { nombre: String(r.worker_name).trim(), n: 0 };
     g.n++; gente.set(k, g);
   }
-  if (!gente.size) { caja.innerHTML = '<p class="hint">Ese día no hay autos registrados.</p>'; return; }
+  if (!gente.size) { caja.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">Ese día no hay autos registrados.</span></div>'; return; }
   /* Dos botones por persona y no uno: la foto es para mandar por WhatsApp,
      el PDF para imprimir o archivar, y cada uno prepara sólo lo suyo. */
   caja.innerHTML = [...gente.entries()].sort((a, b) => b[1].n - a[1].n).map(([k, g]) =>
     '<div class="resfila"><div class="resnom"><b>' + esc(g.nombre) + '</b><span class="hint" style="margin:0">' + g.n + ' auto' + (g.n === 1 ? '' : 's') + '</span></div>' +
-    '<button class="primary" type="button" data-w="' + esc(k) + '" data-f="foto">📷 Foto</button>' +
-    '<button class="primary" type="button" data-w="' + esc(k) + '" data-f="pdf">📄 PDF</button></div>').join("");
+    '<button class="primary" type="button" data-w="' + esc(k) + '" data-f="foto">Foto</button>' +
+    '<button class="primary" type="button" data-w="' + esc(k) + '" data-f="pdf">PDF</button></div>').join("");
   caja.querySelectorAll("[data-w]").forEach(b => b.onclick = () => generarResumen(dia, b.dataset.w, b.dataset.f));
 }
 async function generarResumen(dia, clave, formato){
@@ -890,22 +937,27 @@ async function loadToday(){
     const rows = await rpc("vin_log_lista", { p_from: startOfDay(now).toISOString(), p_to: endOfDayExclusive(now).toISOString() });
     todayRows = rows || [];
     renderTodayList(todayRows);
-  } catch (e) { document.getElementById("todayList").innerHTML = '<p class="hint">⚠︎ No se pudo cargar (revisa tu conexión).</p>'; }
+  } catch (e) { document.getElementById("todayList").innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">No se pudo cargar. Revisa la conexión.</span></div>'; }
 }
 function renderTodayList(rows){
   const pend = getQueue().map(q => ({ vin6: q.p_vin6, make: q.p_make, model: q.p_model, worker_name: q.p_worker_name, client_at: q.p_client_at, _pending: true }));
   const list = pend.concat(rows);
   document.getElementById("todayCount").textContent = list.length;
-  document.getElementById("todayList").innerHTML = list.length ? list.map(rowHTML).join("") : '<p class="hint">Sin registros hoy todavía.</p>';
+  document.getElementById("todayList").innerHTML = list.length ? list.map(rowHTML).join("")
+    : '<div class="fila"><span class="mas" style="color:var(--sec)">Todavía no hay autos hoy. Escanea el primero.</span></div>';
   document.querySelectorAll("#todayList .vrow[data-id]").forEach(el => el.onclick = () => openEditFromId(el.dataset.id, todayRows));
 }
+/* Una fila por auto: los seis últimos del VIN delante, grandes, que es lo
+   que se busca; marca y modelo, y debajo quién y a qué hora. */
 function rowHTML(r){
   const time = new Date(r.client_at).toLocaleTimeString("es-AU", { hour: "2-digit", minute: "2-digit" });
   const makeModel = [r.make, r.model].filter(Boolean).join(" ");
-  const idAttr = r._pending ? "" : ' data-id="' + esc(r.id) + '"';
-  return '<div class="vrow ' + (r._pending ? "pending" : "") + '"' + idAttr + '>' +
-    '<div class="vrow-vin">' + esc(r.vin6 || "—") + '</div>' +
-    '<div class="vrow-meta"><b>' + esc(makeModel || "—") + '</b><span>' + esc(r.worker_name) + ' · ' + time + (r._pending ? " · ⏳ pendiente" : "") + '</span></div></div>';
+  const idAttr = r._pending ? "" : ' data-id="' + esc(r.id) + '" role="button" tabindex="0"';
+  return '<div class="fila vrow' + (r._pending ? " pending" : "") + '"' + idAttr + '>' +
+    '<span class="vin6">' + esc(r.vin6 || "—") + '</span>' +
+    '<span class="mas">' + esc(r.worker_name || "") +
+      '<span class="sub">' + (r._pending ? "Pendiente de subir" : esc(makeModel || "Sin marca ni modelo")) + '</span></span>' +
+    '<span class="val">' + time + '</span>' + (r._pending ? "" : CHEV) + '</div>';
 }
 async function openEditFromId(id, source){
   const row = source.find(r => String(r.id) === String(id));
@@ -946,9 +998,9 @@ function shiftAnchor(dir){
 async function loadReport(){
   const range = periodRange(repPeriod, repAnchor);
   document.getElementById("rep_range").textContent = fmtRange(range);
-  const box = document.getElementById("rep_table"); box.innerHTML = '<p class="hint">Cargando…</p>';
+  const box = document.getElementById("rep_table"); box.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">Cargando…</span></div>';
   try { repRows = await rpc("vin_log_lista", { p_from: range.from.toISOString(), p_to: range.to.toISOString() }) || []; renderReport(); }
-  catch (e) { box.innerHTML = '<p class="hint">⚠︎ No se pudo cargar el reporte.</p>'; }
+  catch (e) { box.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">No se pudo cargar el reporte. Revisa la conexión.</span></div>'; }
 }
 let repChartInstance = null;
 function renderReport(){
@@ -962,35 +1014,40 @@ function renderReport(){
   document.getElementById("stat_totalsub").textContent = document.getElementById("rep_range").textContent;
   document.getElementById("stat_top").textContent = workerEntries.length ? workerEntries[0][0] : "—";
   document.getElementById("stat_topsub").textContent = workerEntries.length
-    ? (workerEntries[0][1] + " auto(s)" + (workerEntries[1] ? (" · " + (workerEntries[0][1] - workerEntries[1][1]) + " más que " + workerEntries[1][0]) : ""))
-    : "sin datos todavía en este período";
+    ? (workerEntries[0][1] + " autos" + (workerEntries[1] ? (", " + (workerEntries[0][1] - workerEntries[1][1]) + " más que " + workerEntries[1][0]) : ""))
+    : "Sin datos todavía en este período";
   document.getElementById("stat_missing").textContent = missing;
 
-  document.getElementById("rep_byWorker").innerHTML = workerEntries.map(([w, n]) => '<span class="chip">' + esc(w) + ': ' + n + '</span>').join("") || '<span class="hint">—</span>';
+  document.getElementById("rep_byWorker").innerHTML = workerEntries.map(([w, n]) =>
+    '<div class="fila"><span class="mas">' + esc(w) + '</span><span class="val">' + n + '</span></div>').join("")
+    || '<div class="fila"><span class="mas" style="color:var(--sec)">Sin registros en este período.</span></div>';
 
   renderReportChart();
   renderReportInsights(workerEntries, missing, total);
 
   const box = document.getElementById("rep_table");
-  if (!total) { box.innerHTML = '<p class="hint">Sin registros en este período.</p>'; return; }
+  if (!total) { box.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">Sin registros en este período.</span></div>'; return; }
   box.innerHTML = '<table class="reptable"><thead><tr><th>Fecha</th><th>VIN (6)</th><th>VIN completo</th><th>Marca</th><th>Modelo</th><th>Color</th><th>Trabajador</th><th>Supervisor</th><th></th></tr></thead><tbody>' +
     repRows.map(r => '<tr data-id="' + esc(r.id) + '"><td>' + new Date(r.client_at).toLocaleString("es-AU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) +
       '</td><td><b>' + esc(r.vin6 || "—") + '</b></td><td>' + esc(r.vin_full || "—") + '</td><td>' + esc(r.make || "—") + '</td><td>' + esc(r.model || "—") + '</td><td>' + esc(r.color || "—") + '</td><td>' + esc(r.worker_name) + '</td><td>' + esc(r.supervisor_name || "—") + '</td><td>' +
-      (r.tiene_foto ? '<a href="#" class="photolink" data-id="' + esc(r.id) + '">📷</a>' : "") + '</td></tr>').join("") + '</tbody></table>';
+      (r.tiene_foto ? '<a href="#" class="photolink" data-id="' + esc(r.id) + '">Ver foto</a>' : "") + '</td></tr>').join("") + '</tbody></table>';
   /* La foto se pide al tocarla, no antes. Venia dentro de la lista, asi que
      abrir el informe de un mes descargaba todas las fotos del periodo para
      enseñar una tabla de texto. */
   box.querySelectorAll(".photolink").forEach(a => a.onclick = async ev => {
     ev.preventDefault(); ev.stopPropagation();
-    a.textContent = "⏳";
+    a.textContent = "Abriendo…";
     try {
       const foto = await rpc("vin_log_foto", { p_id: a.dataset.id });
       if (foto) openPhotoLightbox(foto); else toast("La foto de este registro ya se liberó");
     } catch (e) { toast("⚠︎ No se pudo abrir la foto"); }
-    a.textContent = "📷";
+    a.textContent = "Ver foto";
   });
   box.querySelectorAll("tr[data-id]").forEach(tr => tr.onclick = () => openEditFromId(tr.dataset.id, repRows));
 }
+/* Los colores del gráfico salen del tema, para que cambien solos con el
+   modo oscuro del teléfono. */
+const color = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 function renderReportChart(){
   const canvas = document.getElementById("rep_chart");
   if (!window.Chart || !canvas) return;
@@ -1005,12 +1062,13 @@ function renderReportChart(){
   if (repChartInstance) { repChartInstance.destroy(); repChartInstance = null; }
   repChartInstance = new Chart(canvas, {
     type: "bar",
-    data: { labels, datasets: [{ label: "Autos", data: counts, backgroundColor: "#3fa939", borderRadius: 6, maxBarThickness: 36 }] },
+    data: { labels, datasets: [{ label: "Autos", data: counts, backgroundColor: color("--boton"), borderRadius: 5, maxBarThickness: 28 }] },
     options: {
+      maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        y: { beginAtZero: true, ticks: { color: "#8fa096", precision: 0 }, grid: { color: "#26352c" } },
-        x: { ticks: { color: "#8fa096" }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: color("--sec"), precision: 0 }, grid: { color: color("--sep") }, border: { display: false } },
+        x: { ticks: { color: color("--sec") }, grid: { display: false } },
       },
     },
   });
@@ -1023,13 +1081,13 @@ function renderReportInsights(workerEntries, missing, total){
   } else {
     if (workerEntries.length) {
       const [topName, topN] = workerEntries[0];
-      bullets.push(topName + " lavó " + topN + " auto(s), el " + Math.round(topN / total * 100) + "% del total del período.");
+      bullets.push(topName + " lavó " + topN + (topN === 1 ? " auto" : " autos") + ", el " + Math.round(topN / total * 100) + "% del período.");
     }
     if (workerEntries.length > 1) {
-      bullets.push("Entre " + workerEntries.length + " trabajador(es) distinto(s) se repartió el trabajo de este período.");
+      bullets.push("El trabajo se repartió entre " + workerEntries.length + " personas.");
     }
     if (missing > 0) {
-      bullets.push(missing + " de " + total + " auto(s) todavía no tienen el VIN completo — se puede terminar de cargar mirando la foto guardada.");
+      bullets.push(missing + " de " + total + (total === 1 ? " auto no tiene" : " autos no tienen") + " el VIN completo. Se puede completar mirando la foto guardada.");
     } else {
       bullets.push("Todos los autos de este período ya tienen el VIN cargado.");
     }
@@ -1164,21 +1222,23 @@ const SEMAFORO = { verde: "🟢 Parece correcto", ambar: "🟡 Revísalo", rojo:
 let pendientes = [];
 async function loadPendientes(){
   const caja = document.getElementById("pend_lista");
-  caja.innerHTML = "<p class='hint'>Cargando…</p>";
+  caja.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">Cargando…</span></div>';
   try {
     const r = await rpc("vin_log_pendientes", {});
     pendientes = Array.isArray(r) ? r : [];
-    if (!pendientes.length) { caja.innerHTML = "<p class='hint'>Nada pendiente. Todos los autos tienen su chasis confirmado.</p>"; renderPendientesBadge(); return; }
+    if (!pendientes.length) { caja.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">Nada pendiente. Todos los autos tienen el chasis confirmado.</span></div>'; renderPendientesBadge(); return; }
+    const ESTADO = { verde: "Parece correcto", ambar: "Revísalo", rojo: "No se pudo leer" };
     caja.innerHTML = pendientes.map(e => {
-      const cuando = new Date(e.client_at).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-      const sem = SEMAFORO[e.vin_estado] || "⚪️ Sin leer todavía";
-      return "<div class='row' data-id='" + e.id + "' style='padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer'>" +
-        "<div><b>" + esc(e.vin_full || e.vin6 || "sin chasis") + "</b><br>" +
-        "<span class='hint'>" + sem + " · " + cuando + " · " + esc(e.worker_name || "") + "</span></div></div>";
+      const cuando = new Date(e.client_at).toLocaleString("es-AU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+      return '<div class="fila" data-id="' + esc(e.id) + '" role="button" tabindex="0">' +
+        '<span class="punto ' + (e.vin_estado || "") + '"></span>' +
+        '<span class="mas">' + esc(e.vin_full || (e.vin6 ? "…" + e.vin6 : "Sin chasis")) +
+          '<span class="sub">' + (ESTADO[e.vin_estado] || "Sin leer todavía") + (e.worker_name ? ", " + esc(e.worker_name) : "") + '</span></span>' +
+        '<span class="val">' + cuando + '</span>' + CHEV + '</div>';
     }).join("");
     caja.querySelectorAll("[data-id]").forEach(el => el.onclick = () => abrirConfirmacion(el.dataset.id));
     renderPendientesBadge();
-  } catch (e) { caja.innerHTML = "<p class='hint'>No se pudo cargar. Revisa la conexión.</p>"; }
+  } catch (e) { caja.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">No se pudo cargar. Revisa la conexión.</span></div>'; }
 }
 
 async function renderPendientesBadge(){
