@@ -129,6 +129,13 @@
     return o
   }
 
+  /* El mismo giro, para un recuadro en fracciones de la imagen. */
+  function girarCaja (f, q) {
+    q = ((q % 4) + 4) % 4
+    for (let i = 0; i < q; i++) f = { x: 1 - f.y - f.h, y: f.x, w: f.h, h: f.w }
+    return f
+  }
+
   /* Recorta el rectángulo del VIN y lo agranda mucho.
 
      Tesseract lee mal el texto pequeño: por debajo de unos 40 píxeles de
@@ -392,9 +399,16 @@
     if (capas.length === 1) { out.getContext('2d').drawImage(ref.c, 0, 0); return { c: out, usados: 1, nitidez: ref.n, m: ref.m } }
     const g = out.getContext('2d')
     const od = g.createImageData(W, H)
+    od.data.set(capas[0].d)
+    /* Sólo se combina alrededor del marco, que es lo que se lee: el resto
+       de la zona sólo se ve en el editor, y combinarla entera tenía el
+       teléfono parado uno o dos segundos después de pulsar el disparador. */
+    const mm = ref.m || { x: 0, y: 0, w: 1, h: 1 }
+    const x0 = Math.max(0, Math.floor((mm.x - mm.w * 0.1) * W)), x1 = Math.min(W, Math.ceil((mm.x + mm.w * 1.1) * W))
+    const y0 = Math.max(0, Math.floor((mm.y - mm.h * 0.6) * H)), y1 = Math.min(H, Math.ceil((mm.y + mm.h * 1.6) * H))
     const v = new Float32Array(capas.length)
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++) {
         const o = (y * W + x) * 4
         for (let ch = 0; ch < 3; ch++) {
           let n = 0
@@ -1268,6 +1282,7 @@
   const TEXTOS = {
     es: {
       cerrar: 'Cerrar', marco: 'Pon el VIN dentro del marco', marco2: 'En horizontal, que llene el marco',
+      marcoV: 'VIN vertical: que llene el marco de arriba abajo', vinVertical: 'Vertical',
       preparando: 'Preparando el lector…', buscando: 'Buscando…', linterna: 'Linterna',
       galeria: 'Galería', capturar: 'Capturar', zoom: 'Zoom',
       sinCamara: 'No se pudo abrir la cámara aquí.', permiso: 'Hay que permitir la cámara para escanear. También puedes usar la cámara del teléfono.',
@@ -1295,6 +1310,7 @@
     },
     en: {
       cerrar: 'Close', marco: 'Fit the VIN inside the frame', marco2: 'Horizontal, filling the frame',
+      marcoV: 'Vertical VIN: fill the frame top to bottom', vinVertical: 'Vertical',
       preparando: 'Getting the reader ready…', buscando: 'Looking…', linterna: 'Torch',
       galeria: 'Gallery', capturar: 'Capture', zoom: 'Zoom',
       sinCamara: 'The camera could not be opened here.', permiso: 'Allow the camera to scan. You can also use the phone camera.',
@@ -1329,7 +1345,8 @@
     girar: '<path d="M4 12a8 8 0 108-8H8"/><path d="M11 1L8 4l3 3"/>',
     menos: '<path d="M5 12h14"/>', mas: '<path d="M5 12h14M12 5v14"/>',
     cam: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="4"/>',
-    leer: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>'
+    leer: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
+    vertical: '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M12 7v10"/>'
   }
   const icono = n => `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONOS[n]}</svg>`
 
@@ -1374,6 +1391,10 @@
 .lv-disp:active{transform:scale(.92)}
 .lv-lado{width:76px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;letter-spacing:0;color:rgba(255,255,255,.9)}
 .lv-lado svg{width:26px;height:26px}
+.lv-lado[aria-pressed=true]{color:var(--lv-ambar)}
+.lv-flash{position:absolute;inset:0;z-index:5;background:#fff;pointer-events:none;animation:lv-flash .3s ease-out forwards}
+@keyframes lv-flash{from{opacity:.85}to{opacity:0}}
+@media (prefers-reduced-motion:reduce){.lv-flash{animation-duration:.01s}}
 .lv-aviso{position:absolute;left:20px;right:20px;top:28%;z-index:4;background:rgba(30,30,30,.92);
   -webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px);border-radius:14px;padding:20px 16px 16px;text-align:center}
 .lv-aviso p{margin:0 0 16px;font-size:15px;line-height:1.4;color:rgba(255,255,255,.85)}
@@ -1422,6 +1443,10 @@
 @media (min-width:700px){.lv-panel{max-height:46%;max-width:640px;width:100%;margin:0 auto}.lv-acciones{flex-direction:row}}
 `
   let _css = false
+  /* Si el VIN de estos autos va en vertical, la cámara se abre ya así la
+     próxima vez: se trabaja por tandas del mismo modelo. */
+  let _vertical = false
+  try { _vertical = localStorage.getItem('lv-vertical') === '1' } catch (e) {}
   function ponerCss () {
     if (_css) return
     _css = true
@@ -1480,6 +1505,32 @@
       terminar(valor || null)
     }
 
+    /* Los botones responden al levantar el dedo, sin esperar al "click":
+       con el teléfono ocupado leyendo, el click llegaba tarde o se perdía,
+       y la X o el disparador parecían no funcionar. Sólo si el dedo se
+       levanta sobre el mismo botón que tocó y sin arrastrar; el click que
+       llega después se ignora para no hacer lo mismo dos veces. */
+    let tocadoEn = 0, abajo = null
+    const alTocar = fn => {
+      raiz.onpointerdown = e => {
+        const b = e.target.closest('[data-a]')
+        abajo = b && e.pointerType !== 'mouse' ? { b, x: e.clientX, y: e.clientY } : null
+      }
+      raiz.onpointerup = e => {
+        const a = abajo; abajo = null
+        if (!a || e.target.closest('[data-a]') !== a.b || a.b.disabled) return
+        if (Math.hypot(e.clientX - a.x, e.clientY - a.y) > 12) return
+        tocadoEn = performance.now()
+        fn(a.b)
+      }
+      raiz.onpointercancel = () => { abajo = null }
+      raiz.onclick = e => {
+        if (performance.now() - tocadoEn < 800) return
+        const b = e.target.closest('[data-a]')
+        if (b) fn(b)
+      }
+    }
+
     /* ----- Elegir una foto de la galería ----- */
     const elegirFoto = () => {
       const inp = document.createElement('input')
@@ -1504,7 +1555,7 @@
       raiz.innerHTML = `
         <video class="lv-video" playsinline muted autoplay></video>
         <div class="lv-marco" data-s=""></div>
-        <div class="lv-guia"><b>${tx('marco')}</b><span>${tx('marco2')}</span></div>
+        <div class="lv-guia"><b>${tx('marco')}</b><span>${tx(_vertical ? 'marcoV' : 'marco2')}</span></div>
         <div class="lv-vivo"><code>${tx('preparando')}</code><br><span class="lv-chip" hidden></span></div>
         <div class="lv-bar lv-top">
           <button class="lv-ib" data-a="x" aria-label="${tx('cerrar')}">${icono('x')}</button>
@@ -1516,7 +1567,7 @@
           <div class="lv-fila">
             <button class="lv-lado" data-a="gal">${icono('gal')}<span>${tx('galeria')}</span></button>
             <button class="lv-disp" data-a="disp" aria-label="${tx('capturar')}"></button>
-            <span class="lv-lado"></span>
+            <button class="lv-lado" data-a="orient" aria-pressed="${_vertical}">${icono('vertical')}<span>${tx('vinVertical')}</span></button>
           </div>
         </div>`
       const $ = s => raiz.querySelector(s)
@@ -1524,6 +1575,12 @@
       const code = vivo.querySelector('code'), chip = vivo.querySelector('.lv-chip')
       let stream = null, track = null, zoomHw = null, zoomDig = 1, vivoActivo = true, ocupado = false
       let previas = [], ultimo = null, avisado = false, tempo = null
+      /* VIN vertical: el marco se pone de pie y cada fotograma se gira un
+         cuarto antes de guardarlo, así que el lector y el editor lo ven en
+         horizontal como siempre. Si el VIN se lee de arriba abajo y no de
+         abajo arriba, al girarlo queda boca abajo: "invertido" lo da la
+         vuelta, y se prueba solo cuando la lectura no sale. */
+      let vertical = _vertical, invertido = false, fallosGiro = 0, modo = 0, capturando = false
 
       /* El marco: ancho de casi toda la pantalla y bajo, como un VIN. La
          gente lo llena acercándose o con el zoom; un marco más alto dejaría
@@ -1531,8 +1588,14 @@
          al lector. */
       const colocar = () => {
         const W = raiz.clientWidth, H = raiz.clientHeight
-        const w = Math.min(W * 0.9, 620), h = Math.max(54, Math.round(w * 0.2))
-        const top = Math.round(H * 0.4 - h / 2)
+        let w, h, top
+        if (vertical) {
+          h = Math.max(160, Math.min(440, H - 340)); w = Math.max(54, Math.round(h * 0.2))
+          top = Math.max(124, Math.round(H * 0.42 - h / 2))
+        } else {
+          w = Math.min(W * 0.9, 620); h = Math.max(54, Math.round(w * 0.2))
+          top = Math.round(H * 0.4 - h / 2)
+        }
         Object.assign(marco.style, { width: w + 'px', height: h + 'px', top: top + 'px' })
         guia.style.top = Math.max(70, top - 64) + 'px'
         vivo.style.top = (top + h + 12) + 'px'
@@ -1554,8 +1617,10 @@
            de más a los lados lo descarta el propio lector. */
         let w = r.width / s, h = r.height / s
         const mv = alto == null ? 0.15 : alto
-        let x = (r.left - rr.left - ox) / s - w * 0.07, y = (r.top - rr.top - oy) / s - h * mv
-        w *= 1.14; h *= 1 + 2 * mv
+        /* El margen a lo largo del VIN y el de través, según cómo esté. */
+        const mx = vertical ? mv : 0.07, my = vertical ? 0.07 : mv
+        let x = (r.left - rr.left - ox) / s - w * mx, y = (r.top - rr.top - oy) / s - h * my
+        w *= 1 + 2 * mx; h *= 1 + 2 * my
         x = Math.max(0, x); y = Math.max(0, y)
         return { x: x / vw, y: y / vh, w: Math.min(1 - x / vw, w / vw), h: Math.min(1 - y / vh, h / vh) }
       }
@@ -1577,12 +1642,14 @@
         const m = cajaDelMarco(0)
         if (!m) return null
         const vw = video.videoWidth, vh = video.videoHeight
-        let x = (m.x - m.w * 0.12) * vw, y = (m.y - m.h * 1.5) * vh
-        let w = m.w * 1.24 * vw, h = m.h * 4 * vh
+        let x, y, w, h
+        if (vertical) { x = (m.x - m.w * 1.5) * vw; y = (m.y - m.h * 0.12) * vh; w = m.w * 4 * vw; h = m.h * 1.24 * vh }
+        else { x = (m.x - m.w * 0.12) * vw; y = (m.y - m.h * 1.5) * vh; w = m.w * 1.24 * vw; h = m.h * 4 * vh }
         x = Math.max(0, x); y = Math.max(0, y)
         w = Math.min(vw - x, w); h = Math.min(vh - y, h)
         if (w < 16 || h < 16) return null
-        return { x, y, w, h, m: { x: (m.x * vw - x) / w, y: (m.y * vh - y) / h, w: m.w * vw / w, h: m.h * vh / h } }
+        const mz = { x: (m.x * vw - x) / w, y: (m.y * vh - y) / h, w: m.w * vw / w, h: m.h * vh / h }
+        return { x, y, w, h, m: vertical ? girarCaja(mz, 1) : mz }
       }
       const muestrear = () => {
         if (!vivoActivo || cerrado) return
@@ -1592,8 +1659,13 @@
             const viejo = bufer.length >= BUFER ? bufer.shift() : null
             const c = viejo ? viejo.c : document.createElement('canvas')
             const W = Math.round(z.w), H = Math.round(z.h)
-            if (c.width !== W || c.height !== H) { c.width = W; c.height = H }
-            c.getContext('2d').drawImage(video, z.x, z.y, z.w, z.h, 0, 0, W, H)
+            const cw = vertical ? H : W, ch = vertical ? W : H
+            if (c.width !== cw || c.height !== ch) { c.width = cw; c.height = ch }
+            const gz = c.getContext('2d')
+            /* En vertical, girado un cuarto a la derecha al copiarlo. */
+            if (vertical) gz.setTransform(0, 1, -1, 0, H, 0)
+            gz.drawImage(video, z.x, z.y, z.w, z.h, 0, 0, W, H)
+            gz.setTransform(1, 0, 0, 1, 0, 0)
             const n = nitidez(c, z.m)
             bufer.push({ c, t: performance.now(), n, m: z.m })
             /* "Mantén quieto el teléfono" cuando la nitidez cae muy por
@@ -1604,7 +1676,7 @@
             const quieto = flojos >= 3
             if (quieto !== quietoVisible) {
               quietoVisible = quieto
-              guiaTexto.textContent = quieto ? tx('quieto') : tx('marco2')
+              guiaTexto.textContent = quieto ? tx('quieto') : tx(vertical ? 'marcoV' : 'marco2')
               guia.classList.toggle('lv-movido', quieto)
             }
           }
@@ -1663,13 +1735,25 @@
           /* En vivo, sin margen por arriba y por abajo: lo que entra de
              más ahí son otros renglones, y a una lectura rápida la lían. */
           const caja = cajaDelMarco(0)
-          if (caja) {
+          const e = mejorReciente()
+          /* En vertical sólo se lee lo ya girado. */
+          if (caja && (e || !vertical)) {
             ocupado = true
+            const mio = modo
             try {
-              const e = mejorReciente()
-              const r = await leerRapido(e ? recortarYAmpliar(e.c, e.m, 900) : trozo(caja))
+              let img = e ? recortarYAmpliar(e.c, e.m, 900) : trozo(caja)
+              if (vertical && invertido) img = girarCuartos(img, 2)
+              const r = await leerRapido(img)
               if (!vivoActivo) return
-              if (r && r.vin && r.vin.length === 17) {
+              if (mio !== modo) { ocupado = false; tempo = setTimeout(bucle, 350); return }
+              /* Al revés también salen 17 caracteres, pero no un VIN que
+                 cuadre: sólo el verde fija el sentido. */
+              const verde = r && r.vin && r.vin.length === 17 && semaforo(r.vin) === 'verde'
+              if (vertical) {
+                if (verde) fallosGiro = 0
+                else if (++fallosGiro >= 2) { invertido = !invertido; fallosGiro = 0 }
+              }
+              if (r && r.vin && r.vin.length === 17 && (verde || !vertical)) {
                 previas.push(r)
                 if (previas.length > 10) previas.shift()
               }
@@ -1732,11 +1816,23 @@
         bucle()
       }
 
-      raiz.onclick = e => {
-        const b = e.target.closest('[data-a]')
-        if (!b) return
+      const cambiarOrientacion = b => {
+        vertical = _vertical = !vertical
+        try { localStorage.setItem('lv-vertical', vertical ? '1' : '') } catch (e) {}
+        b.setAttribute('aria-pressed', String(vertical))
+        modo++
+        bufer.length = 0; previas = []; recientes.length = 0
+        invertido = false; fallosGiro = 0; techo = 0; flojos = 0; ultimo = null; avisado = false
+        quietoVisible = false; guia.classList.remove('lv-movido')
+        guiaTexto.textContent = tx(vertical ? 'marcoV' : 'marco2')
+        marco.dataset.s = ''; chip.hidden = true; code.textContent = tx('buscando')
+        colocar()
+      }
+
+      alTocar(b => {
         const a = b.dataset.a
         if (a === 'x') cerrar(null)
+        else if (a === 'orient') cambiarOrientacion(b)
         else if (a === 'gal') elegirFoto()
         else if (a === 'nativa') camaraNativa()
         else if (a === 'luz') {
@@ -1744,7 +1840,8 @@
           track.applyConstraints({ advanced: [{ torch: on }] })
             .then(() => b.setAttribute('aria-pressed', String(on))).catch(() => {})
         } else if (a === 'disp') {
-          if (!video.videoWidth) return
+          if (!video.videoWidth || capturando) return
+          capturando = true
           const tToque = performance.now()
           try { navigator.vibrate && navigator.vibrate(20) } catch (e) {}
           /* Lo que se lee y se guarda es lo mejor del último segundo, no el
@@ -1752,18 +1849,29 @@
              nada más abrir), el fotograma de ahora, como antes. */
           vivoActivo = false
           clearTimeout(tempoMuestra)
-          const elegida = bufer.length ? mejorFoto(bufer, tToque) : null
-          if (elegida) {
-            const m = elegida.m
-            /* El recuadro: el marco con el mismo margen de siempre. */
-            const caja = { x: Math.max(0, m.x - m.w * 0.07), y: Math.max(0, m.y - m.h * 0.15), w: m.w * 1.14, h: m.h * 1.3 }
-            caja.w = Math.min(1 - caja.x, caja.w); caja.h = Math.min(1 - caja.y, caja.h)
-            editor(elegida.c, { caja, previas: previas.slice(), fotogramas: elegida.usados })
-          } else {
-            editor(fotograma(), { caja: cajaDelMarco(), previas: previas.slice() })
-          }
+          /* El destello sale ya, antes de combinar las tomas: sin él, en un
+             teléfono lento parecía que el disparador no había hecho nada. */
+          const fl = document.createElement('div')
+          fl.className = 'lv-flash'
+          raiz.appendChild(fl)
+          requestAnimationFrame(() => setTimeout(() => {
+            if (cerrado) return
+            const elegida = bufer.length ? mejorFoto(bufer, tToque) : null
+            if (elegida) {
+              let c = elegida.c, m = elegida.m
+              if (vertical && invertido) { c = girarCuartos(c, 2); m = girarCaja(m, 2) }
+              /* El recuadro: el marco con el mismo margen de siempre. */
+              const caja = { x: Math.max(0, m.x - m.w * 0.07), y: Math.max(0, m.y - m.h * 0.15), w: m.w * 1.14, h: m.h * 1.3 }
+              caja.w = Math.min(1 - caja.x, caja.w); caja.h = Math.min(1 - caja.y, caja.h)
+              editor(c, { caja, previas: previas.slice(), fotogramas: elegida.usados })
+            } else {
+              let f = fotograma(), caja = cajaDelMarco()
+              if (vertical) { const q = invertido ? 3 : 1; f = girarCuartos(f, q); caja = caja && girarCaja(caja, q) }
+              editor(f, { caja, previas: previas.slice() })
+            }
+          }, 0))
         }
-      }
+      })
       $('.lv-zoom input').oninput = e => ponerZoom(e.target.value)
 
       limpiar = () => {
@@ -2130,9 +2238,7 @@
         pintarPanel()
       }
 
-      raiz.onclick = e => {
-        const b = e.target.closest('[data-a]')
-        if (!b) return
+      alTocar(b => {
         const a = b.dataset.a
         if (a === 'x') cerrar(null)
         else if (a === 'otra') { if (o.desdeGaleria) elegirFoto(); else camara() }
@@ -2163,7 +2269,7 @@
             foto, recorte: rc
           })
         }
-      }
+      })
 
       const alCambiarTamano = () => encajar(true)
       window.addEventListener('resize', alCambiarTamano)
