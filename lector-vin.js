@@ -268,6 +268,153 @@
     return o
   }
 
+  /* ---------------- Captura inteligente ----------------
+
+     La foto que se lee no es la del instante del toque. El propio toque en
+     la pantalla mueve el teléfono justo cuando se hace la foto, y la placa
+     sale corrida: es lo que pasó con una placa real de VW, desenfocada
+     justo en WVGZZZ. Mientras se apunta se guarda el último segundo de
+     vídeo con la nitidez de cada fotograma; al capturar se toman los más
+     nítidos de antes del toque, se alinean entre sí (el pulso los mueve unos
+     píxeles) y se combinan con la mediana: el ruido se cancela y un reflejo
+     que cambia de sitio de un fotograma a otro desaparece, porque en la
+     mayoría de ellos no estaba ahí. */
+
+  /* Nitidez: cuánto varía la imagen de un píxel al de al lado (la varianza
+     del laplaciano). Una placa movida tiene los bordes de las letras
+     corridos y da un número mucho más bajo. Se mide en pequeño, sobre el
+     marco: es para comparar fotogramas entre sí, no para nada absoluto. */
+  function nitidez (c, m) {
+    const w = 320, h = Math.max(24, Math.round(320 * (m.h * c.height) / (m.w * c.width)))
+    const t = lienzo(w, h)
+    const g = t.getContext('2d')
+    g.drawImage(c, m.x * c.width, m.y * c.height, m.w * c.width, m.h * c.height, 0, 0, w, h)
+    const d = g.getImageData(0, 0, w, h).data
+    const gr = new Float32Array(w * h)
+    for (let i = 0, j = 0; j < gr.length; i += 4, j++) gr[j] = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114
+    let suma = 0, suma2 = 0, n = 0
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const k = y * w + x
+        const l = 4 * gr[k] - gr[k - 1] - gr[k + 1] - gr[k - w] - gr[k + w]
+        suma += l; suma2 += l * l; n++
+      }
+    }
+    const media = suma / n
+    return suma2 / n - media * media
+  }
+
+  function grisDe (c, escala) {
+    const w = Math.max(8, Math.round(c.width * escala)), h = Math.max(8, Math.round(c.height * escala))
+    const t = lienzo(w, h)
+    const g = t.getContext('2d')
+    g.drawImage(c, 0, 0, w, h)
+    const d = g.getImageData(0, 0, w, h).data
+    const gr = new Float32Array(w * h)
+    for (let i = 0, j = 0; j < gr.length; i += 4, j++) gr[j] = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114
+    return { gr, w, h }
+  }
+  /* Bordes en vez de brillo para alinear: entre dos fotogramas la luz
+     cambia (un reflejo, la exposición automática) y los bordes no. */
+  function bordes ({ gr, w, h }) {
+    const b = new Float32Array(w * h)
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const k = y * w + x
+        b[k] = Math.abs(gr[k + 1] - gr[k - 1]) + Math.abs(gr[k + w] - gr[k - w])
+      }
+    }
+    return { gr: b, w, h }
+  }
+  /* Cuánto hay que mover un fotograma para que caiga encima del de
+     referencia: primero en pequeño y con mucho margen, después afinando a
+     tamaño real. Sólo desplazamiento: en lo que dura un segundo el pulso
+     mueve el teléfono, apenas lo gira. */
+  function desplazamiento (ref, otro) {
+    const e = Math.min(1, 360 / ref.width)
+    const a = bordes(grisDe(ref, e)), b = bordes(grisDe(otro, e))
+    const R = 12
+    const error = (A, B, dx, dy, paso, margen) => {
+      let s = 0, n = 0
+      for (let y = margen; y < A.h - margen; y += paso) {
+        const yy = y + dy
+        if (yy < 0 || yy >= B.h) continue
+        for (let x = margen; x < A.w - margen; x += paso) {
+          const xx = x + dx
+          if (xx < 0 || xx >= B.w) continue
+          s += Math.abs(A.gr[y * A.w + x] - B.gr[yy * B.w + xx]); n++
+        }
+      }
+      return n ? s / n : Infinity
+    }
+    let mejor = { dx: 0, dy: 0, err: error(a, b, 0, 0, 2, R) }
+    for (let dy = -R; dy <= R; dy++) {
+      for (let dx = -R; dx <= R; dx++) {
+        const v = error(a, b, dx, dy, 2, R)
+        if (v < mejor.err) mejor = { dx, dy, err: v }
+      }
+    }
+    const A = grisDe(ref, 1), B = grisDe(otro, 1)
+    const bx = Math.round(mejor.dx / e), by = Math.round(mejor.dy / e)
+    const r = Math.ceil(1 / e) + 1
+    let fino = { dx: bx, dy: by, err: Infinity }
+    for (let dy = by - r; dy <= by + r; dy++) {
+      for (let dx = bx - r; dx <= bx + r; dx++) {
+        const v = error(A, B, dx, dy, 3, Math.ceil(R / e))
+        if (v < fino.err) fino = { dx, dy, err: v }
+      }
+    }
+    return fino
+  }
+
+  /* De los fotogramas guardados mientras se apuntaba, la foto que se lee.
+     entradas: [{ c, t, n }] con c del mismo tamaño. Se descartan los de
+     justo antes del toque (el dedo ya está moviendo el teléfono), se toman
+     los más nítidos —como mucho cinco, y sólo los que no estén muy por
+     debajo del mejor: uno movido estropearía la mezcla— y se combinan. */
+  function mejorFoto (entradas, tToque) {
+    let lista = entradas.filter(e => e.t <= tToque - 60)
+    if (!lista.length) lista = entradas.slice()
+    if (!lista.length) return null
+    lista.sort((a, b) => b.n - a.n)
+    const ref = lista[0]
+    const elegidos = lista.filter(e => e.n >= ref.n * 0.7).slice(0, 5)
+    const W = ref.c.width, H = ref.c.height
+    const capas = [{ d: ref.c.getContext('2d').getImageData(0, 0, W, H).data, dx: 0, dy: 0 }]
+    for (const e of elegidos.slice(1)) {
+      if (e.c.width !== W || e.c.height !== H) continue
+      const m = desplazamiento(ref.c, e.c)
+      /* Si no encaja bien —se movió demasiado, o entró la mano—, fuera. */
+      if (m.err > 22) continue
+      capas.push({ d: e.c.getContext('2d').getImageData(0, 0, W, H).data, dx: m.dx, dy: m.dy })
+    }
+    const out = lienzo(W, H)
+    if (capas.length === 1) { out.getContext('2d').drawImage(ref.c, 0, 0); return { c: out, usados: 1, nitidez: ref.n, m: ref.m } }
+    const g = out.getContext('2d')
+    const od = g.createImageData(W, H)
+    const v = new Float32Array(capas.length)
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const o = (y * W + x) * 4
+        for (let ch = 0; ch < 3; ch++) {
+          let n = 0
+          for (const cp of capas) {
+            const xx = x + cp.dx, yy = y + cp.dy
+            if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue
+            const val = cp.d[(yy * W + xx) * 4 + ch]
+            let k = n++
+            while (k > 0 && v[k - 1] > val) { v[k] = v[k - 1]; k-- }
+            v[k] = val
+          }
+          od.data[o + ch] = n % 2 ? v[(n - 1) >> 1] : (v[n / 2 - 1] + v[n / 2]) / 2
+        }
+        od.data[o + 3] = 255
+      }
+    }
+    g.putImageData(od, 0, 0)
+    return { c: out, usados: capas.length, nitidez: ref.n, m: ref.m }
+  }
+
   /* Realza los bordes antes de umbralizar. Un número grabado en metal tiene
      muy poco contraste con el metal de al lado; sin esto, Otsu parte por un
      sitio cualquiera y se lleva medio carácter. */
@@ -1142,6 +1289,7 @@
       deshacer: 'Volver a lo leído', escrito: 'Has escrito el VIN a mano. El lector leyó {v}.', usarLeido: 'Usar lo leído',
       vertical: 'La foto está vertical: si el VIN se ve de lado, pulsa Girar.',
       caracteres: '{n} carácter', caracteresN: '{n} caracteres',
+      quieto: 'Mantén quieto el teléfono',
       dudas: 'El lector dudó en lo marcado. Compáralo con la placa y, si hace falta, toca la otra opción:',
       posicion: '{n}º'
     },
@@ -1168,6 +1316,7 @@
       deshacer: 'Back to what was read', escrito: 'You typed the VIN. The reader read {v}.', usarLeido: 'Use what was read',
       vertical: 'The photo is portrait: if the VIN is sideways, tap Rotate.',
       caracteres: '{n} character', caracteresN: '{n} characters',
+      quieto: 'Hold the phone still',
       dudas: 'The reader was unsure about the marked ones. Compare with the plate and, if needed, tap the other option:',
       posicion: '#{n}'
     }
@@ -1200,6 +1349,7 @@
 .lv-marco[data-s=verde]{border-color:#3ddc6a}.lv-marco[data-s=ambar]{border-color:#ffc23d}.lv-marco[data-s=rojo]{border-color:#ff5a4f}
 .lv-guia{position:absolute;left:0;right:0;text-align:center;z-index:2;padding:0 20px;text-shadow:0 1px 3px #000}
 .lv-guia b{display:block;font-size:18px}.lv-guia span{font-size:14px;opacity:.85}
+.lv-guia.lv-movido span{opacity:1;font-weight:700;color:#ffc23d;font-size:16px}
 .lv-vivo{position:absolute;left:0;right:0;text-align:center;z-index:2;padding:0 12px}
 .lv-vivo code{display:inline-block;font:600 20px/1.2 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.06em;
   background:rgba(0,0,0,.6);padding:6px 10px;border-radius:8px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1395,6 +1545,58 @@
         c.getContext('2d').drawImage(video, 0, 0)
         return c
       }
+
+      /* El último segundo de vídeo, sólo la zona del marco con margen (el
+         fotograma entero, ocho veces, serían decenas de megas). Cada uno
+         con su nitidez y con dónde cae el marco dentro de la zona. */
+      const BUFER = 8
+      const bufer = []
+      let tempoMuestra = null, techo = 0, flojos = 0, quietoVisible = false
+      const guiaTexto = guia.querySelector('span')
+      const zonaDe = () => {
+        const m = cajaDelMarco(0)
+        if (!m) return null
+        const vw = video.videoWidth, vh = video.videoHeight
+        let x = (m.x - m.w * 0.12) * vw, y = (m.y - m.h * 1.5) * vh
+        let w = m.w * 1.24 * vw, h = m.h * 4 * vh
+        x = Math.max(0, x); y = Math.max(0, y)
+        w = Math.min(vw - x, w); h = Math.min(vh - y, h)
+        if (w < 16 || h < 16) return null
+        return { x, y, w, h, m: { x: (m.x * vw - x) / w, y: (m.y * vh - y) / h, w: m.w * vw / w, h: m.h * vh / h } }
+      }
+      const muestrear = () => {
+        if (!vivoActivo || cerrado) return
+        if (!document.hidden && video.videoWidth && video.readyState >= 2) {
+          const z = zonaDe()
+          if (z) {
+            const viejo = bufer.length >= BUFER ? bufer.shift() : null
+            const c = viejo ? viejo.c : document.createElement('canvas')
+            const W = Math.round(z.w), H = Math.round(z.h)
+            if (c.width !== W || c.height !== H) { c.width = W; c.height = H }
+            c.getContext('2d').drawImage(video, z.x, z.y, z.w, z.h, 0, 0, W, H)
+            const n = nitidez(c, z.m)
+            bufer.push({ c, t: performance.now(), n, m: z.m })
+            /* "Mantén quieto el teléfono" cuando la nitidez cae muy por
+               debajo de la mejor de los últimos segundos. El techo baja
+               despacio: si se acerca o se aleja, la escala cambia. */
+            techo = Math.max(n, techo * 0.97)
+            flojos = n < techo * 0.45 ? flojos + 1 : 0
+            const quieto = flojos >= 3
+            if (quieto !== quietoVisible) {
+              quietoVisible = quieto
+              guiaTexto.textContent = quieto ? tx('quieto') : tx('marco2')
+              guia.classList.toggle('lv-movido', quieto)
+            }
+          }
+        }
+        tempoMuestra = setTimeout(muestrear, 100)
+      }
+      /* La lectura en vivo, del fotograma más nítido de los tres últimos y
+         no del que toque: así el marco se pone verde antes. */
+      const mejorReciente = () => {
+        const r = bufer.slice(-3)
+        return r.length ? r.reduce((a, b) => (b.n > a.n ? b : a)) : null
+      }
       /* En vivo se copia sólo lo que hay dentro del marco: copiar el
          fotograma entero tres veces por segundo son megas de memoria que un
          teléfono modesto acaba notando. */
@@ -1444,7 +1646,8 @@
           if (caja) {
             ocupado = true
             try {
-              const r = await leerRapido(trozo(caja))
+              const e = mejorReciente()
+              const r = await leerRapido(e ? recortarYAmpliar(e.c, e.m, 900) : trozo(caja))
               if (!vivoActivo) return
               if (r && r.vin && r.vin.length === 17) {
                 previas.push(r)
@@ -1505,6 +1708,7 @@
           $('.lv-zv').textContent = (+zin.value).toFixed(1) + '×'
         }
         $('.lv-zoom').hidden = false
+        muestrear()
         bucle()
       }
 
@@ -1521,10 +1725,23 @@
             .then(() => b.setAttribute('aria-pressed', String(on))).catch(() => {})
         } else if (a === 'disp') {
           if (!video.videoWidth) return
-          const caja = cajaDelMarco()
-          const foto = fotograma()
+          const tToque = performance.now()
           try { navigator.vibrate && navigator.vibrate(20) } catch (e) {}
-          editor(foto, { caja, previas: previas.slice() })
+          /* Lo que se lee y se guarda es lo mejor del último segundo, no el
+             fotograma del toque. Si todavía no hay nada guardado (se captura
+             nada más abrir), el fotograma de ahora, como antes. */
+          vivoActivo = false
+          clearTimeout(tempoMuestra)
+          const elegida = bufer.length ? mejorFoto(bufer, tToque) : null
+          if (elegida) {
+            const m = elegida.m
+            /* El recuadro: el marco con el mismo margen de siempre. */
+            const caja = { x: Math.max(0, m.x - m.w * 0.07), y: Math.max(0, m.y - m.h * 0.15), w: m.w * 1.14, h: m.h * 1.3 }
+            caja.w = Math.min(1 - caja.x, caja.w); caja.h = Math.min(1 - caja.y, caja.h)
+            editor(elegida.c, { caja, previas: previas.slice(), fotogramas: elegida.usados })
+          } else {
+            editor(fotograma(), { caja: cajaDelMarco(), previas: previas.slice() })
+          }
         }
       }
       $('.lv-zoom input').oninput = e => ponerZoom(e.target.value)
@@ -1532,6 +1749,8 @@
       limpiar = () => {
         vivoActivo = false
         clearTimeout(tempo)
+        clearTimeout(tempoMuestra)
+        bufer.length = 0
         window.removeEventListener('resize', colocar)
         if (stream) stream.getTracks().forEach(t => t.stop())
         stream = null
@@ -1992,6 +2211,7 @@
     get listo () { return _listo },
     /* Para la prueba de acierto: lo que necesita sin pasar por la pantalla. */
     _interno: { cargarImagen, recortarYAmpliar, girarCuartos, aLienzo, VIN_CORE, VIN_LANG, cargarTesseract, prepararRecorte, variantes,
+      nitidez, desplazamiento, mejorFoto,
       lineaDe: c => enFila(async () => renglonDelVin(await obtenerWorker(), c)) }
   }
 })()
