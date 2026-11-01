@@ -36,6 +36,7 @@
   'use strict'
 
   const VIN_CDN = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js'
+  const VIN_CDN_SRI = 'sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F'
   const VIN_CORE = 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1'
   const VIN_LANG = 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng@1.0.0/4.0.0'
 
@@ -59,6 +60,8 @@
       if (window.Tesseract) return ok(window.Tesseract)
       const s = document.createElement('script')
       s.src = VIN_CDN
+      s.integrity = VIN_CDN_SRI
+      s.crossOrigin = 'anonymous'
       s.onload = () => window.Tesseract ? ok(window.Tesseract) : no(new Error('SIN_LECTOR'))
       s.onerror = () => { _tess = null; no(new Error('SIN_LECTOR')) }
       document.head.appendChild(s)
@@ -115,6 +118,14 @@
      ejecuta. Si se cambia la versión, se recalcula:
        curl -s <url> | openssl dgst -sha384 -binary | openssl base64 -A */
   const NEU_ORT_SRI = 'sha384-6hgW9I+eQKl5CrHLstudPd4L3E2eTYHm+qNKvf4pI+RZnfBJILOHAiaalHV+trgG'
+  /* ort.wasm.min.js baja por su cuenta dos archivos más: el motor (.wasm) y
+     el código que lo arranca (.mjs), que se ejecuta en la página. Sin esto
+     iban sin comprobar; ahora se bajan aquí, con su huella, y se le dan ya
+     hechos. */
+  const NEU_MJS = 'ort-wasm-simd-threaded.mjs'
+  const NEU_MJS_SRI = 'sha384-SyfqCcawqO3udRV2twBwYuuR4Wh7Nj/yfAxyfN6UltDOh5VTrJH4aT9HfEvthS02'
+  const NEU_WASM = 'ort-wasm-simd-threaded.wasm'
+  const NEU_WASM_SRI = 'sha384-t24pimTffN4djMKJaYLDupLzilNBHTgwqbjacQNJObCC4RrMH4UjfZgDkwHEU04k'
   const NEU_ALTO = 48
   /* Lo que el modelo devuelve por cada trocito de la imagen: 0 es "nada",
      1-10 las cifras, 11-36 las letras A-Z y 437 el espacio. */
@@ -146,7 +157,15 @@
       s.onerror = () => no(new Error('SIN_RED'))
       document.head.appendChild(s)
     }).then(async ort => {
-      ort.env.wasm.wasmPaths = NEU_ORT
+      const bajar = (f, sri) => fetch(NEU_ORT + f, { integrity: sri, mode: 'cors' })
+        .then(r => { if (!r.ok) throw new Error('SIN_RED'); return r })
+      const [mjs, wasm] = await Promise.all([bajar(NEU_MJS, NEU_MJS_SRI).then(r => r.text()), bajar(NEU_WASM, NEU_WASM_SRI).then(r => r.arrayBuffer())])
+      /* Ya comprobado, se ejecuta desde una copia en memoria. Esa copia no
+         tiene dirección propia, y el archivo calcula rutas a partir de la
+         suya: se le dice cuál era. */
+      const fuenteMjs = mjs.split('import.meta.url').join(JSON.stringify(NEU_ORT + NEU_MJS))
+      ort.env.wasm.wasmPaths = { mjs: URL.createObjectURL(new Blob([fuenteMjs], { type: 'text/javascript' })) }
+      ort.env.wasm.wasmBinary = wasm
       /* Un solo hilo: más hilos piden que la página esté "aislada", y esta
          lectura es de unas decenas de milisegundos. */
       ort.env.wasm.numThreads = 1

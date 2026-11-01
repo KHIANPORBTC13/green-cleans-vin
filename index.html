@@ -87,7 +87,7 @@ button.fila:active,label.fila:active,a.fila:active,.fila[data-id]:active{backgro
 .punto.verde{background:var(--verde)}.punto.ambar{background:var(--ambar)}.punto.rojo{background:var(--rojo)}
 /* VIN repetido: en rojo y con su nombre, para verlo sin buscarlo. */
 .rep-et{display:inline-block;font-size:12px;line-height:18px;font-weight:700;letter-spacing:.3px;color:#fff;background:var(--rojo);
-  border-radius:5px;padding:0 6px;margin-right:6px;vertical-align:1px;white-space:nowrap}
+  border-radius:5px;padding:0 6px;margin:0 6px 2px 0;vertical-align:1px;max-width:100%;white-space:normal}
 .fila.repetido .vin6,.fila.repetido .mas,.fila.repetido .sub{color:var(--rojo)}
 .fila.repetido .sub{white-space:normal;margin-top:2px}
 .rep-et,.reptable tr.repetido td,#rep_insightsList li.mal{-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -491,7 +491,7 @@ nav.tabs button.active{color:var(--tinte)}
 <script src="lector-vin.js"></script>
 <!-- El resumen del día (foto y PDF): el mismo archivo que usa SOO. -->
 <script src="informe-dia.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
 <script>
 const CHEV = '<svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const CLOUD = {
