@@ -218,6 +218,110 @@ table.reptable tr[data-id]{cursor:pointer}
 table.reptable tr[data-id]:active{background:var(--relleno)}
 .photolink{color:var(--tinte);text-decoration:none;font-weight:700}
 
+/* ---- Gráficos del reporte (graficos.js) ----
+   Colores comprobados con el validador: verde para el período elegido, gris
+   para el anterior (además va en línea, no en barras, y con leyenda), y una
+   rampa de un solo verde, de claro a oscuro, para el mapa de calor. */
+:root{
+  --viz-1:#118a3d; --viz-prev:#a3b5a9; --viz-vacio:#eef5f0; --viz-rango:#cdeed8;
+  --viz-p1:#b5e3c4; --viz-p2:#7fcf9c; --viz-p3:#43b06f; --viz-p4:#1e8c4a; --viz-p5:#0b5f2e;
+  --viz-rejilla:rgba(11,36,22,.07); --viz-base:rgba(11,36,22,.22);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --viz-1:#22a656; --viz-prev:#5b7766; --viz-vacio:#12301f; --viz-rango:#1d4a31;
+    --viz-p1:#1d5a36; --viz-p2:#23794a; --viz-p3:#2a9a5c; --viz-p4:#43c46f; --viz-p5:#8ef0b0;
+    --viz-rejilla:rgba(234,251,239,.07); --viz-base:rgba(234,251,239,.22);
+  }
+}
+.viz{padding:16px;overflow:visible}
+.viz svg{display:block;overflow:visible;touch-action:pan-y}
+.viz-eje{font-size:11.5px;fill:var(--sec);font-variant-numeric:tabular-nums}
+.viz-valor{font-size:12.5px;font-weight:800;fill:var(--texto)}
+.viz-rejilla{stroke:var(--viz-rejilla);stroke-width:1}
+.viz-base{stroke:var(--viz-base);stroke-width:1}
+.viz-col{fill:var(--viz-1);transition:opacity .15s}
+.viz-prev{fill:none;stroke:var(--viz-prev);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.viz-prev-punto{fill:var(--viz-prev);stroke:var(--celda);stroke-width:2}
+.viz-hit{fill:transparent;cursor:pointer}
+.viz:has(.on) .viz-col:not(.on){opacity:.45}
+.viz-prev-punto.on{r:5}
+.viz-celda{fill:var(--viz-vacio);cursor:pointer}
+.viz-celda.p1{fill:var(--viz-p1)}.viz-celda.p2{fill:var(--viz-p2)}.viz-celda.p3{fill:var(--viz-p3)}.viz-celda.p4{fill:var(--viz-p4)}.viz-celda.p5{fill:var(--viz-p5)}
+.viz-celda.on{stroke:var(--texto);stroke-width:2}
+.viz-rango{fill:var(--viz-rango)}
+.viz-rango.on{fill:var(--viz-p2)}
+.viz-auto{fill:var(--viz-1);stroke:var(--celda);stroke-width:1.5}
+.viz-leyenda{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13.5px;font-weight:600;color:var(--sec);margin:0 0 10px}
+.viz-leyenda span{display:inline-flex;align-items:center;gap:7px}
+.ley-barra{width:12px;height:12px;border-radius:3px;background:var(--viz-1)}
+.ley-linea{width:18px;height:2px;border-radius:1px;background:var(--viz-prev);position:relative}
+.ley-linea::after{content:"";position:absolute;left:6px;top:-3px;width:7px;height:7px;border-radius:50%;background:var(--viz-prev)}
+.viz-escala{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12.5px;color:var(--sec);margin-top:8px}
+.viz-escala .esc{display:inline-flex;align-items:center;gap:3px}
+.viz-escala .esc i{width:14px;height:14px;border-radius:4px;display:inline-block}
+.viz-escala .esc i.p1{background:var(--viz-p1)}.viz-escala .esc i.p2{background:var(--viz-p2)}.viz-escala .esc i.p3{background:var(--viz-p3)}
+.viz-escala .esc i.p4{background:var(--viz-p4)}.viz-escala .esc i.p5{background:var(--viz-p5)}
+.viz-escala .esc i.ley-auto{width:9px;height:9px;border-radius:50%;background:var(--viz-1);margin-right:4px}
+.viz-vacio,.viz-nota{margin:2px 4px;font-size:14.5px;color:var(--sec)}
+.viz-nota{margin-top:12px}
+/* La etiqueta flotante con el dato exacto. */
+.viz-tip{position:fixed;left:0;top:0;z-index:60;pointer-events:none;max-width:240px;padding:10px 13px;border-radius:14px;
+  background:rgba(8,32,18,.92);color:#fff;font-size:13.5px;line-height:18px;box-shadow:0 8px 24px rgba(4,33,15,.25);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.viz-tip b{display:block;font-size:14px;font-weight:800;margin-bottom:2px}
+.viz-tip span{display:block;color:rgba(255,255,255,.75)}
+
+/* Indicadores: cuatro tarjetas con el número grande y el cambio. */
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 6px}
+.kpi{position:relative;background:var(--celda);border-radius:22px;box-shadow:var(--sombra);padding:16px 16px 14px;display:flex;flex-direction:column;min-width:0}
+.kpi-k{font-size:13.5px;font-weight:700;color:var(--sec)}
+.kpi-v{font-size:30px;line-height:36px;font-weight:800;letter-spacing:-.8px;color:var(--tinte);font-variant-numeric:tabular-nums;margin:4px 0 2px}
+.kpi:nth-child(3) .kpi-v{font-size:22px;line-height:36px;letter-spacing:-.4px}
+.kpi-s{font-size:12.5px;color:var(--sec);line-height:16px}
+.kpi.alerta .kpi-s{color:var(--rojo);font-weight:700}
+.kpi-d{display:flex;align-items:flex-start;gap:4px;font-size:12.5px;line-height:16px;color:var(--sec);margin-top:6px;font-weight:600}
+.kpi-d svg{width:12px;height:12px;flex:none;margin-top:2px;fill:currentColor}
+.kpi-d.bien{color:var(--verde)}
+.kpi-d.mal{color:var(--rojo)}
+.kpi-spark{display:block;width:100%;height:30px;margin-top:8px}
+.spark-linea{fill:none;stroke:var(--viz-1);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.spark-area{fill:var(--viz-1);opacity:.12}
+.spark-punto{fill:var(--viz-1);stroke:var(--celda);stroke-width:2}
+
+/* Por trabajador: una ficha por persona con su barra. */
+.tr-fila{padding:10px 4px 12px;cursor:pointer}
+.tr-fila+.tr-fila{border-top:1px solid var(--sep)}
+.tr-cab{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.tr-cab b{font-size:16px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tr-n{font-size:20px;font-weight:800;color:var(--tinte);font-variant-numeric:tabular-nums}
+.tr-pista{height:10px;border-radius:5px;background:var(--viz-vacio);margin:6px 0 7px;overflow:hidden}
+.tr-pista i{display:block;height:100%;border-radius:5px;background:var(--viz-1)}
+.tr-fila.on .tr-pista i{background:var(--viz-p4)}
+.tr-datos{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--sec);font-variant-numeric:tabular-nums}
+.tr-datos .flojo{color:var(--rojo);font-weight:700}
+
+/* Estado del VIN: barra al 100 % con huecos y leyenda con icono. */
+.est-barra{display:flex;gap:2px;height:22px;border-radius:8px;overflow:hidden}
+.est-barra i{min-width:4px;cursor:pointer}
+.est-verde{background:var(--verde);color:#fff}.est-ambar{background:#e8a317;color:#3a2600}.est-rojo{background:var(--rojo);color:#fff}.est-gris{background:var(--ter);color:var(--celda)}
+.est-ley{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:8px}
+.est-ley li{display:flex;align-items:center;gap:10px;font-size:15px}
+.est-ico{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;flex:none}
+.est-ico svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.est-etq{flex:1}
+.est-ley b{font-variant-numeric:tabular-nums;font-weight:800}
+.est-pct{width:44px;text-align:right;color:var(--sec);font-variant-numeric:tabular-nums}
+
+/* Marcas: barras horizontales, una sola tinta. */
+.mc-fila{display:grid;grid-template-columns:minmax(64px,30%) 1fr auto;align-items:center;gap:10px;padding:6px 2px;cursor:pointer}
+.mc-etq{font-size:14.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mc-pista{height:12px;border-radius:6px;background:var(--viz-vacio);overflow:hidden}
+.mc-pista i{display:block;height:100%;border-radius:6px;background:var(--viz-1)}
+.mc-pista i.otras{background:var(--viz-prev)}
+.mc-fila b{font-variant-numeric:tabular-nums;font-weight:800;min-width:24px;text-align:right}
+@media print{.viz-tip{display:none}.kpi,.grupo{box-shadow:none;border:1px solid #ddd}}
+
 /* ---- La barra de pestañas: vidrio líquido que flota ----
    Una píldora translúcida que deja ver lo que pasa por debajo, desenfocado
    y con más color; un brillo arriba como el canto de un cristal, y una
@@ -456,18 +560,26 @@ nav.tabs button.active .ic{stroke-width:2.2}
     </div>
 
     <div id="rep_printArea">
-      <div class="grupo">
-        <div class="fila" style="flex-direction:column;align-items:flex-start;gap:2px;padding:14px 16px">
-          <span class="sub">Autos lavados</span>
-          <span class="resumen-num" id="stat_total">0</span>
-          <span class="sub" id="stat_totalsub"></span>
-        </div>
-        <div class="fila"><span class="mas">Más autos<span class="sub" id="stat_topsub"></span></span><span class="val" id="stat_top">—</span></div>
-        <div class="fila"><span class="mas">Sin VIN completo<span class="sub">Se completa mirando la foto</span></span><span class="val" id="stat_missing">0</span></div>
-      </div>
+      <!-- Cada gráfico contesta una pregunta del jefe; los dibuja graficos.js. -->
+      <div class="kpis" id="rep_kpis"></div>
 
-      <div class="grupo-cab"><span>Autos por día</span></div>
-      <div class="grupo grafico"><canvas id="rep_chart"></canvas></div>
+      <div class="grupo-cab"><span id="rep_tendTit">Autos por día</span></div>
+      <div class="grupo viz" id="rep_tend"></div>
+
+      <div class="grupo-cab" id="rep_calorCab"><span>Cuándo se trabaja</span><span>autos por día y hora</span></div>
+      <div class="grupo viz" id="rep_calor"></div>
+
+      <div class="grupo-cab"><span>Por trabajador</span><span>autos, ritmo y VIN</span></div>
+      <div class="grupo viz" id="rep_byWorker"></div>
+
+      <div class="grupo-cab"><span>Jornada de cada día</span><span>del primer auto al último</span></div>
+      <div class="grupo viz" id="rep_jornada"></div>
+
+      <div class="grupo-cab"><span>Estado del VIN</span></div>
+      <div class="grupo viz" id="rep_estado"></div>
+
+      <div class="grupo-cab"><span>Marcas</span></div>
+      <div class="grupo viz" id="rep_marcas"></div>
 
       <div class="grupo-cab"><span>Lo que dicen los números</span></div>
       <div class="grupo"><ul id="rep_insightsList"></ul></div>
@@ -623,7 +735,7 @@ nav.tabs button.active .ic{stroke-width:2.2}
 <script src="lector-vin.js"></script>
 <!-- El resumen del día (foto y PDF): el mismo archivo que usa SOO. -->
 <script src="informe-dia.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
+<script src="graficos.js"></script>
 <script>
 const CHEV = '<svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const CLOUD = {
@@ -1286,35 +1398,99 @@ async function loadReport(){
   const range = periodRange(repPeriod, repAnchor);
   document.getElementById("rep_range").textContent = fmtRange(range);
   const box = document.getElementById("rep_table"); box.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">Cargando…</span></div>';
+  /* El período anterior, del mismo largo, para comparar. Si falla, el
+     reporte sale igual, sin comparación. */
+  const ant = periodoAnterior(range);
+  const previo = rpc("vin_log_lista", { p_from: ant.from.toISOString(), p_to: ant.to.toISOString() }).catch(() => null);
   try {
-    repRows = await rpc("vin_log_lista", { p_from: range.from.toISOString(), p_to: range.to.toISOString() }) || []; renderReport();
+    repRows = await rpc("vin_log_lista", { p_from: range.from.toISOString(), p_to: range.to.toISOString() }) || [];
+    repPrev = await previo; renderReport();
     if (!repFresco()) historialRepetidos().then(h => { if (h) renderReport(); });
   }
   catch (e) { box.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">No se pudo cargar el reporte. Revisa la conexión.</span></div>'; }
 }
-let repChartInstance = null, repMarcas = new Map();
+let repMarcas = new Map(), repPrev = null;
+const NOMBRE_PERIODO = { day: ["día", "días"], week: ["semana", "semanas"], fortnight: ["quincena", "quincenas"], month: ["mes", "meses"], semester: ["semestre", "semestres"] };
+function periodoAnterior(r){
+  if (repPeriod === "month") return { from: new Date(r.from.getFullYear(), r.from.getMonth() - 1, 1), to: new Date(r.from) };
+  if (repPeriod === "semester") return { from: new Date(r.from.getFullYear(), r.from.getMonth() - 6, 1), to: new Date(r.from) };
+  if (repPeriod === "fortnight") { const d = new Date(r.from); d.setDate(d.getDate() - 1); return periodRange("fortnight", d); }
+  const largo = r.to - r.from;
+  return { from: new Date(r.from.getTime() - largo), to: new Date(r.from) };
+}
+/* Las columnas de la tendencia: por hora si es un día, por semana si es un
+   semestre, y por día en lo demás. Cada una con su par del período anterior
+   (el lunes con el lunes, el día 3 con el día 3). */
+function cubetasTendencia(range, filas, previas){
+  const ant = periodoAnterior(range);
+  const fecha = d => d.toLocaleDateString("es-AU", { day: "numeric", month: "short" });
+  let cubetas = [], llave, llaveAnt;
+  if (repPeriod === "day") {
+    const hs = filas.concat(previas || []).map(r => new Date(r.client_at).getHours());
+    const h0 = Math.min(7, ...hs), h1 = Math.max(17, ...hs);
+    for (let h = h0; h <= h1; h++) cubetas.push({ etq: String(h), largo: h + ":00 a " + (h + 1) + ":00", n: 0, prev: 0 });
+    llave = r => new Date(r.client_at).getHours() - h0; llaveAnt = llave;
+  } else if (repPeriod === "semester") {
+    for (let d = new Date(range.from); d < range.to; d.setDate(d.getDate() + 7)) {
+      const fin = new Date(d); fin.setDate(fin.getDate() + 6);
+      cubetas.push({ etq: fecha(d), largo: "Semana del " + fecha(d) + " al " + fecha(fin), n: 0, prev: 0 });
+    }
+    llave = r => Math.floor((new Date(r.client_at) - range.from) / (7 * 864e5));
+    llaveAnt = r => Math.floor((new Date(r.client_at) - ant.from) / (7 * 864e5));
+  } else {
+    for (let d = new Date(range.from); d < range.to; d.setDate(d.getDate() + 1)) {
+      const corto = repPeriod === "week" ? d.toLocaleDateString("es-AU", { weekday: "short" }).replace(".", "") : String(d.getDate());
+      cubetas.push({ etq: corto, largo: d.toLocaleDateString("es-AU", { weekday: "long", day: "numeric", month: "long" }), n: 0, prev: 0 });
+    }
+    const dia = (r, base) => Math.round((startOfDay(new Date(r.client_at)) - startOfDay(base)) / 864e5);
+    llave = r => dia(r, range.from); llaveAnt = r => dia(r, ant.from);
+  }
+  for (const r of filas) { const k = llave(r); if (cubetas[k]) cubetas[k].n++; }
+  for (const r of previas || []) { const k = llaveAnt(r); if (cubetas[k]) cubetas[k].prev++; }
+  if (!previas) cubetas.forEach(c => { c.prev = null; });
+  /* Lo que todavía no ha pasado no es un cero. */
+  const ahora = new Date();
+  if (repPeriod !== "day" && range.to > ahora) {
+    cubetas.forEach((c, i) => {
+      const ini = repPeriod === "semester" ? new Date(range.from.getTime() + i * 7 * 864e5) : new Date(range.from.getFullYear(), range.from.getMonth(), range.from.getDate() + i);
+      if (ini > ahora) c.futuro = true;
+    });
+  }
+  return cubetas;
+}
 function renderReport(){
   const total = repRows.length;
   repMarcas = repetidosDe(repRows, repHist);
-  const byWorker = {};
-  repRows.forEach(r => { byWorker[r.worker_name] = (byWorker[r.worker_name] || 0) + 1; });
-  const workerEntries = Object.entries(byWorker).sort((a, b) => b[1] - a[1]);
-  const missing = repRows.filter(r => !r.vin6).length;
-
-  document.getElementById("stat_total").textContent = total;
-  document.getElementById("stat_totalsub").textContent = document.getElementById("rep_range").textContent;
-  document.getElementById("stat_top").textContent = workerEntries.length ? workerEntries[0][0] : "—";
-  document.getElementById("stat_topsub").textContent = workerEntries.length
-    ? (workerEntries[0][1] + " autos" + (workerEntries[1] ? (", " + (workerEntries[0][1] - workerEntries[1][1]) + " más que " + workerEntries[1][0]) : ""))
-    : "Sin datos todavía en este período";
-  document.getElementById("stat_missing").textContent = missing;
-
-  document.getElementById("rep_byWorker").innerHTML = workerEntries.map(([w, n]) =>
-    '<div class="fila"><span class="mas">' + esc(w) + '</span><span class="val">' + n + '</span></div>').join("")
-    || '<div class="fila"><span class="mas" style="color:var(--sec)">Sin registros en este período.</span></div>';
-
-  renderReportChart();
-  renderReportInsights(workerEntries, missing, total, repMarcas.size);
+  const range = periodRange(repPeriod, repAnchor);
+  const [uno] = NOMBRE_PERIODO[repPeriod];
+  const actual = (range.from <= new Date() && new Date() < range.to)
+    ? (repPeriod === "day" ? "hoy" : (repPeriod === "month" || repPeriod === "semester" ? "este " : "esta ") + uno)
+    : (repPeriod === "month" || repPeriod === "semester" ? "el " : "la ") + uno + " elegid" + (repPeriod === "month" || repPeriod === "semester" ? "o" : "a");
+  const anterior = repPeriod === "day" ? "día anterior" : uno + " anterior";
+  const cubetas = cubetasTendencia(range, repRows, repPrev);
+  Graficos.indicadores(document.getElementById("rep_kpis"), { filas: repRows, anteriores: repPrev, nombreAnterior: anterior,
+    repetidos: repMarcas.size, serie: cubetas.filter(c => !c.futuro).map(c => c.n) });
+  document.getElementById("rep_tendTit").textContent = repPeriod === "day" ? "Autos por hora" : repPeriod === "semester" ? "Autos por semana" : "Autos por día";
+  Graficos.tendencia(document.getElementById("rep_tend"), { cubetas,
+    titulo: document.getElementById("rep_tendTit").textContent, nombreActual: actual.charAt(0).toUpperCase() + actual.slice(1),
+    nombreAnterior: anterior, conAnterior: !!(repPrev && repPrev.length) });
+  /* El mapa de calor necesita varios días para decir algo. */
+  const conCalor = repPeriod !== "day";
+  document.getElementById("rep_calorCab").hidden = !conCalor;
+  document.getElementById("rep_calor").hidden = !conCalor;
+  if (conCalor) Graficos.calor(document.getElementById("rep_calor"), { filas: repRows, semanas: Math.max(1, Math.round((range.to - range.from) / (7 * 864e5))) });
+  Graficos.trabajadores(document.getElementById("rep_byWorker"), { filas: repRows });
+  Graficos.jornada(document.getElementById("rep_jornada"), { filas: repRows });
+  const completos = repRows.filter(r => r.vin_full && String(r.vin_full).length === 17);
+  const est = { verde: 0, ambar: 0, rojo: 0 };
+  for (const r of completos) est[vinSemaforo(r.vin_full)]++;
+  Graficos.estado(document.getElementById("rep_estado"), { partes: [
+    { clase: "verde", etq: "Parece correcto", n: est.verde },
+    { clase: "ambar", etq: "Para revisar", n: est.ambar },
+    { clase: "rojo", etq: "No parece un VIN", n: est.rojo },
+    { clase: "gris", etq: "Sin VIN completo", n: total - completos.length }] });
+  Graficos.marcas(document.getElementById("rep_marcas"), { filas: repRows });
+  renderReportInsights(total, repMarcas.size, cubetas);
 
   const box = document.getElementById("rep_table");
   if (!total) { box.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">Sin registros en este período.</span></div>'; return; }
@@ -1336,35 +1512,9 @@ function renderReport(){
   });
   box.querySelectorAll("tr[data-id]").forEach(tr => tr.onclick = () => openEditFromId(tr.dataset.id, repRows));
 }
-/* Los colores del gráfico salen del tema, para que cambien solos con el
-   modo oscuro del teléfono. */
-const color = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-function renderReportChart(){
-  const canvas = document.getElementById("rep_chart");
-  if (!window.Chart || !canvas) return;
-  const range = periodRange(repPeriod, repAnchor);
-  const days = [];
-  for (let d = new Date(range.from); d < range.to; d.setDate(d.getDate() + 1)) days.push(new Date(d));
-  const counts = days.map(d => {
-    const dayStart = startOfDay(d), dayEnd = endOfDayExclusive(d);
-    return repRows.filter(r => { const t = new Date(r.client_at); return t >= dayStart && t < dayEnd; }).length;
-  });
-  const labels = days.map(d => d.toLocaleDateString("es-AU", { day: "2-digit", month: "short" }));
-  if (repChartInstance) { repChartInstance.destroy(); repChartInstance = null; }
-  repChartInstance = new Chart(canvas, {
-    type: "bar",
-    data: { labels, datasets: [{ label: "Autos", data: counts, backgroundColor: color("--boton"), borderRadius: 5, maxBarThickness: 28 }] },
-    options: {
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { beginAtZero: true, ticks: { color: color("--sec"), precision: 0 }, grid: { color: color("--sep") }, border: { display: false } },
-        x: { ticks: { color: color("--sec") }, grid: { display: false } },
-      },
-    },
-  });
-}
-function renderReportInsights(workerEntries, missing, total, repetidos){
+/* Lo que dicen los números, en frases: lo que el jefe contaría si mirara
+   los gráficos con calma. */
+function renderReportInsights(total, repetidos, cubetas){
   const list = document.getElementById("rep_insightsList");
   const bullets = [];
   const alerta = repetidos ? "VIN REPETIDO en " + repetidos + (repetidos === 1 ? " registro" : " registros") +
@@ -1372,18 +1522,27 @@ function renderReportInsights(workerEntries, missing, total, repetidos){
   if (!total) {
     bullets.push("Sin registros en este período todavía.");
   } else {
-    if (workerEntries.length) {
-      const [topName, topN] = workerEntries[0];
-      bullets.push(topName + " lavó " + topN + (topN === 1 ? " auto" : " autos") + ", el " + Math.round(topN / total * 100) + "% del período.");
+    const porPersona = new Map();
+    for (const r of repRows) { const k = String(r.worker_name || "").trim(); if (k) porPersona.set(k, (porPersona.get(k) || []).concat([r])); }
+    const gente = [...porPersona.entries()].map(([nombre, filas]) => ({ nombre, n: filas.length, ritmo: Graficos.ritmo(filas) })).sort((a, b) => b.n - a.n);
+    if (gente.length) bullets.push(gente[0].nombre + " lavó " + gente[0].n + (gente[0].n === 1 ? " auto" : " autos") + ", el " + Math.round(gente[0].n / total * 100) + " % del período" +
+      (gente.length > 1 ? ", entre " + gente.length + " personas." : "."));
+    const rapidos = gente.filter(g => g.n >= 5 && g.ritmo != null).sort((a, b) => a.ritmo - b.ritmo);
+    if (rapidos.length > 1) bullets.push("El ritmo más rápido es el de " + rapidos[0].nombre + " (uno cada " + Math.round(rapidos[0].ritmo) + " min); el más lento, " +
+      rapidos[rapidos.length - 1].nombre + " (uno cada " + Math.round(rapidos[rapidos.length - 1].ritmo) + " min).");
+    const mejor = cubetas.reduce((b, c) => (!b || c.n > b.n ? c : b), null);
+    if (mejor && mejor.n && repPeriod !== "day") bullets.push("El " + (repPeriod === "semester" ? "mejor período fue la " + mejor.largo.charAt(0).toLowerCase() + mejor.largo.slice(1) : "mejor día fue el " + mejor.largo) + ", con " + mejor.n + " autos.");
+    const porHora = new Map();
+    for (const r of repRows) { const h = new Date(r.client_at).getHours(); porHora.set(h, (porHora.get(h) || 0) + 1); }
+    const pico = [...porHora.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (pico) bullets.push("La hora con más autos es de " + pico[0] + ":00 a " + (pico[0] + 1) + ":00 (" + pico[1] + " en el período).");
+    if (repPrev && repPrev.length) {
+      const d = total - repPrev.length;
+      bullets.push(d === 0 ? "Los mismos autos que en el período anterior." : (d > 0 ? d + " autos más" : -d + " autos menos") + " que en el período anterior (" + repPrev.length + ").");
     }
-    if (workerEntries.length > 1) {
-      bullets.push("El trabajo se repartió entre " + workerEntries.length + " personas.");
-    }
-    if (missing > 0) {
-      bullets.push(missing + " de " + total + (total === 1 ? " auto no tiene" : " autos no tienen") + " el VIN completo. Se puede completar mirando la foto guardada.");
-    } else {
-      bullets.push("Todos los autos de este período ya tienen el VIN cargado.");
-    }
+    const sinVin = repRows.filter(r => !(r.vin_full && String(r.vin_full).length === 17)).length;
+    bullets.push(sinVin ? sinVin + " de " + total + (total === 1 ? " auto no tiene" : " autos no tienen") + " el VIN completo. Se puede completar mirando la foto guardada."
+      : "Todos los autos de este período tienen el VIN completo.");
   }
   list.innerHTML = (alerta ? '<li class="mal">' + esc(alerta) + "</li>" : "") + bullets.map(b => "<li>" + esc(b) + "</li>").join("");
 }
@@ -1639,6 +1798,13 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("cifraCola").onclick = () => { flushQueue(); toast("Subiendo lo guardado sin señal…"); };
   pintarSaludo(); moverLente();
   window.addEventListener("resize", moverLente);
+  /* Los gráficos se dibujan al ancho de la pantalla: al girar el teléfono
+     o cambiar la ventana, se vuelven a dibujar. */
+  let esperaGraficos = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(esperaGraficos);
+    esperaGraficos = setTimeout(() => { if (!document.getElementById("tab-reportes").hidden && repRows.length) renderReport(); }, 200);
+  });
   if (document.fonts) document.fonts.ready.then(moverLente);
   document.getElementById("btnResumen").onclick = abrirResumen;
   document.getElementById("btnResumenRep").onclick = abrirResumen;
