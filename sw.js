@@ -12,7 +12,7 @@
    La pagina se pide primero a la red y solo si no hay señal se tira de la
    copia: asi cada arreglo que se sube llega en la siguiente apertura, en vez
    de quedarse el telefono con la version vieja hasta vaciar la memoria. */
-const CACHE = "registro-vin-v6";
+const CACHE = "registro-vin-v7";
 /* El programa que lee va aparte y con nombre fijo: si fuera en la cache de
    la carcasa se borraria con cada version nueva, y justo despues de
    actualizar el lector dejaria de funcionar sin señal hasta volver a bajar
@@ -43,7 +43,7 @@ self.addEventListener("fetch", e => {
      guardarlos hace que el lector arranque al momento la segunda vez. */
   if (url.hostname === "cdn.jsdelivr.net" || url.hostname.endsWith("gstatic.com")
       || url.hostname.endsWith("googleapis.com")) {
-    const destino = /tesseract/i.test(url.pathname) ? CACHE_LECTOR : CACHE;
+    const destino = /tesseract|onnxruntime|zxing/i.test(url.pathname) ? CACHE_LECTOR : CACHE;
     e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => {
       if (r.ok) { const copia = r.clone(); caches.open(destino).then(c => c.put(req, copia)); }
       return r;
@@ -52,6 +52,18 @@ self.addEventListener("fetch", e => {
   }
 
   if (url.origin !== self.location.origin) return;
+
+  /* Los modelos de la red que lee el VIN (unos 12 MB): nombre y version
+     fijos, cache primero y aparte de la carcasa, para que una version nueva
+     de la app no obligue a bajarlos otra vez. */
+  if (/\/modelos\//.test(url.pathname)) {
+    e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => {
+      if (r.ok) { const copia = r.clone(); caches.open(CACHE_LECTOR).then(c => c.put(req, copia)); }
+      return r;
+    })));
+    return;
+  }
+
   e.respondWith(fetch(req).then(r => {
     if (r.ok) { const copia = r.clone(); caches.open(CACHE).then(c => c.put(req, copia)); }
     return r;

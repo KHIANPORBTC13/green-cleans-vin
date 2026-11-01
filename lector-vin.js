@@ -84,7 +84,328 @@
 
   let _listo = false
   function precargar () {
-    return obtenerWorker().then(() => { _listo = true; return true }, () => false)
+    const t = obtenerWorker().then(() => { _listo = true; return true }, () => false)
+    /* La red se despierta cuando Tesseract ya está listo, no a la vez: las
+       dos bajan megas y arrancan WebAssembly, y juntas se estorban en un
+       teléfono modesto. */
+    t.then(() => cargarNeuronal()).then(() => cargarDeteccion())
+    return t
+  }
+
+  /* ---------------- La segunda lectura: una red neuronal ----------------
+
+     Tesseract se hizo para páginas escaneadas, y una placa estampada, un
+     grabado en el vidrio o un reflejo no se parecen a una página. Con las
+     placas reales del cliente acertaba 2 de 5. Un modelo de lectura de texto
+     en escenas (PaddleOCR, 8 MB) leyendo exactamente el mismo renglón acertó
+     las 5, también las que Tesseract leía con letras cambiadas (B por 8,
+     L por W) o con dos caracteres de diecisiete.
+
+     Corre en el propio teléfono con onnxruntime: la foto sigue sin salir de
+     él. No sustituye a Tesseract, que sigue encontrando el renglón y votando:
+     se suma como la lectura que más pesa, y si ella sola ve un VIN creíble y
+     seguro se ahorran las demás pasadas.
+
+     Es un añadido, no una dependencia: sin el modelo, sin red la primera vez,
+     con el ahorro de datos puesto o en un teléfono sin WebAssembly, el lector
+     funciona como antes. Y nunca se espera a que baje: si todavía no está,
+     esa lectura sale sólo con Tesseract. */
+  const NEU_ORT = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/'
+  /* Versión fija y huella: si el CDN sirviera otra cosa, el navegador no la
+     ejecuta. Si se cambia la versión, se recalcula:
+       curl -s <url> | openssl dgst -sha384 -binary | openssl base64 -A */
+  const NEU_ORT_SRI = 'sha384-6hgW9I+eQKl5CrHLstudPd4L3E2eTYHm+qNKvf4pI+RZnfBJILOHAiaalHV+trgG'
+  const NEU_ALTO = 48
+  /* Lo que el modelo devuelve por cada trocito de la imagen: 0 es "nada",
+     1-10 las cifras, 11-36 las letras A-Z y 437 el espacio. */
+  const NEU_ESPACIO = 437
+  const NEU_CLASES = []
+  for (const ch of VIN_ALFABETO) NEU_CLASES.push([ch, ch <= '9' ? 1 + Number(ch) : 11 + ch.charCodeAt(0) - 65])
+  const NEU_CHAR = { [NEU_ESPACIO]: ' ' }
+  for (const [ch, k] of NEU_CLASES) NEU_CHAR[k] = ch
+  /* Con todos los caracteres a la vez de 0 a 100: por debajo de esto la red
+     misma duda de alguno, y vale más contrastarla con las otras lecturas. */
+  const NEU_SEGURA = 90
+  const urlModelo = () => window.LECTOR_MODELO || new URL('modelos/rec_en_v5.onnx', document.baseURI).href
+
+  let _neu = null
+  let _neuSesion = null
+  let _neuApagada = false
+  function cargarNeuronal () {
+    if (_neuApagada || typeof WebAssembly !== 'object') return Promise.resolve(null)
+    if (_neu) return _neu
+    /* Con "ahorro de datos" no se bajan 19 MB por su cuenta. */
+    if (navigator.connection && navigator.connection.saveData && !window.LECTOR_MODELO) return Promise.resolve(null)
+    _neu = new Promise((ok, no) => {
+      if (window.ort) return ok(window.ort)
+      const s = document.createElement('script')
+      s.src = NEU_ORT + 'ort.wasm.min.js'
+      s.integrity = NEU_ORT_SRI
+      s.crossOrigin = 'anonymous'
+      s.onload = () => window.ort ? ok(window.ort) : no(new Error('SIN_RED'))
+      s.onerror = () => no(new Error('SIN_RED'))
+      document.head.appendChild(s)
+    }).then(async ort => {
+      ort.env.wasm.wasmPaths = NEU_ORT
+      /* Un solo hilo: más hilos piden que la página esté "aislada", y esta
+         lectura es de unas decenas de milisegundos. */
+      ort.env.wasm.numThreads = 1
+      const r = await fetch(urlModelo())
+      if (!r.ok) throw new Error('SIN_MODELO')
+      const sesion = await ort.InferenceSession.create(await r.arrayBuffer(), { executionProviders: ['wasm'] })
+      _neuSesion = { ort, sesion }
+      return _neuSesion
+    }).catch(() => { _neuApagada = true; _neu = null; return null })
+    return _neu
+  }
+
+  /* Un renglón (tinta oscura sobre claro) → lo que la red lee, carácter a
+     carácter: { c, conf 0-100, alts }. Sólo hay que mirar el alfabeto del VIN
+     —sin I, O ni Q—, así que una "O" que la red ve con más fuerza que un 0
+     ya es el 0: no existe otra opción. */
+  async function leerNeuronal (renglon) {
+    const n = _neuSesion
+    if (!n || !renglon || !renglon.width || !renglon.height) return null
+    const H = NEU_ALTO
+    const w = Math.max(32, Math.min(1920, Math.round(H * renglon.width / renglon.height)))
+    const c = lienzo(w, H)
+    const g = c.getContext('2d')
+    g.imageSmoothingQuality = 'high'
+    g.drawImage(renglon, 0, 0, w, H)
+    const d = g.getImageData(0, 0, w, H).data
+    const t = new Float32Array(3 * H * w)
+    for (let i = 0; i < H * w; i++) {
+      const v = ((0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]) / 255 - 0.5) / 0.5
+      t[i] = v; t[H * w + i] = v; t[2 * H * w + i] = v
+    }
+    const r = await n.sesion.run({ [n.sesion.inputNames[0]]: new n.ort.Tensor('float32', t, [1, 3, H, w]) })
+    const o = r[n.sesion.outputNames[0]]
+    const T = o.dims[1], C = o.dims[2], p = o.data
+    const fuera = []
+    let antes = -1, corrida = null
+    for (let s = 0; s < T; s++) {
+      const b = s * C
+      let ix = 0, pm = p[b]
+      for (const [, k] of NEU_CLASES) if (p[b + k] > pm) { pm = p[b + k]; ix = k }
+      if (p[b + NEU_ESPACIO] > pm) { pm = p[b + NEU_ESPACIO]; ix = NEU_ESPACIO }
+      if (ix !== 0 && ix === antes) {
+        /* Mismo carácter en varios trocitos seguidos: es uno solo, con la
+           seguridad del trocito donde más claro se vio. */
+        if (pm > corrida.pm) { corrida.pm = pm; corrida.b = b; corrida.conf = Math.round(pm * 100) }
+      } else if (ix !== 0) {
+        corrida = { k: ix, pm, b, conf: Math.round(pm * 100) }
+        fuera.push(corrida)
+      }
+      antes = ix
+    }
+    return fuera.map(x => {
+      const alts = x.k === NEU_ESPACIO ? [] : NEU_CLASES
+        .map(([ch, k]) => [ch, p[x.b + k]])
+        .filter(([ch, v]) => ch !== NEU_CHAR[x.k] && v >= 0.02)
+        .sort((a, b2) => b2[1] - a[1]).slice(0, 2).map(a => a[0])
+      return { c: NEU_CHAR[x.k], conf: x.conf, alts }
+    })
+  }
+
+  /* La lectura de la red como un candidato más, igual que los de Tesseract,
+     con la seguridad y las alternativas de cada carácter para que voten. */
+  async function lecturaNeuronal (renglon) {
+    if (!_neuSesion) { cargarNeuronal(); return null }
+    let r = null
+    try { r = await leerNeuronal(renglon) } catch (e) { return null }
+    if (!r || !r.length) return null
+    const texto = r.map(x => x.c).join('')
+    const sin = r.filter(x => x.c !== ' ')
+    if (sin.length < 11) return { crudo: texto }
+    const media = sin.reduce((a, x) => a + x.conf, 0) / sin.length
+    const c = mejorCandidato(texto, media)
+    if (!c) return { crudo: texto }
+    /* La seguridad de cada carácter, alineada con los diecisiete que se
+       eligieron (el texto pudo traer "VIN" delante o algo corregido). */
+    if (c.vin.length === 17) {
+      let mejorK = -1, menos = 4
+      for (let k = 0; k + 17 <= sin.length; k++) {
+        let dif = 0
+        for (let i = 0; i < 17; i++) if (sin[k + i].c !== c.vin[i]) dif++
+        if (dif < menos) { menos = dif; mejorK = k }
+      }
+      if (mejorK >= 0) {
+        const tr = sin.slice(mejorK, mejorK + 17)
+        c.confs = tr.map(x => x.conf)
+        c.alts = tr.map(x => x.alts)
+      }
+    }
+    /* Con doce puntos de ventaja: a igualdad con una pasada de Tesseract,
+       gana la red. */
+    return Object.assign(c, { neuronal: true, puntos: c.puntos + 12, crudo: texto })
+  }
+
+  /* ---------- Encontrar el texto en una foto entera ----------
+
+     Tesseract busca texto suelto en una foto bastante peor de lo que lee un
+     renglón ya recortado: con las fotos reales no encontraba el VIN en 4 de
+     5. El detector de texto de PaddleOCR (DBNet, 5 MB) da, para cada
+     renglón, su centro, su largo y lo torcido que está, sea cual sea el
+     ángulo: así una foto de lado o inclinada no necesita probar giros. */
+  const NEU_DET_LADO = 1280
+  const urlDeteccion = () => window.LECTOR_DETECTOR || new URL('modelos/det_v4.onnx', document.baseURI).href
+  let _det = null
+  let _detSesion = null
+  let _detApagado = false
+  function cargarDeteccion () {
+    if (_detSesion) return Promise.resolve(_detSesion)
+    if (_detApagado) return Promise.resolve(null)
+    if (_det) return _det
+    _det = cargarNeuronal().then(async n => {
+      if (!n) return null
+      const r = await fetch(urlDeteccion())
+      if (!r.ok) throw new Error('SIN_MODELO')
+      _detSesion = { ort: n.ort, sesion: await n.ort.InferenceSession.create(await r.arrayBuffer(), { executionProviders: ['wasm'] }) }
+      return _detSesion
+    }).catch(() => { _detApagado = true; _det = null; return null })
+    return _det
+  }
+
+  /* Los renglones de texto de una imagen: { cx, cy, w, h, th } en píxeles de
+     la imagen, con th el ángulo (radianes, y hacia abajo) del eje largo. */
+  async function detectarTexto (im) {
+    const n = _detSesion
+    if (!n) return []
+    const W0 = anchoDe(im), H0 = altoDe(im)
+    const e = Math.min(1, NEU_DET_LADO / Math.max(W0, H0))
+    const rw = Math.max(32, Math.round(W0 * e / 32) * 32), rh = Math.max(32, Math.round(H0 * e / 32) * 32)
+    const c = lienzo(rw, rh)
+    const g = c.getContext('2d')
+    g.imageSmoothingQuality = 'high'
+    g.drawImage(im, 0, 0, rw, rh)
+    const d = g.getImageData(0, 0, rw, rh).data
+    const t = new Float32Array(3 * rw * rh)
+    const media = [0.485, 0.456, 0.406], desv = [0.229, 0.224, 0.225]
+    /* El modelo se entrenó con los canales en orden azul-verde-rojo. */
+    for (let i = 0; i < rw * rh; i++) for (let k = 0; k < 3; k++) t[k * rw * rh + i] = (d[i * 4 + (2 - k)] / 255 - media[k]) / desv[k]
+    const r = await n.sesion.run({ [n.sesion.inputNames[0]]: new n.ort.Tensor('float32', t, [1, 3, rh, rw]) })
+    const p = r[n.sesion.outputNames[0]].data
+
+    /* Manchas conexas de "aquí hay texto" por encima de 0.3. La cola de la
+       búsqueda es el propio arreglo de píxeles, que así queda en orden. */
+    const visto = new Uint8Array(rw * rh)
+    const orden = new Int32Array(rw * rh)
+    const cajas = []
+    let fin = 0
+    for (let i0 = 0; i0 < rw * rh; i0++) {
+      if (p[i0] <= 0.3 || visto[i0]) continue
+      const ini = fin
+      visto[i0] = 1; orden[fin++] = i0
+      for (let k = ini; k < fin; k++) {
+        const i = orden[k], x = i % rw, y = (i / rw) | 0
+        for (let dy = -1; dy <= 1; dy++) {
+          const ny = y + dy
+          if (ny < 0 || ny >= rh) continue
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx
+            if (nx < 0 || nx >= rw) continue
+            const j = ny * rw + nx
+            if (p[j] > 0.3 && !visto[j]) { visto[j] = 1; orden[fin++] = j }
+          }
+        }
+      }
+      const cuantos = fin - ini
+      if (cuantos < 20) continue
+      let mx = 0, my = 0, sp = 0
+      for (let k = ini; k < fin; k++) { const i = orden[k]; mx += i % rw; my += (i / rw) | 0; sp += p[i] }
+      mx /= cuantos; my /= cuantos
+      /* Su eje largo, por el eje principal de los píxeles. */
+      let cxx = 0, cyy = 0, cxy = 0
+      for (let k = ini; k < fin; k++) { const i = orden[k], x = (i % rw) - mx, y = ((i / rw) | 0) - my; cxx += x * x; cyy += y * y; cxy += x * y }
+      const th = 0.5 * Math.atan2(2 * cxy, cxx - cyy), co = Math.cos(th), si = Math.sin(th)
+      let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9
+      for (let k = ini; k < fin; k++) {
+        const i = orden[k], x = (i % rw) - mx, y = ((i / rw) | 0) - my
+        const u = x * co + y * si, v = -x * si + y * co
+        if (u < u0) u0 = u; if (u > u1) u1 = u; if (v < v0) v0 = v; if (v > v1) v1 = v
+      }
+      const largo = u1 - u0, ancho = v1 - v0
+      if (sp / cuantos < 0.5 || Math.min(largo, ancho) < 3) continue
+      const uc = (u0 + u1) / 2, vc = (v0 + v1) / 2
+      /* La mancha es el texto encogido: se agranda como hace el propio
+         modelo (razón 1.5) para que no queden letras cortadas. */
+      const un = (largo * ancho) * 1.5 / (2 * (largo + ancho))
+      const k = W0 / rw
+      cajas.push({ cx: (mx + co * uc - si * vc) * k, cy: (my + si * uc + co * vc) * k,
+        w: (largo + 2 * un) * k, h: (ancho + 2 * un) * k, th, tinta: ancho * k })
+    }
+    return cajas
+  }
+
+  /* El renglón enderezado y al derecho, como lo espera el lector. Con el
+     largo alargado un poco por los dos lados: el detector se queda corto en
+     las puntas y una primera letra cortada es una letra mal leída (una W
+     cortada se lee N). */
+  function recorteDeRenglon (im, b, volteado) {
+    const w = b.w + b.h * 1.2
+    const c = lienzo(w, b.h)
+    const g = c.getContext('2d')
+    g.imageSmoothingQuality = 'high'
+    g.fillStyle = '#fff'
+    g.fillRect(0, 0, c.width, c.height)
+    g.translate(c.width / 2, c.height / 2)
+    g.rotate(-b.th + (volteado ? Math.PI : 0))
+    g.translate(-b.cx, -b.cy)
+    g.drawImage(im, 0, 0)
+    return c
+  }
+
+  /* Dónde está el VIN en una imagen y qué dice: los renglones largos y
+     bajos, cada uno leído por la red; gana el que más parece un VIN.
+     Primero todos de pie; sólo si ninguno convence se prueban al revés. */
+  async function vinEnFoto (im) {
+    const cajas = (await detectarTexto(im))
+      .filter(b => b.w / b.h >= 2.5 && b.w >= 40)
+      .sort((a, b) => b.w * b.h - a.w * a.h).slice(0, 10)
+    let mejor = null
+    const probar = async volteado => {
+      for (const b of cajas) {
+        const c = await lecturaNeuronal(recorteDeRenglon(im, b, volteado))
+        if (!c || !c.vin || c.vin.length !== 17) continue
+        const p = c.puntos + (semaforo(c.vin) === 'verde' ? 20 : 0)
+        if (!mejor || p > mejor.p) mejor = { c, p, caja: b, volteado }
+      }
+    }
+    await probar(false)
+    if (!mejor || semaforo(mejor.c.vin) !== 'verde') await probar(true)
+    return mejor
+  }
+
+  /* De la posición del VIN en la foto a lo que entiende el editor: cuántos
+     cuartos de vuelta, cuántos grados enderezarla, y el recuadro (en
+     fracciones) en la foto ya girada. Es la misma cuenta que hacen
+     girarCuartos y enderezar, aplicada al centro del renglón. */
+  function sitioDe (base, m) {
+    const W = base.width, H = base.height
+    const alfa = ((m.caja.th * 180 / Math.PI + (m.volteado ? 180 : 0) + 540) % 360) - 180
+    const q = ((Math.round(-alfa / 90) % 4) + 4) % 4
+    const grados = alfa + 90 * Math.round(-alfa / 90)
+    const a1 = q * Math.PI / 2
+    const W1 = q % 2 ? H : W, H1 = q % 2 ? W : H
+    const dx = m.caja.cx - W / 2, dy = m.caja.cy - H / 2
+    let x = W1 / 2 + dx * Math.cos(a1) - dy * Math.sin(a1)
+    let y = H1 / 2 + dx * Math.sin(a1) + dy * Math.cos(a1)
+    let W2 = W1, H2 = H1
+    if (Math.abs(grados) >= 0.5) {
+      const r = grados * Math.PI / 180, sen = Math.abs(Math.sin(r)), cos = Math.abs(Math.cos(r))
+      W2 = Math.max(1, Math.round(W1 * cos + H1 * sen)); H2 = Math.max(1, Math.round(W1 * sen + H1 * cos))
+      const ux = x - W1 / 2, uy = y - H1 / 2
+      x = W2 / 2 + ux * Math.cos(-r) - uy * Math.sin(-r)
+      y = H2 / 2 + ux * Math.sin(-r) + uy * Math.cos(-r)
+    }
+    /* El texto ocupa más o menos la mitad de lo que el detector pinta. */
+    const th = Math.max(m.caja.tinta * 1.25, m.caja.h * 0.5)
+    const w = m.caja.w * 1.12, h = th * 1.9
+    const bx = Math.max(0, x - w / 2), by = Math.max(0, y - h / 2)
+    return {
+      cuartos: q, enderezado: Math.abs(grados) >= 0.5 ? grados : 0, vin: m.c.vin, p: 100 + m.p,
+      caja: { x: bx / W2, y: by / H2, w: Math.min(W2 - bx, w) / W2, h: Math.min(H2 - by, h) / H2 }
+    }
   }
 
   /* ---------------- Preparar la imagen ---------------- */
@@ -730,7 +1051,7 @@
      estaba cada una, y el resultado es mejor que cualquier lectura suelta.
      Antes se descartan las que hablan de otra cosa: basta una que se coma un
      carácter para comparar la letra 5 de una con la 6 de otra. */
-  function consenso (cands) {
+  function consenso (cands, escalaTess) {
     let largos = cands.filter(c => c.vin.length === 17)
     if (largos.length < 3) return null
     const patron = largos.reduce((a, b) => (b.puntos > a.puntos ? b : a))
@@ -746,7 +1067,7 @@
            pasada muy segura y equivocada se imponía a tres correctas. Las
            lecturas de la cámara en vivo pesan menos: son fotogramas más
            pequeños y movidos, sirven para desempatar. */
-        const peso = (1 + (c.confs ? c.confs[i] : Math.min(100, c.puntos)) / 100) * (c.vivo ? 0.6 : 1)
+        const peso = (1 + (c.confs ? c.confs[i] : Math.min(100, c.puntos)) / 100) * (c.vivo ? 0.6 : c.neuronal ? 4 : (escalaTess || 1))
         m.set(c.vin[i], (m.get(c.vin[i]) || 0) + peso)
         for (const a of (c.alts ? c.alts[i] : [])) if (a !== c.vin[i]) m.set(a, (m.get(a) || 0) + 0.05)
       }
@@ -896,13 +1217,36 @@
       _listo = true
       const im = await cargarImagen(fuente)
       let recorte = prepararRecorte(im, caja, 1200)
-      const linea = await renglonDelVin(worker, recorte)
-      if (linea) recorte = linea
+      const fila = await renglonDelVin(worker, recorte)
+      /* Sin renglón encontrado, el recuadro entero: si ya era un solo
+         renglón, la red lo lee igual; si eran varios, no saca un VIN. */
+      let paraLaRed = recorte
+      if (fila) { recorte = fila.franja; paraLaRed = fila.fina }
       const imagenes = variantes(recorte)
       const todos = (opc.previas || []).filter(c => c && c.vin && c.vin.length === 17)
       const leido = []
       const total = imagenes.length * VIN_MODOS.length
       let hechas = 0
+
+      /* Primero la red: unas decenas de milisegundos, y lo normal es que
+         acierte. Si ve ella sola un VIN creíble y seguro de cada carácter,
+         no hay nada que contrastar y se ahorran las pasadas de Tesseract,
+         que son lo que más tarda. Si duda, vota junto a ellas con más peso. */
+      let red = await lecturaNeuronal(paraLaRed)
+      /* Si Tesseract no encontró el renglón —letras pálidas, grabado en el
+         vidrio— o la red no sacó un VIN de lo que le tocó, que lo busque
+         ella dentro del recuadro. */
+      if (!(red && red.vin && red.vin.length === 17) && _detSesion && _neuSesion) {
+        try {
+          const m = await vinEnFoto(recorte)
+          if (m) red = m.c
+        } catch (e) {}
+      }
+      if (opc.depurarRed) opc.depurarRed(paraLaRed, red)
+      if (red && red.crudo) leido.push(red.crudo.replace(/\s+/g, ' ').trim())
+      if (red && red.vin) todos.push(red)
+      const redSegura = !!(red && red.vin && red.vin.length === 17 && red.confs &&
+        Math.min(...red.confs) >= NEU_SEGURA && semaforo(red.vin) === 'verde')
 
       /* Cuando la foto sale bien no hace falta gastar todas las pasadas: si
          cuatro de esta foto coinciden letra por letra y además dan un VIN
@@ -916,7 +1260,7 @@
       }
 
       for (const modo of VIN_MODOS) {
-        if (yaEstaClaro()) break
+        if (redSegura || yaEstaClaro()) break
         for (const im2 of imagenes) {
           const { c, bruto } = await pasada(worker, im2, modo)
           if (bruto) leido.push(bruto)
@@ -934,8 +1278,15 @@
          puntos y ganaba la primera que saliera; en un Kia la buena salía
          tres veces y perdía por tres puntos de confianza contra una que
          salía dos. Las lecturas de la cámara en vivo cuentan media. */
+      /* Nueve pasadas de Tesseract son nueve miradas del mismo motor a la
+         misma imagen: cuando se equivoca, se equivoca nueve veces igual (en
+         el Kia real, todas leyeron B donde había un 8). Contarlas como nueve
+         opiniones tapaba a la red, que es el otro motor. Con la red
+         presente, todas las de Tesseract juntas valen como tres. */
+      const nTess = todos.filter(c => !c.neuronal && !c.vivo && c.vin.length === 17).length
+      const escalaTess = todos.some(c => c.neuronal && c.vin.length === 17) && nTess > 3 ? 3 / nTess : 1
       const apoyo = new Map()
-      for (const c of todos) if (c.vin.length === 17) apoyo.set(c.vin, (apoyo.get(c.vin) || 0) + (c.vivo ? 0.5 : 1))
+      for (const c of todos) if (c.vin.length === 17) apoyo.set(c.vin, (apoyo.get(c.vin) || 0) + (c.vivo ? 0.5 : c.neuronal ? 4 : escalaTess))
       /* En proporción al VIN más repetido, no con un tope fijo: con un
          tope de cuatro, diez pasadas y seis pasadas valían lo mismo. */
       const maxApoyo = Math.max(1, ...apoyo.values())
@@ -943,7 +1294,7 @@
       let mejor = null
       for (const c of todos) if (!c.vivo && (!mejor || conApoyo(c) > conApoyo(mejor))) mejor = c
       if (mejor) mejor = Object.assign({}, mejor, { puntos: conApoyo(mejor) })
-      const cons = consenso(todos)
+      const cons = consenso(todos, escalaTess)
       if (cons) {
         const base = cifrasAlFinal(arreglarVerificador(cons.vin))
         const afinado = afinarConVotos(base, cons.alternativas) || corregirConVerificador(base)
@@ -975,9 +1326,15 @@
           const otras = vs.filter(x => x[0] !== mejor.vin[i] && x[1] / tot >= 0.15).slice(0, 2).map(x => x[0])
           if (mio / tot < 0.75 && otras.length) dudas.push({ i, es: mejor.vin[i], otras })
         }
+      } else if (mejor && mejor.neuronal && mejor.confs && mejor.vin.length === 17) {
+        /* Sólo la red leyó: sus dudas son las suyas. */
+        for (let i = 0; i < 17; i++) {
+          const otras = (mejor.alts[i] || []).filter(a => a !== mejor.vin[i])
+          if (mejor.confs[i] < NEU_SEGURA && otras.length) dudas.push({ i, es: mejor.vin[i], otras })
+        }
       }
       const crudo = Array.from(new Set(leido)).slice(0, 6).join(' | ')
-      if (opc.depurar) opc.depurar(todos.map(c => ({ vin: c.vin, puntos: c.puntos, vivo: !!c.vivo })), cons && cons.vin)
+      if (opc.depurar) opc.depurar(todos.map(c => ({ vin: c.vin, puntos: c.puntos, vivo: !!c.vivo, red: !!c.neuronal })), cons && cons.vin)
       if (!mejor) return { vin: null, leido: crudo }
       return {
         vin: mejor.vin,
@@ -1053,8 +1410,15 @@
        ocupa el renglón: en las placas reales cortaba el principio —WVGZ en
        un VW, MNAAXX en un Ford grabado en el vidrio— justo por ser lo más
        tenue. El recuadro lo puso la persona alrededor del VIN, así que a
-       lo ancho no sobra nada. */
-    return recortarYAmpliar(recorte, { x: 0, y: m.caja.y, w: 1, h: m.caja.h }, 1200)
+       lo ancho no sobra nada.
+
+       Además, el renglón con sólo un margen corto, para la red: a ella le
+       estorban los renglones vecinos que a Tesseract le dan contexto. */
+    const franja = recortarYAmpliar(recorte, { x: 0, y: m.caja.y, w: 1, h: m.caja.h }, 1200)
+    const cy = m.caja.y + m.caja.h / 2
+    const hf = Math.min(1, (m.caja.h / 1.9) * 1.4)
+    const yf = Math.max(0, Math.min(1 - hf, cy - hf / 2))
+    return { franja, fina: recortarYAmpliar(recorte, { x: 0, y: yf, w: 1, h: hf }, 1200) }
   }
 
   /* Dónde está el VIN en una foto entera, y en qué posición está la foto.
@@ -1070,6 +1434,15 @@
       _listo = true
       const im = await cargarImagen(fuente)
       const base = aLienzo(im, 1600)
+      /* Con la red lista, ella busca el VIN en la foto entera, sea cual sea
+         su giro. Sólo cuando no hay sitio fijo que respetar: el editor pide
+         buscar "sin girar" tras girar a mano, y eso sí lo hace Tesseract. */
+      if (!posiciones && _detSesion && _neuSesion) {
+        try {
+          const m = await vinEnFoto(base)
+          if (m) return sitioDe(base, m)
+        } catch (e) {}
+      }
       let mejor = null
       for (const q of posiciones || [0, 1, 3]) {
         const c = girarCuartos(base, q)
@@ -1306,7 +1679,10 @@
       caracteres: '{n} carácter', caracteresN: '{n} caracteres',
       quieto: 'Mantén quieto el teléfono',
       dudas: 'El lector dudó en lo marcado. Compáralo con la placa y, si hace falta, toca la otra opción:',
-      posicion: '{n}º'
+      posicion: '{n}º',
+      barrasGuia: 'Apunta al código de barras', barrasGuia2: 'El de la etiqueta de la puerta o del parabrisas',
+      buscandoBarras: 'Buscando el código…', barrasOtro: 'Leí un código que no es un VIN: {t}',
+      barrasNoVin: 'En esa foto no hay un código de barras con un VIN.', barrasNada: 'No se pudo leer el código de barras. Prueba con más luz o más cerca.'
     },
     en: {
       cerrar: 'Close', marco: 'Fit the VIN inside the frame', marco2: 'Horizontal, filling the frame',
@@ -1334,7 +1710,10 @@
       caracteres: '{n} character', caracteresN: '{n} characters',
       quieto: 'Hold the phone still',
       dudas: 'The reader was unsure about the marked ones. Compare with the plate and, if needed, tap the other option:',
-      posicion: '#{n}'
+      posicion: '#{n}',
+      barrasGuia: 'Point at the barcode', barrasGuia2: 'The one on the door or windshield label',
+      buscandoBarras: 'Looking for the code…', barrasOtro: 'I read a code that is not a VIN: {t}',
+      barrasNoVin: 'That photo has no barcode with a VIN.', barrasNada: 'The barcode could not be read. Try more light or get closer.'
     }
   }
 
@@ -2331,13 +2710,293 @@
     return promesa
   }
 
+
+  /* ======================= CÓDIGO DE BARRAS =======================
+
+     Muchos autos traen el VIN además como código de barras: la etiqueta del
+     marco de la puerta, la del parabrisas. Un código de barras no se "lee
+     mal": o sale entero y exacto, o no sale, y se tarda un instante. Por eso
+     es una opción aparte de la cámara que lee letras, no un añadido de ella:
+     cuando el auto lo trae, es la forma más segura de capturar el VIN. No
+     todos lo traen, y para esos está la lectura de siempre.
+
+     Usa el lector de códigos del propio teléfono cuando lo tiene (Chrome en
+     Android) y, si no (iPhone), una librería pequeña que se baja la primera
+     vez que se usa. */
+  const BARRAS_FORMATOS = ['code_39', 'code_128', 'data_matrix', 'qr_code', 'pdf417', 'itf', 'codabar', 'code_93', 'aztec']
+  const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js'
+  const ZXING_SRI = 'sha384-BzBxP10ZE72aitqj5UMmUsbKFliP/DZqA8Wq+BNNhlIJDGoEd1tpkMYXOg9+n6sB'
+  let _zx = null
+  function cargarZXing () {
+    if (_zx) return _zx
+    _zx = new Promise((ok, no) => {
+      if (window.ZXing) return ok(window.ZXing)
+      const s = document.createElement('script')
+      s.src = ZXING_URL
+      s.integrity = ZXING_SRI
+      s.crossOrigin = 'anonymous'
+      s.onload = () => window.ZXing ? ok(window.ZXing) : no(new Error('SIN_BARRAS'))
+      s.onerror = () => { _zx = null; no(new Error('SIN_BARRAS')) }
+      document.head.appendChild(s)
+    })
+    return _zx
+  }
+
+  /* El VIN que lleva un texto de código de barras, o null. Una etiqueta de
+     Code 39 suele traer una "I" delante (la norma de Norteamérica) o un
+     carácter de control detrás: se busca el trozo de diecisiete que es un VIN
+     y, si hay más de uno, el que más lo parece. Nada de corregir letras: aquí
+     no hay errores de lectura, y una "O" en un código de barras no es un 0. */
+  function vinDeCodigo (texto) {
+    const t = String(texto || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+    if (t.length < 17 || t.length > 24) return null
+    let mejor = null
+    for (let i = 0; i + 17 <= t.length; i++) {
+      const v = t.slice(i, i + 17)
+      if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(v) || semaforo(v) === 'rojo') continue
+      const p = puntuar(v, 100) + (verificadorOk(v) && esNorteamericano(v) ? 10 : 0)
+      if (!mejor || p > mejor.p) mejor = { v, p }
+    }
+    return mejor && mejor.v
+  }
+
+  let _motorBarras = null
+  /* → { nombre, decodificar(fuente) → Promise<[{ texto, formato, caja }]> },
+     donde fuente es un vídeo o un lienzo y caja (si se sabe) está en píxeles
+     de esa fuente. */
+  function motorDeBarras () {
+    if (_motorBarras) return _motorBarras
+    _motorBarras = (async () => {
+      if (window.BarcodeDetector) {
+        try {
+          const ok = await window.BarcodeDetector.getSupportedFormats()
+          const formatos = BARRAS_FORMATOS.filter(f => ok.indexOf(f) >= 0)
+          if (formatos.indexOf('code_39') >= 0 || formatos.indexOf('code_128') >= 0) {
+            const det = new window.BarcodeDetector({ formats: formatos })
+            return { nombre: 'nativo', decodificar: async fuente => (await det.detect(fuente)).map(b => ({
+              texto: b.rawValue, formato: b.format,
+              caja: b.boundingBox ? { x: b.boundingBox.x, y: b.boundingBox.y, w: b.boundingBox.width, h: b.boundingBox.height } : null })) }
+          }
+        } catch (e) {}
+      }
+      const Z = await cargarZXing()
+      const pistas = new Map()
+      pistas.set(Z.DecodeHintType.POSSIBLE_FORMATS, [Z.BarcodeFormat.CODE_39, Z.BarcodeFormat.CODE_128, Z.BarcodeFormat.DATA_MATRIX,
+        Z.BarcodeFormat.QR_CODE, Z.BarcodeFormat.PDF_417, Z.BarcodeFormat.ITF, Z.BarcodeFormat.CODABAR, Z.BarcodeFormat.CODE_93, Z.BarcodeFormat.AZTEC])
+      pistas.set(Z.DecodeHintType.TRY_HARDER, true)
+      const lector = new Z.MultiFormatReader()
+      return { nombre: 'zxing', decodificar: async fuente => {
+        /* A lo sumo 1280 de ancho: una foto de teléfono entera tarda más de lo que sirve. */
+        const w = anchoDe(fuente), h = altoDe(fuente)
+        const c = aLienzo(fuente, 1280)
+        const k = w / c.width
+        try {
+          const r = lector.decode(new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(c))), pistas)
+          const pts = (r.getResultPoints() || []).filter(Boolean)
+          let caja = null
+          if (pts.length) {
+            const xs = pts.map(q => q.getX() * k), ys = pts.map(q => q.getY() * k)
+            caja = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }
+          }
+          return [{ texto: r.getText(), formato: String(r.getBarcodeFormat()), caja }]
+        } catch (e) { return [] }
+      } }
+    })().catch(e => { _motorBarras = null; throw e })
+    return _motorBarras
+  }
+
+  /* El VIN de lo que haya en una imagen o un fotograma, o null. */
+  async function vinEnBarras (fuente) {
+    const m = await motorDeBarras()
+    for (const h of await m.decodificar(fuente)) {
+      const vin = vinDeCodigo(h.texto)
+      if (vin) return { vin, texto: h.texto, formato: h.formato, caja: h.caja }
+    }
+    return null
+  }
+
+  /* escanearBarras(opciones) → Promise<resultado | null>
+     Mismo resultado que abrir(): { vin, semaforo, confianza, foto, recorte,
+     emparejado, soloFoto }, con origen: 'barras'. La foto es el fotograma en
+     el que se leyó el código: el respaldo de siempre. */
+  function escanearBarras (opc) {
+    opc = opc || {}
+    ponerCss()
+    const L = TEXTOS[opc.idioma] || TEXTOS.es
+    const tx = (k, vars) => (L[k] || TEXTOS.es[k] || k).replace(/\{(\w+)\}/g, (_, n) => (vars && vars[n] != null ? vars[n] : ''))
+    const raiz = document.createElement('div')
+    raiz.className = 'lv'
+    raiz.setAttribute('role', 'dialog')
+    raiz.setAttribute('aria-modal', 'true')
+    document.body.appendChild(raiz)
+    const scrollPrevio = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    let terminar
+    const promesa = new Promise(r => { terminar = r })
+    let cerrado = false, stream = null, track = null, tempo = null, ocupado = false, motor = null
+    const cerrar = valor => {
+      if (cerrado) return
+      cerrado = true
+      clearTimeout(tempo)
+      window.removeEventListener('resize', colocar)
+      if (stream) stream.getTracks().forEach(t => t.stop())
+      stream = null
+      raiz.remove()
+      document.body.style.overflow = scrollPrevio
+      terminar(valor || null)
+    }
+
+    raiz.insertAdjacentHTML('beforeend', `
+      <video class="lv-video" playsinline muted autoplay></video>
+      <div class="lv-marco" data-s=""></div>
+      <div class="lv-guia"><b>${tx('barrasGuia')}</b><span>${tx('barrasGuia2')}</span></div>
+      <div class="lv-vivo"><code>${tx('buscandoBarras')}</code></div>
+      <div class="lv-bar lv-top">
+        <button class="lv-ib" data-a="x" aria-label="${tx('cerrar')}">${icono('x')}</button>
+        <span style="flex:1"></span>
+        <button class="lv-ib" data-a="luz" aria-label="${tx('linterna')}" aria-pressed="false" hidden>${icono('luz')}</button>
+      </div>
+      <div class="lv-bar lv-bajo">
+        <div class="lv-fila" style="justify-content:center">
+          <button class="lv-lado" data-a="gal">${icono('gal')}<span>${tx('galeria')}</span></button>
+        </div>
+      </div>`)
+    const $ = s => raiz.querySelector(s)
+    const video = $('video'), marco = $('.lv-marco'), guia = $('.lv-guia'), vivo = $('.lv-vivo'), code = vivo.querySelector('code')
+
+    /* El marco sólo orienta: se mira todo el fotograma, no sólo lo de dentro.
+       Ancho y bajo, que es como son los códigos de barras de las etiquetas. */
+    function colocar () {
+      const W = raiz.clientWidth, H = raiz.clientHeight
+      const w = Math.min(W * 0.9, 620), h = Math.max(70, Math.round(w * 0.3))
+      const top = Math.round(H * 0.4 - h / 2)
+      Object.assign(marco.style, { width: w + 'px', height: h + 'px', top: top + 'px' })
+      guia.style.top = Math.max(70, top - 64) + 'px'
+      vivo.style.top = (top + h + 12) + 'px'
+    }
+    colocar()
+    window.addEventListener('resize', colocar)
+
+    /* Sin cámara no hay nada que buscar: fuera el marco y el "buscando", y
+       dos salidas — la cámara del teléfono (una foto nítida lee mejor un
+       código pequeño que un fotograma de vídeo) o una foto ya hecha. */
+    const aviso = msg => {
+      marco.hidden = true; guia.hidden = true; vivo.hidden = true
+      const a = document.createElement('div')
+      a.className = 'lv-aviso'
+      a.insertAdjacentHTML('beforeend', `<p>${msg}</p>
+        <button class="lv-btn" data-a="nativa">${icono('cam')}${tx('camaraTel')}</button>
+        <div style="height:8px"></div>
+        <button class="lv-btn sec" data-a="gal">${icono('gal')}${tx('galeria')}</button>`)
+      raiz.appendChild(a)
+    }
+
+    /* Lo que se entrega al leer: la foto entera del momento (el respaldo) y,
+       si se sabe dónde está el código, un recorte alrededor para la miniatura. */
+    const entregar = (fuente, h) => {
+      const lienzoFoto = aLienzo(fuente, 1600)
+      const e = lienzoFoto.width / anchoDe(fuente)
+      let recorte = null
+      if (h.caja && h.caja.w > 4 && h.caja.h > 4) {
+        const mx = h.caja.w * 0.15, my = h.caja.h * 0.5
+        const x = Math.max(0, h.caja.x * e - mx * e), y = Math.max(0, h.caja.y * e - my * e)
+        const w = Math.min(lienzoFoto.width - x, (h.caja.w + 2 * mx) * e), hh = Math.min(lienzoFoto.height - y, (h.caja.h + 2 * my) * e)
+        recorte = recortarYAmpliar(lienzoFoto, { x: x / lienzoFoto.width, y: y / lienzoFoto.height, w: w / lienzoFoto.width, h: hh / lienzoFoto.height }, 560)
+          .toDataURL('image/jpeg', 0.82)
+      }
+      try { navigator.vibrate && navigator.vibrate(35) } catch (e2) {}
+      cerrar({ vin: h.vin, semaforo: semaforo(h.vin), confianza: 100, foto: lienzoFoto.toDataURL('image/jpeg', 0.85), recorte,
+        emparejado: null, soloFoto: false, origen: 'barras', formato: h.formato })
+    }
+
+    const bucle = async () => {
+      if (cerrado) return
+      if (!ocupado && motor && !document.hidden && video.videoWidth && video.readyState >= 2) {
+        ocupado = true
+        try {
+          const hallados = await motor.decodificar(video)
+          for (const x of hallados) {
+            const vin = vinDeCodigo(x.texto)
+            if (vin) { if (!cerrado) entregar(video, { vin, texto: x.texto, formato: x.formato, caja: x.caja }); return }
+            if (x.texto) code.textContent = tx('barrasOtro', { t: String(x.texto).slice(0, 18) })
+          }
+        } catch (e) {}
+        ocupado = false
+      }
+      tempo = setTimeout(bucle, 120)
+    }
+
+    const arrancar = async () => {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { aviso(tx('sinCamara')); return }
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+        })
+      } catch (e) {
+        aviso(e && e.name === 'NotAllowedError' ? tx('permiso') : tx('sinCamara'))
+        return
+      }
+      if (cerrado) { stream.getTracks().forEach(t => t.stop()); return }
+      video.srcObject = stream
+      try { await video.play() } catch (e) {}
+      track = stream.getVideoTracks()[0]
+      const cap = track && track.getCapabilities ? track.getCapabilities() : {}
+      if (cap.torch) $('[data-a=luz]').hidden = false
+      /* Un código de barras pequeño pide enfoque continuo y cerca. */
+      if (cap.focusMode && cap.focusMode.indexOf('continuous') >= 0) track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {})
+      try { motor = await motorDeBarras() } catch (e) { code.textContent = tx('sinRed'); return }
+      bucle()
+    }
+
+    const elegirFoto = camaraTel => {
+      const inp = document.createElement('input')
+      inp.type = 'file'
+      inp.accept = 'image/*'
+      if (camaraTel) inp.setAttribute('capture', 'environment')
+      inp.onchange = async () => {
+        const f = inp.files && inp.files[0]
+        if (!f) return
+        vivo.hidden = false
+        code.textContent = tx('leyendo')
+        try {
+          const im = await cargarImagen(f)
+          const base = aLienzo(im, 2000)
+          let h = await vinEnBarras(base)
+          /* De lado: lo normal en una foto del marco de la puerta. */
+          for (const q of [1, 3, 2]) { if (h) break; h = await vinEnBarras(girarCuartos(base, q)) }
+          if (h && !cerrado) entregar(base, h)
+          else code.textContent = tx('barrasNoVin')
+        } catch (e) { code.textContent = e && e.message === 'SIN_BARRAS' ? tx('sinRed') : tx('barrasNoVin') }
+      }
+      inp.click()
+    }
+
+    raiz.onclick = e => {
+      const b = e.target.closest('[data-a]')
+      if (!b) return
+      const a = b.dataset.a
+      if (a === 'x') cerrar(null)
+      else if (a === 'gal') elegirFoto(false)
+      else if (a === 'nativa') elegirFoto(true)
+      else if (a === 'luz') {
+        const on = b.getAttribute('aria-pressed') !== 'true'
+        track.applyConstraints({ advanced: [{ torch: on }] }).then(() => b.setAttribute('aria-pressed', String(on))).catch(() => {})
+      }
+    }
+    arrancar()
+    return promesa
+  }
+
   window.LectorVIN = {
-    precargar, abrir, leer, leerRapido, localizar, leerFotoEntera, recortarVin,
+    precargar, abrir, escanearBarras, vinDeCodigo, vinEnBarras, leer, leerRapido, localizar, leerFotoEntera, recortarVin,
     semaforo, verificadorOk, limpiar: limpiarVin, emparejar, recordar, historial,
     get listo () { return _listo },
     /* Para la prueba de acierto: lo que necesita sin pasar por la pantalla. */
     _interno: { cargarImagen, recortarYAmpliar, girarCuartos, aLienzo, VIN_CORE, VIN_LANG, cargarTesseract, prepararRecorte, variantes,
       nitidez, desplazamiento, mejorFoto,
-      lineaDe: c => enFila(async () => renglonDelVin(await obtenerWorker(), c)) }
+      lineaDe: c => enFila(async () => { const f = await renglonDelVin(await obtenerWorker(), c); return f && f.franja }),
+      cargarNeuronal, leerNeuronal, lecturaNeuronal, cargarDeteccion, detectarTexto, vinEnFoto, sitioDe, motorDeBarras }
   }
 })()

@@ -250,6 +250,7 @@ nav.tabs button.active{color:var(--tinte)}
 <symbol id="ico-report" viewBox="0 0 24 24"><path d="M4.5 4v14.2a1.3 1.3 0 0 0 1.3 1.3H20"/><path d="M9 16.5v-4.7M13 16.5v-7.6M17 16.5v-3.2"/></symbol>
 <symbol id="ico-settings" viewBox="0 0 24 24"><path d="M4 8h8.5M18.5 8H20"/><circle cx="15.5" cy="8" r="2.5"/><path d="M4 16h3.5M13.5 16H20"/><circle cx="10.5" cy="16" r="2.5"/></symbol>
 <symbol id="ico-gallery" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="3"/><circle cx="8.4" cy="9.6" r="1.4"/><path d="M3.8 17.2 9 12l3.4 3.4 2.3-2.3 5.5 5.5"/></symbol>
+<symbol id="ico-barcode" viewBox="0 0 24 24"><path d="M4 8.5V7a3 3 0 0 1 3-3h1.5M15.5 4H17a3 3 0 0 1 3 3v1.5M20 15.5V17a3 3 0 0 1-3 3h-1.5M8.5 20H7a3 3 0 0 1-3-3v-1.5"/><path d="M8 9v6M11 9v6M13.5 9v6M16 9v6"/></symbol>
 <symbol id="ico-rotate" viewBox="0 0 24 24"><path d="M20.3 12a8.3 8.3 0 1 1-2.7-6.1"/><path d="M20.6 4.4v5.2h-5.2"/></symbol>
 <symbol id="ico-check" viewBox="0 0 24 24"><path d="M4.4 12.6 9.6 17.8 19.8 6.6"/></symbol>
 <symbol id="ico-delete" viewBox="0 0 24 24"><path d="M3.6 6.6h16.8"/><path d="M9.6 6.6V5a1.5 1.5 0 0 1 1.5-1.5h1.8A1.5 1.5 0 0 1 14.4 5v1.6"/><path d="m5.7 6.6 1 12.2a2 2 0 0 0 2 1.8h6.6a2 2 0 0 0 2-1.8l1-12.2"/><path d="M10.2 10.4v6.2M13.8 10.4v6.2"/></symbol>
@@ -288,6 +289,9 @@ nav.tabs button.active{color:var(--tinte)}
     <button class="boton escanear" id="btnCamara" type="button"><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-camera"/></svg>Escanear VIN</button>
     <div class="grupo">
       <label class="fila con-icono" for="galInput"><span class="ico-fila"><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-gallery"/></svg></span><span class="mas">Elegir foto de la galería</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></label>
+      <!-- Aparte de la cámara que lee letras: si el auto trae el VIN en código de
+           barras (etiqueta de la puerta o del parabrisas), se lee entero y sin errores. -->
+      <button class="fila con-icono" id="btnBarras" type="button"><span class="ico-fila"><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-barcode"/></svg></span><span class="mas">Escanear código de barras</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <!-- Al acabar el día, la hoja de cada trabajador: sus autos con la
            foto del VIN y los números del día, para mandarla por WhatsApp. -->
       <button class="fila con-icono" id="btnResumen" type="button"><span class="ico-fila"><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-report"/></svg></span><span class="mas">Resumen del día por trabajador</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -661,6 +665,16 @@ async function abrirLector(opc){
     semaforo: completo ? r.semaforo : null, emparejado: r.emparejado, recorte: r.recorte });
 }
 
+/* El código de barras es una opción aparte de la cámara que lee letras: un
+   código no se "lee mal", sale entero o no sale. Termina en la misma ficha
+   de siempre, con el VIN puesto y la foto del momento como respaldo. */
+async function abrirBarras(){
+  const r = await LectorVIN.escanearBarras();
+  if (!r) return;
+  openReview({ photo: r.foto, vinFull: r.vin, vin6: vin6of(r.vin), make: "", model: "",
+    semaforo: r.semaforo, emparejado: null, recorte: r.recorte, origen: "barras" });
+}
+
 let capFoto = null;
 /* recorte: el recuadro que la persona ajustó en el editor. Es la foto del
    VIN que sale en el resumen del día, así que viaja con la foto hasta que
@@ -748,7 +762,9 @@ function openReview(data){
   if (data.skipHint) {
     hint = "Editando un registro ya guardado.";
   } else if (data.vinFull) {
-    hint = (SEMAFORO[data.semaforo || vinSemaforo(data.vinFull)] || "") + " — ya lo revisaste en el lector.";
+    hint = data.origen === "barras"
+      ? "✓ Leído del código de barras: un código no se equivoca de letra. Revisa que sea el auto."
+      : (SEMAFORO[data.semaforo || vinSemaforo(data.vinFull)] || "") + " — ya lo revisaste en el lector.";
     if (data.emparejado && data.emparejado.tipo === "exacto") hint += " Ojo: este VIN ya se registró antes.";
   } else if (data.vin6) {
     hint = "⚠︎ Sólo tienes parte del VIN. Puedes guardar igual con la foto y completarlo después.";
@@ -1442,6 +1458,7 @@ async function refrescarLimpieza(){
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => showTab(b.dataset.tab));
   document.getElementById("btnCamara").onclick = () => abrirLector({ fuente: "camara" });
+  document.getElementById("btnBarras").onclick = abrirBarras;
   document.getElementById("btnResumen").onclick = abrirResumen;
   document.getElementById("btnResumenRep").onclick = abrirResumen;
   document.getElementById("res_dia").onchange = cargarGenteDelDia;
