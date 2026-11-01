@@ -1677,7 +1677,7 @@
       marcoV: 'VIN vertical: que llene el marco de arriba abajo', vinVertical: 'Vertical',
       preparando: 'Preparando el lector…', buscando: 'Buscando…', linterna: 'Linterna',
       galeria: 'Galería', capturar: 'Capturar', zoom: 'Zoom',
-      sinCamara: 'No se pudo abrir la cámara aquí.', permiso: 'Hay que permitir la cámara para escanear. También puedes usar la cámara del teléfono.',
+      sinCamara: 'No se pudo abrir la cámara aquí.', permiso: 'La cámara está bloqueada. En Android: toca el candado o la ⓘ junto a la dirección, luego Permisos, Cámara y Permitir. Si usas la app instalada: mantén pulsado su icono, Info de la app, Permisos, Cámara. Mientras tanto puedes usar la cámara del teléfono.',
       camaraTel: 'Usar la cámara del teléfono',
       titulo: 'Revisa el VIN', otraFoto: 'Otra foto', girar: 'Girar', enderezar: 'Enderezar',
       ayudaRecuadro: 'El recuadro debe encerrar sólo el VIN. Arrastra sus esquinas; con dos dedos, zoom.',
@@ -1708,7 +1708,7 @@
       marcoV: 'Vertical VIN: fill the frame top to bottom', vinVertical: 'Vertical',
       preparando: 'Getting the reader ready…', buscando: 'Looking…', linterna: 'Torch',
       galeria: 'Gallery', capturar: 'Capture', zoom: 'Zoom',
-      sinCamara: 'The camera could not be opened here.', permiso: 'Allow the camera to scan. You can also use the phone camera.',
+      sinCamara: 'The camera could not be opened here.', permiso: 'The camera is blocked. On Android: tap the padlock or ⓘ next to the address, then Permissions, Camera, Allow. In the installed app: long-press its icon, App info, Permissions, Camera. Meanwhile you can use the phone camera.',
       camaraTel: 'Use the phone camera',
       titulo: 'Check the VIN', otraFoto: 'Another photo', girar: 'Rotate', enderezar: 'Straighten',
       ayudaRecuadro: 'The box must hold only the VIN. Drag its corners; two fingers to zoom.',
@@ -1806,7 +1806,7 @@
 .lv-ed{background:#000}
 .lv-cab{display:flex;align-items:center;gap:12px;padding:8px 16px;padding-top:max(8px,env(safe-area-inset-top));flex:none;min-height:60px}
 .lv-cab h2{flex:1;margin:0;font-size:17px;font-weight:600;text-align:center}
-.lv-mini{background:var(--lv-gris);border-radius:999px;min-height:36px;padding:0 14px;display:flex;gap:6px;align-items:center;
+.lv-mini{background:var(--lv-gris);border-radius:999px;min-height:44px;padding:0 14px;display:flex;gap:6px;align-items:center;
   font-weight:500;font-size:15px;letter-spacing:-.24px;flex:none;white-space:nowrap}
 .lv-mini svg{width:18px;height:18px}
 .lv-mini:active{opacity:.7}
@@ -1817,8 +1817,8 @@
 .lv-barra{height:2px;background:rgba(255,255,255,.12);position:absolute;left:0;right:0;bottom:0}
 .lv-barra i{display:block;height:100%;width:0;background:#fff;transition:width .2s}
 .lv-herr{display:flex;align-items:center;gap:8px;padding:10px 16px;flex:none;flex-wrap:nowrap}
-.lv-herr .lv-mini{min-height:36px}
-.lv-herr .lv-mini[aria-label]{width:36px;padding:0;justify-content:center}
+.lv-herr .lv-mini{min-height:44px}
+.lv-herr .lv-mini[aria-label]{width:44px;padding:0;justify-content:center}
 .lv-herr label{flex:1;min-width:0;font-size:12px;letter-spacing:0;color:var(--lv-sec);display:flex;flex-direction:column;gap:2px;text-align:center}
 .lv-herr input{width:100%;accent-color:#fff;margin:0}
 .lv-panel{flex:none;max-height:52%;overflow-y:auto;padding:14px 16px max(16px,env(safe-area-inset-bottom));touch-action:pan-y;
@@ -1837,7 +1837,7 @@
 .lv-vin{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;letter-spacing:.05em}
 .lv-acciones{display:flex;flex-direction:column;gap:8px;margin-top:14px}
 .lv-dudas{display:flex;flex-wrap:wrap;gap:6px}
-.lv .lv-duda{background:var(--lv-ambar);color:#000;border-radius:999px;padding:0 14px;font-weight:600;font-size:15px;min-height:36px}
+.lv .lv-duda{background:var(--lv-ambar);color:#000;border-radius:999px;padding:0 14px;font-weight:600;font-size:15px;min-height:44px}
 @media (min-width:700px){.lv-panel{max-height:46%;max-width:640px;width:100%;margin:0 auto}.lv-acciones{flex-direction:row}}
 `
   let _css = false
@@ -2202,6 +2202,11 @@
         track = stream.getVideoTracks()[0]
         const cap = track && track.getCapabilities ? track.getCapabilities() : {}
         if (cap.torch) $('[data-a=luz]').hidden = false
+        /* En Android (el Galaxy del jefe) se puede pedir enfoque continuo: sin
+           él, a veces la cámara se queda enfocando lejos y el VIN sale borroso. */
+        if (cap.focusMode && cap.focusMode.indexOf('continuous') >= 0) {
+          track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {})
+        }
         const zin = $('.lv-zoom input')
         if (cap.zoom && cap.zoom.max > cap.zoom.min) {
           zoomHw = cap.zoom

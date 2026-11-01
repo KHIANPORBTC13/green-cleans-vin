@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>Green & Clean · Registro VIN</title>
+<!-- Samsung Internet oscurece por su cuenta las páginas que no dicen que ya
+     tienen modo oscuro, y deja los colores al revés: aquí se lo decimos. -->
+<meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#dcf5e4" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#04170c" media="(prefers-color-scheme: dark)">
 <link rel="preload" href="fuentes/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
@@ -70,6 +73,11 @@ body{margin:0;min-height:100vh;color:var(--texto);font:17px/1.35 var(--letra);le
   background:linear-gradient(180deg,var(--fondo) 0,var(--fondo) 280px,var(--fondo2) 760px) fixed;
   -webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 0}
 button,input,select{font:inherit;letter-spacing:inherit;color:inherit}
+/* En Android: que deslizar hacia abajo arriba del todo no recargue la página
+   (se perdería lo que se está escribiendo), y que mantener pulsado un botón
+   no seleccione su texto. */
+html,body{overscroll-behavior-y:contain}
+button,nav,label.fila,.rapido,.cifra,.kpi,.tr-fila,.mc-fila,.est-barra{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--tinte);outline-offset:2px}
 [hidden]{display:none!important}
@@ -109,7 +117,7 @@ main{padding:max(16px,env(safe-area-inset-top)) 18px calc(118px + env(safe-area-
 .hero .escanear{margin:0}
 .hero-pie{display:flex;align-items:center;gap:10px;padding:14px 22px;border-top:1.5px solid var(--fondo);font-size:16px}
 .hero-pie .mas{flex:1}
-.hero-pie button{border:0;background:none;color:var(--tinte);font-weight:700;font-size:16px;display:flex;align-items:center;gap:4px;padding:6px 0}
+.hero-pie button{border:0;background:none;color:var(--tinte);font-weight:700;font-size:16px;display:flex;align-items:center;gap:4px;padding:6px 0;min-height:44px}
 
 /* ---- Tarjetas con un número grande a la derecha ---- */
 .cifra{display:flex;align-items:center;gap:14px;width:100%;padding:18px 20px;border:0;text-align:left;color:var(--texto);
@@ -196,7 +204,7 @@ input.inp::placeholder{color:var(--ter)}
 /* ---- Control segmentado, de vidrio como la barra ---- */
 .segctrl{display:flex;background:var(--vidrio);border:1px solid var(--vidrio-borde);border-radius:999px;padding:4px;margin:0 0 14px;
   -webkit-backdrop-filter:blur(16px) saturate(170%);backdrop-filter:blur(16px) saturate(170%);box-shadow:var(--sombra)}
-.segctrl button{flex:1;min-width:0;border:0;background:none;border-radius:999px;padding:9px 0;font-size:13.5px;font-weight:600;color:var(--sec);white-space:nowrap}
+.segctrl button{flex:1;min-width:0;min-height:44px;border:0;background:none;border-radius:999px;padding:9px 0;font-size:13.5px;font-weight:600;color:var(--sec);white-space:nowrap}
 .segctrl button.on{background:var(--celda);color:var(--tinte);font-weight:700;box-shadow:0 2px 8px rgba(4,33,15,.12)}
 .repnav{display:flex;align-items:center;justify-content:space-between;margin:0 0 18px}
 .repnav button{width:44px;height:44px;border:0;border-radius:50%;background:var(--celda);color:var(--tinte);font-size:24px;display:grid;place-items:center;box-shadow:var(--sombra)}
@@ -375,6 +383,8 @@ nav.tabs button.active .ic{stroke-width:2.2}
 .sheetTop h3{margin:0}
 .cerrarX{position:absolute;right:14px;top:14px;width:32px;height:32px;border-radius:50%;border:0;background:var(--relleno);
   color:var(--tinte);font-size:13px;font-weight:800;line-height:32px;padding:0}
+/* Se ve de 32 px pero responde en 48, lo que pide Android para un dedo. */
+.cerrarX::after{content:"";position:absolute;inset:-8px}
 .sheet img{display:block;width:100%;border-radius:18px;margin:0 0 14px;max-height:230px;object-fit:cover;background:#000}
 .sheet .hint{margin:0 0 14px}
 #rev_vin6{font-size:30px;font-weight:800;text-align:center;letter-spacing:5px;font-variant-numeric:tabular-nums;color:var(--tinte)}
@@ -391,7 +401,9 @@ nav.tabs button.active .ic{stroke-width:2.2}
 .instalar-ico{width:52px;height:52px;border-radius:14px;flex:none}
 .instalar-tit{font-weight:800}
 .instalar-top>div{flex:1;min-width:0}
-.instalar .cerrarX{position:static}
+/* relative y no static: su zona táctil ampliada (::after) se mide desde la X;
+   con static se medía desde la página y tapaba toda la pantalla. */
+.instalar .cerrarX{position:relative;right:auto;top:auto}
 .pasos{margin:14px 0 0;padding:0;list-style:none;counter-reset:p}
 .pasos li{counter-increment:p;position:relative;padding:11px 0 11px 38px;font-size:15px;line-height:20px;border-top:1px solid var(--sep)}
 .pasos li::before{content:counter(p);position:absolute;left:0;top:9px;width:26px;height:26px;border-radius:50%;
@@ -402,7 +414,7 @@ nav.tabs button.active .ic{stroke-width:2.2}
 .resfila+.resfila::before{content:"";position:absolute;top:0;left:20px;right:20px;border-top:1px solid var(--sep)}
 .resnom{flex:1;min-width:0;display:flex;flex-direction:column}
 .resnom b{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.resfila button{width:auto;min-height:38px;padding:0 16px;border:0;border-radius:19px;background:var(--relleno);
+.resfila button{width:auto;min-height:44px;padding:0 16px;border:0;border-radius:19px;background:var(--relleno);
   color:var(--tinte);font-size:15px;font-weight:700;margin:0;box-shadow:none}
 
 /* ---- Aviso breve, de vidrio oscuro ---- */
@@ -602,7 +614,7 @@ nav.tabs button.active .ic{stroke-width:2.2}
     <h1 class="titulo">Ajustes</h1>
     <div class="grupo-cab"><span>Este teléfono</span></div>
     <div class="grupo">
-      <label class="fila"><span>Tu nombre</span><input class="inp" id="set_supervisor" placeholder="ej. Raúl" autocomplete="name"></label>
+      <label class="fila"><span>Tu nombre</span><input class="inp" id="set_supervisor" placeholder="ej. Raúl" autocomplete="name" autocapitalize="words" enterkeyhint="done"></label>
       <button class="fila accion" id="set_supervisorSave" type="button">Guardar nombre</button>
     </div>
     <p class="grupo-pie">Sale como supervisor en lo que registras. Los registros se sincronizan solos entre los teléfonos del equipo; sin señal se guardan aquí y se suben al volver.</p>
@@ -659,8 +671,8 @@ nav.tabs button.active .ic{stroke-width:2.2}
   <div class="sheet">
     <h3>Guardar sólo la foto</h3>
     <img id="cap_foto" alt="Foto del VIN">
-    <label class="f">Trabajador<input class="inp" id="cap_worker" placeholder="ej. Dani"></label>
-    <label class="f">Supervisor<input class="inp" id="cap_supervisor" placeholder="ej. Raúl"></label>
+    <label class="f">Trabajador<input class="inp" id="cap_worker" autocapitalize="words" enterkeyhint="done" placeholder="ej. Dani"></label>
+    <label class="f">Supervisor<input class="inp" id="cap_supervisor" autocapitalize="words" enterkeyhint="done" placeholder="ej. Raúl"></label>
     <p class="hint">El lector intenta leerla por su cuenta; lo que no consiga queda en Por confirmar.</p>
     <button class="primary" id="cap_save" type="button">Guardar y escanear otro</button>
     <button class="secondary" id="cap_cancel" type="button">Cancelar</button>
@@ -674,8 +686,8 @@ nav.tabs button.active .ic{stroke-width:2.2}
     <h3>Confirmar el chasis</h3>
     <img id="conf_foto" alt="Foto del VIN" hidden>
     <div id="conf_estado" class="hint"></div>
-    <label class="f">VIN completo<input class="inp" id="conf_vinFull" autocapitalize="characters" maxlength="17"></label>
-    <label class="f">Últimos 6 dígitos<input class="inp" id="conf_vin6" autocapitalize="characters" maxlength="8"></label>
+    <label class="f">VIN completo<input class="inp" id="conf_vinFull" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" autocapitalize="characters" maxlength="17"></label>
+    <label class="f">Últimos 6 dígitos<input class="inp" id="conf_vin6" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" autocapitalize="characters" maxlength="8"></label>
     <button class="primary" id="conf_ok" type="button">Correcto, confirmar</button>
     <button class="secondary" id="conf_recortar" type="button">Volver a leer la foto</button>
     <button class="secondary" id="conf_cerrar" type="button">Cerrar</button>
@@ -697,13 +709,13 @@ nav.tabs button.active .ic{stroke-width:2.2}
     <img id="rev_photo" hidden>
     <div id="rev_ocrHint" class="hint"></div>
     <div id="rev_rep" class="aviso-rep" role="alert" hidden></div>
-    <label class="f">Últimos 6 del VIN (opcional)<input class="inp" id="rev_vin6" maxlength="8" autocapitalize="characters"></label>
-    <label class="f">VIN completo (opcional)<input class="inp" id="rev_vinFull" autocapitalize="characters"></label>
+    <label class="f">Últimos 6 del VIN (opcional)<input class="inp" id="rev_vin6" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" maxlength="8" autocapitalize="characters"></label>
+    <label class="f">VIN completo (opcional)<input class="inp" id="rev_vinFull" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" autocapitalize="characters"></label>
     <label class="f">Marca (opcional)<input class="inp" id="rev_make" placeholder="ej. Mazda"></label>
     <label class="f">Modelo (opcional)<input class="inp" id="rev_model" placeholder="ej. CX-5"></label>
     <label class="f">Color (opcional)<input class="inp" id="rev_color" placeholder="ej. Blanco"></label>
-    <label class="f">Trabajador<input class="inp" id="rev_worker" placeholder="Quién lavó el auto"></label>
-    <label class="f">Supervisor<input class="inp" id="rev_supervisor" placeholder="Quién sube esta foto"></label>
+    <label class="f">Trabajador<input class="inp" id="rev_worker" autocapitalize="words" enterkeyhint="done" placeholder="Quién lavó el auto"></label>
+    <label class="f">Supervisor<input class="inp" id="rev_supervisor" autocapitalize="words" enterkeyhint="done" placeholder="Quién sube esta foto"></label>
     <label class="f">Fecha y hora<input class="inp" type="datetime-local" id="rev_when"></label>
     <button class="primary" id="rev_save" type="button">Guardar</button>
     <button class="secondary danger" id="rev_delete" type="button" hidden>Eliminar registro</button>
@@ -1658,10 +1670,67 @@ if ("serviceWorker" in navigator &&
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 
+/* ===================== El botón "atrás" de Android =====================
+
+   En Android el gesto o el botón "atrás" es lo primero que se toca para
+   salir de algo. Sin esto, con una ventana o la cámara abiertas, "atrás"
+   sacaba de la app entera. Ahora cierra lo último que se abrió: la cámara,
+   el resumen, una ventana; y desde otra pestaña vuelve a Registrar. Sólo
+   desde Registrar y sin nada abierto sale de la app, como cualquier otra.
+
+   Cada cosa abierta deja una marca en el historial del navegador; al
+   cerrarla con su X se quita la marca, sin que eso cuente como "atrás". */
+const capasAbiertas = [];          // en orden de apertura, la última arriba
+let marcasAtras = 0, ignorarAtras = 0, tabActual = "registrar";
+function capasAhora(){
+  const l = [];
+  if (tabActual !== "registrar") l.push("tab");
+  document.querySelectorAll(".scrim.open").forEach(e => l.push(e));
+  document.querySelectorAll("body > .lv, body > .ifd").forEach(e => l.push(e));
+  return l;
+}
+function sincronizarAtras(){
+  const ahora = capasAhora();
+  for (let i = capasAbiertas.length - 1; i >= 0; i--) if (!ahora.includes(capasAbiertas[i])) capasAbiertas.splice(i, 1);
+  for (const c of ahora) if (!capasAbiertas.includes(c)) capasAbiertas.push(c);
+  const n = capasAbiertas.length;
+  if (n > marcasAtras) {
+    for (; marcasAtras < n; marcasAtras++) history.pushState({ capa: marcasAtras + 1 }, "");
+  } else if (n < marcasAtras) {
+    /* Un solo salto, y un solo aviso de "atrás" que no hay que atender. */
+    const quitar = marcasAtras - n;
+    marcasAtras = n; ignorarAtras++;
+    history.go(-quitar);
+  }
+}
+function cerrarCapa(c){
+  if (c === "tab") { showTab("registrar"); scrollTo(0, 0); return; }
+  const x = c.querySelector(".cerrarX, [data-a=x]");
+  if (x) x.click();
+  else c.classList.remove("open");
+}
+window.addEventListener("popstate", () => {
+  if (ignorarAtras > 0) { ignorarAtras--; return; }
+  if (!marcasAtras) return;
+  marcasAtras--;
+  const c = capasAbiertas.pop();
+  if (c) cerrarCapa(c);
+  /* Si al cerrarla se abrió otra cosa, o no se cerró, se vuelve a cuadrar. */
+  setTimeout(sincronizarAtras, 0);
+});
+let esperaAtras = false;
+new MutationObserver(() => {
+  if (esperaAtras) return;
+  esperaAtras = true;
+  queueMicrotask(() => { esperaAtras = false; sincronizarAtras(); });
+}).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+
 function showTab(name){
+  tabActual = name;
   ["registrar", "pendientes", "reportes", "ajustes"].forEach(t => { document.getElementById("tab-" + t).hidden = t !== name; });
   document.querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
   moverLente();
+  sincronizarAtras();
   if (name === "reportes") loadReport();
   if (name === "registrar") loadToday();
   if (name === "ajustes") loadEspacio();
