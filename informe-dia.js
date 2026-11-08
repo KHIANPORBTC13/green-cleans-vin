@@ -290,8 +290,11 @@
             g.fillStyle = C.gris; fuente(g, 600, 20); g.textAlign = 'center'
             g.fillText(L.sinFoto, ix + iw / 2, iy + ih / 2 + 7); g.textAlign = 'left'
           }
-          const est = { verde: C.verde, ambar: C.ambar, rojo: C.rojo }[a.estado] || C.gris
-          g.fillStyle = est; g.beginPath(); g.arc(x + 28, yy + 162, 8, 0, Math.PI * 2); g.fill()
+          /* Sin estado (el Registro VIN ya no lo usa) no se pinta el punto. */
+          if (a.estado) {
+            g.fillStyle = { verde: C.verde, ambar: C.ambar, rojo: C.rojo }[a.estado] || C.gris
+            g.beginPath(); g.arc(x + 28, yy + 162, 8, 0, Math.PI * 2); g.fill()
+          }
           g.fillStyle = C.suave; fuente(g, 700, 20)
           g.fillText('#' + (i + k + 1) + (a.hora ? ' · ' + a.hora : ''), x + 46, yy + 169)
           if (a.repetido) {

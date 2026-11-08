@@ -7,9 +7,8 @@
      indicadores    ¿cómo vamos frente al período anterior?
      tendencia      ¿qué días (u horas) se hizo más, y frente a antes?
      calor          ¿a qué día y hora se trabaja? (para los turnos)
-     trabajadores   ¿quién hace cuántos, a qué ritmo y con el VIN completo?
+     trabajadores   ¿quién hace cuántos, a qué ritmo y cuánto cambió?
      jornada        ¿a qué hora empezó y terminó cada día, y dónde hubo huecos?
-     estado         ¿cuántos VIN están bien, por revisar o sin leer?
      marcas         ¿qué marcas entran más?
 
    Sin librerías: es una descarga menos, funciona sin señal y se ve igual
@@ -118,12 +117,10 @@
     const m = huecos.length >> 1
     return huecos.length % 2 ? huecos[m] : (huecos[m - 1] + huecos[m]) / 2
   }
-  const completo = r => !!r.vin_full && String(r.vin_full).length === 17
   function resumen (filas) {
     const dias = new Set(filas.map(r => claveDia(new Date(r.client_at))))
     const n = filas.length
-    return { n, dias: dias.size, porDia: dias.size ? n / dias.size : 0, ritmo: ritmo(filas),
-      completo: n ? filas.filter(completo).length / n : null }
+    return { n, dias: dias.size, porDia: dias.size ? n / dias.size : 0, ritmo: ritmo(filas) }
   }
 
   /* ---------- 1. Indicadores frente al período anterior ---------- */
@@ -137,7 +134,6 @@
       return '<span class="kpi-d ' + (bien ? 'bien' : 'mal') + '"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="' +
         (d > 0 ? 'M6 2.5 10 8H2Z' : 'M6 9.5 10 4H2Z') + '"/></svg>' + esc(fmt(Math.abs(d))) + ' frente al ' + esc(o.nombreAnterior) + '</span>'
     }
-    const pct = v => Math.round(v * 100) + ' %'
     const deltaPct = (va, vp) => vp ? Math.round(Math.abs(va - vp) / vp * 100) + ' %' : num(Math.abs(va - vp))
     const tiles = [
       { k: 'Autos lavados', v: num(a.n), d: delta(a.n, p.n, false, () => deltaPct(a.n, p.n)), spark: true },
@@ -145,8 +141,8 @@
         d: a.dias ? delta(a.porDia, p.dias ? p.porDia : null, false, x => num(x, 1)) : '' },
       { k: 'Ritmo', v: a.ritmo == null ? '—' : '1 cada ' + Math.round(a.ritmo) + ' min', s: 'mediana entre autos seguidos',
         d: a.ritmo == null ? '' : delta(a.ritmo, p.ritmo, true, x => Math.round(x) + ' min') },
-      { k: 'VIN completo', v: a.completo == null ? '—' : pct(a.completo), s: o.repetidos ? o.repetidos + ' con VIN repetido' : 'de los autos registrados',
-        alerta: !!o.repetidos, d: a.completo == null ? '' : delta(a.completo, p.n ? p.completo : null, false, x => { const p = Math.round(x * 100); return p + (p === 1 ? ' punto' : ' puntos') }) }
+      { k: 'VIN repetidos', v: num(o.repetidos || 0), s: o.repetidos ? 'revisa los marcados en rojo' : 'ningún auto apuntado dos veces',
+        alerta: !!o.repetidos }
     ]
     cont.innerHTML = tiles.map((t, i) => '<div class="kpi' + (t.alerta ? ' alerta' : '') + '"><span class="kpi-k">' + esc(t.k) + '</span>' +
       '<b class="kpi-v">' + esc(t.v) + '</b>' + (t.s ? '<span class="kpi-s">' + esc(t.s) + '</span>' : '') + (t.d || '') +
@@ -249,7 +245,7 @@
     conEtiqueta(cont)
   }
 
-  /* ---------- 4. Por trabajador: barra, ritmo y VIN completo ---------- */
+  /* ---------- 4. Por trabajador: barra, ritmo y cambio frente al anterior ---------- */
   function trabajadores (cont, o) {
     const grupos = new Map()
     for (const r of o.filas) {
@@ -262,15 +258,21 @@
     const lista = [...grupos.values()].map(g => Object.assign(g, resumen(g.filas))).sort((a, b) => b.n - a.n)
     if (!lista.length) { cont.innerHTML = '<p class="viz-vacio">Sin registros en este período.</p>'; return }
     const mx = lista[0].n, total = o.filas.length
+    const antes = new Map()
+    for (const r of o.anteriores || []) { const k = String(r.worker_name || '').trim().toLowerCase(); if (k) antes.set(k, (antes.get(k) || 0) + 1) }
+    const hayAntes = !!(o.anteriores && o.anteriores.length)
     cont.innerHTML = lista.map(t => {
+      const pa = antes.get(t.nombre.toLowerCase()) || 0, dd = t.n - pa
+      const cambio = !hayAntes ? '' : !pa ? 'nuevo en este período' : dd === 0 ? 'igual que el ' + o.nombreAnterior : (dd > 0 ? '+' : '−') + num(Math.abs(dd)) + ' frente al ' + o.nombreAnterior
       const tip = '<b>' + esc(t.nombre) + '</b>' + num(t.n) + ' autos, el ' + Math.round(t.n / total * 100) + ' % del total' +
         '<span>' + (t.ritmo == null ? 'Ritmo sin datos' : 'Uno cada ' + Math.round(t.ritmo) + ' min') + '</span>' +
-        '<span>' + t.dias + (t.dias === 1 ? ' día' : ' días') + ', ' + num(t.porDia, 1) + ' por día</span>'
+        '<span>' + t.dias + (t.dias === 1 ? ' día' : ' días') + ', ' + num(t.porDia, 1) + ' por día</span>' +
+        (hayAntes ? '<span>' + num(pa) + ' en el ' + esc(o.nombreAnterior) + '</span>' : '')
       return '<div class="tr-fila" data-tip="' + esc(tip) + '"><div class="tr-cab"><b>' + esc(t.nombre) + '</b><span class="tr-n">' + num(t.n) + '</span></div>' +
         '<div class="tr-pista"><i style="width:' + Math.max(2, t.n / mx * 100).toFixed(1) + '%"></i></div>' +
         '<div class="tr-datos"><span>' + (t.ritmo == null ? 'ritmo —' : '1 cada ' + Math.round(t.ritmo) + ' min') + '</span>' +
         '<span>' + num(t.porDia, 1) + ' por día</span>' +
-        '<span class="' + (t.completo != null && t.completo < 0.9 ? 'flojo' : '') + '">VIN completo ' + (t.completo == null ? '—' : Math.round(t.completo * 100) + ' %') + '</span></div></div>'
+        (cambio ? '<span class="' + (pa && dd < 0 ? 'flojo' : '') + '">' + esc(cambio) + '</span>' : '') + '</div></div>'
     }).join('')
     conEtiqueta(cont)
   }
@@ -320,24 +322,6 @@
     conEtiqueta(cont)
   }
 
-  /* ---------- 6. Estado del VIN: una barra al 100 % ---------- */
-  const ICONO = {
-    verde: '<path d="M3 6.2 5 8.2 9 3.8"/>',
-    ambar: '<path d="M6 3v3.6M6 8.6v.1"/>',
-    rojo: '<path d="M3.6 3.6l4.8 4.8M8.4 3.6 3.6 8.4"/>',
-    gris: '<path d="M3.5 6h5"/>'
-  }
-  function estado (cont, o) {
-    const total = o.partes.reduce((a, p) => a + p.n, 0)
-    if (!total) { cont.innerHTML = '<p class="viz-vacio">Sin autos en este período.</p>'; return }
-    const visibles = o.partes.filter(p => p.n)
-    cont.innerHTML = '<div class="est-barra">' + visibles.map(p =>
-      '<i class="est-' + p.clase + '" style="flex:' + p.n + '" data-tip="' + esc('<b>' + esc(p.etq) + '</b>' + num(p.n) + ' de ' + num(total) + ' (' + Math.round(p.n / total * 100) + ' %)') + '"></i>').join('') + '</div>' +
-      '<ul class="est-ley">' + o.partes.map(p => '<li><span class="est-ico est-' + p.clase + '"><svg viewBox="0 0 12 12" aria-hidden="true">' + ICONO[p.clase] + '</svg></span>' +
-        '<span class="est-etq">' + esc(p.etq) + '</span><b>' + num(p.n) + '</b><span class="est-pct">' + (total ? Math.round(p.n / total * 100) : 0) + ' %</span></li>').join('') + '</ul>'
-    conEtiqueta(cont)
-  }
-
   /* ---------- 7. Marcas: las seis primeras y el resto ---------- */
   function marcas (cont, o) {
     const c = new Map()
@@ -359,5 +343,5 @@
     conEtiqueta(cont)
   }
 
-  window.Graficos = { indicadores, tendencia, calor, trabajadores, jornada, estado, marcas, resumen, ritmo, ocultar }
+  window.Graficos = { indicadores, tendencia, calor, trabajadores, jornada, marcas, resumen, ritmo, ocultar }
 })()
