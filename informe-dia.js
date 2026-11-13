@@ -267,55 +267,85 @@
     if (!autos.length) {
       out.push({ alto: 90, dibujar (g, y) { g.fillStyle = C.suave; fuente(g, 500, 24); g.fillText(L.ninguno, M, y + 50) } })
     }
-    const gap = 20, tw = (W - gap) / 2, th = 258
-    for (let i = 0; i < autos.length; i += 2) {
-      const par = autos.slice(i, i + 2)
+    /* Lo que comparten las dos clases de tarjeta: el fondo (rojo entero si
+       es repetido, para verlo de un vistazo), el número con la hora, la
+       etiqueta de repetido y el VIN con los seis últimos en negrita, que es
+       lo que se busca con la vista en una hoja con veinte. Devuelve el ancho
+       del VIN para poner algo a su derecha. */
+    const fondo = (g, x, yy, w, h, rep) => {
+      if (rep) { rect(g, x, yy, w, h, 20, C.rojo); rect(g, x + 3, yy + 3, w - 6, h - 6, 18, '#fdecea') } else rect(g, x, yy, w, h, 20, C.panel)
+    }
+    const cabecera = (g, a, n, x, w, yb) => {
+      /* Sin estado (el Registro VIN ya no lo usa) no se pinta el punto. */
+      let tx = x + 20
+      if (a.estado) {
+        g.fillStyle = { verde: C.verde, ambar: C.ambar, rojo: C.rojo }[a.estado] || C.gris
+        g.beginPath(); g.arc(x + 28, yb - 7, 8, 0, Math.PI * 2); g.fill()
+        tx = x + 46
+      }
+      g.fillStyle = C.suave; fuente(g, 700, 20)
+      g.fillText('#' + n + (a.hora ? ' · ' + a.hora : ''), tx, yb)
+      if (a.repetido) {
+        g.fillStyle = C.rojo; fuente(g, 800, 19); g.textAlign = 'right'
+        g.fillText(L.repetido, x + w - 20, yb); g.textAlign = 'left'
+      }
+    }
+    const vinMono = (g, a, x, yb) => {
+      const vin = String(a.vin || '')
+      g.fillStyle = a.repetido ? C.rojo : C.tinta
+      if (vin.length > 6) {
+        g.font = `500 25px ${MONO}`; const pre = vin.slice(0, -6)
+        g.fillText(pre, x, yb)
+        const pw = g.measureText(pre).width
+        g.font = `800 25px ${MONO}`; g.fillText(vin.slice(-6), x + pw, yb)
+        return pw + g.measureText(vin.slice(-6)).width
+      }
+      g.font = `800 25px ${MONO}`; g.fillText(vin || '—', x, yb)
+      return g.measureText(vin || '—').width
+    }
+    const detalle = (g, a, x, yb, max) => {
+      g.fillStyle = a.repetido ? C.rojo : C.suave; fuente(g, a.repetido ? 700 : 500, 19)
+      g.fillText(recortarTexto(g, (a.repetido && typeof a.repetido === 'string' ? a.repetido : a.detalle) || '', max), x, yb)
+    }
+
+    /* Primero los autos con foto, en rejilla de dos; después, los que no la
+       tienen, en una fila compacta cada uno a todo lo ancho. Una tarjeta
+       grande con "Sin foto" en gris ocupaba lo mismo que una con foto y
+       no decía nada: así la hoja es más corta y la foto, cuando la hay,
+       sale más grande. El número es el del orden del día y no cambia. */
+    const todos = autos.map((a, i) => ({ a, n: i + 1, im: recortes[i] }))
+    const conFoto = todos.filter(x => x.im), sinFoto = todos.filter(x => !x.im)
+    const gap = 20, tw = (W - gap) / 2, th = 296
+    for (let i = 0; i < conFoto.length; i += 2) {
+      const par = conFoto.slice(i, i + 2)
       out.push({ alto: th + gap, fila: true, dibujar (g, y) {
-        par.forEach((a, k) => {
+        par.forEach(({ a, n, im }, k) => {
           const x = M + k * (tw + gap), yy = y + gap / 2
-          /* Repetido: la tarjeta entera en rojo, para verla de un vistazo. */
-          if (a.repetido) { rect(g, x, yy, tw, th, 20, C.rojo); rect(g, x + 3, yy + 3, tw - 6, th - 6, 18, '#fdecea') }
-          else rect(g, x, yy, tw, th, 20, C.panel)
+          fondo(g, x, yy, tw, th, a.repetido)
           /* La foto del VIN: entera y centrada, sin deformar. */
-          const ix = x + 16, iy = yy + 16, iw = tw - 32, ih = 112
+          const ix = x + 16, iy = yy + 16, iw = tw - 32, ih = 146
           rect(g, ix, iy, iw, ih, 12, '#dfe6e2')
-          const im = recortes[i + k]
-          if (im) {
-            const e = Math.min(iw / im.width, ih / im.height)
-            const w = im.width * e, h = im.height * e
-            g.save(); g.beginPath(); g.rect(ix, iy, iw, ih); g.clip()
-            g.drawImage(im, ix + (iw - w) / 2, iy + (ih - h) / 2, w, h)
-            g.restore()
-          } else {
-            g.fillStyle = C.gris; fuente(g, 600, 20); g.textAlign = 'center'
-            g.fillText(L.sinFoto, ix + iw / 2, iy + ih / 2 + 7); g.textAlign = 'left'
-          }
-          /* Sin estado (el Registro VIN ya no lo usa) no se pinta el punto. */
-          if (a.estado) {
-            g.fillStyle = { verde: C.verde, ambar: C.ambar, rojo: C.rojo }[a.estado] || C.gris
-            g.beginPath(); g.arc(x + 28, yy + 162, 8, 0, Math.PI * 2); g.fill()
-          }
-          g.fillStyle = C.suave; fuente(g, 700, 20)
-          g.fillText('#' + (i + k + 1) + (a.hora ? ' · ' + a.hora : ''), x + 46, yy + 169)
-          if (a.repetido) {
-            g.fillStyle = C.rojo; fuente(g, 800, 19); g.textAlign = 'right'
-            g.fillText(L.repetido, x + tw - 20, yy + 169); g.textAlign = 'left'
-          }
-          /* El VIN con los seis últimos en negrita: es lo que se busca con
-             la vista en una hoja con veinte. */
-          const vin = String(a.vin || '')
-          g.fillStyle = a.repetido ? C.rojo : C.tinta
-          if (vin.length > 6) {
-            g.font = `500 25px ${MONO}`; const pre = vin.slice(0, -6)
-            g.fillText(pre, x + 20, yy + 208)
-            const pw = g.measureText(pre).width
-            g.font = `800 25px ${MONO}`; g.fillText(vin.slice(-6), x + 20 + pw, yy + 208)
-          } else {
-            g.font = `800 25px ${MONO}`; g.fillText(vin || '—', x + 20, yy + 208)
-          }
-          g.fillStyle = a.repetido ? C.rojo : C.suave; fuente(g, a.repetido ? 700 : 500, 19)
-          g.fillText(recortarTexto(g, (a.repetido && typeof a.repetido === 'string' ? a.repetido : a.detalle) || '', tw - 40), x + 20, yy + 240)
+          const e = Math.min(iw / im.width, ih / im.height)
+          const w = im.width * e, h = im.height * e
+          g.save(); g.beginPath(); g.rect(ix, iy, iw, ih); g.clip()
+          g.drawImage(im, ix + (iw - w) / 2, iy + (ih - h) / 2, w, h)
+          g.restore()
+          cabecera(g, a, n, x, tw, yy + 203)
+          vinMono(g, a, x + 20, yy + 242)
+          detalle(g, a, x + 20, yy + 274, tw - 40)
         })
+      } })
+    }
+    /* La fila compacta: número y hora arriba (y VIN REPETIDO a la derecha),
+       debajo el VIN y, a su lado, el detalle. Un tercio de la tarjeta con foto. */
+    const fh = 92, fgap = 14
+    for (const { a, n } of sinFoto) {
+      out.push({ alto: fh + fgap, fila: true, dibujar (g, y) {
+        const x = M, yy = y + fgap / 2
+        fondo(g, x, yy, W, fh, a.repetido)
+        cabecera(g, a, n, x, W, yy + 34)
+        const vw = vinMono(g, a, x + 20, yy + 70)
+        detalle(g, a, x + 20 + vw + 24, yy + 70, W - 64 - vw)
       } })
     }
 
@@ -456,14 +486,14 @@
   const TEXTOS = {
     es: {
       titulo: 'Resumen del día', repetido: 'VIN REPETIDO', vehiculos: 'Vehículos del día ({n})', ninguno: 'Ningún vehículo registrado este día.',
-      sinFoto: 'Sin foto del VIN', pagina: 'Página {i} de {n}', preparando: 'Preparando el resumen…',
+      pagina: 'Página {i} de {n}', preparando: 'Preparando el resumen…',
       fotos: 'Preparando las fotos del VIN {i} de {n}…', compartir: 'Compartir', descargar: 'Descargar',
       enFoto: 'en foto', enPdf: 'en PDF', cerrar: 'Cerrar', error: 'No se pudo preparar el resumen.',
       bajado: 'Guardado en Descargas'
     },
     en: {
       titulo: 'Daily summary', repetido: 'REPEATED VIN', vehiculos: 'Vehicles of the day ({n})', ninguno: 'No vehicles recorded this day.',
-      sinFoto: 'No VIN photo', pagina: 'Page {i} of {n}', preparando: 'Preparing the summary…',
+      pagina: 'Page {i} of {n}', preparando: 'Preparing the summary…',
       fotos: 'Preparing the VIN photos {i} of {n}…', compartir: 'Share', descargar: 'Download',
       enFoto: 'as photo', enPdf: 'as PDF', cerrar: 'Close', error: 'The summary could not be prepared.',
       bajado: 'Saved to Downloads'

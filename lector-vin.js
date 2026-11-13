@@ -1537,6 +1537,12 @@
        rojo   eso no puede ser un VIN
      Es un filtro de verosimilitud, no una prueba. */
   const VIN_REGIONES = '123458JKLMNPRSVWXYZ6'
+  /* Un toque de vibración donde el teléfono sepa darlo (Android sí; iPhone
+     en Safari no). Nunca puede tumbar la lectura por no existir. */
+  function vibrar (ms) {
+    try { if (navigator.vibrate) navigator.vibrate(ms) } catch (e) {}
+  }
+
   function semaforo (v) {
     if (!v || !/^[A-HJ-NPR-Z0-9]{17}$/.test(v)) return 'rojo'
     if (VIN_REGIONES.indexOf(v[0]) < 0) return 'rojo'
@@ -1765,9 +1771,23 @@
 .lv-ib svg{width:20px;height:20px}
 .lv-ib[aria-pressed=true]{background:#fff;color:#000}
 .lv-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform-origin:center}
-.lv-marco{position:absolute;left:50%;transform:translateX(-50%);border:2px solid rgba(255,255,255,.85);border-radius:14px;
-  box-shadow:0 0 0 100vmax rgba(0,0,0,.5);transition:border-color .2s;z-index:1}
-.lv-marco[data-s=verde]{border-color:var(--lv-verde)}.lv-marco[data-s=ambar]{border-color:var(--lv-ambar)}.lv-marco[data-s=rojo]{border-color:var(--lv-rojo)}
+.lv-marco{position:absolute;left:50%;transform:translateX(-50%);border:1.5px solid rgba(255,255,255,.4);border-radius:14px;
+  box-shadow:0 0 0 100vmax rgba(0,0,0,.5);transition:border-color .22s;z-index:1;--lv-cierre:0px}
+.lv-marco[data-s=verde]{border-color:rgba(48,209,88,.5);--lv-cierre:6px}
+.lv-marco[data-s=ambar]{border-color:rgba(255,214,10,.5);--lv-cierre:3px}
+.lv-marco[data-s=rojo]{border-color:rgba(255,69,58,.6)}
+/* Las cuatro esquinas en L: blancas y abiertas mientras no hay lectura, a
+   medias en ámbar, y en verde se cierran 6 px hacia dentro. Se nota más por
+   el rabillo del ojo que un cambio de color, que es lo que hace falta con el
+   sol de frente y el teléfono a medio metro. */
+.lv-marco i{position:absolute;width:24px;height:24px;border:3px solid #fff;pointer-events:none;
+  transition:transform .22s ease-out,border-color .22s}
+.lv-marco i:nth-child(1){top:-2px;left:-2px;border-right:0;border-bottom:0;border-top-left-radius:14px;transform:translate(var(--lv-cierre),var(--lv-cierre))}
+.lv-marco i:nth-child(2){top:-2px;right:-2px;border-left:0;border-bottom:0;border-top-right-radius:14px;transform:translate(calc(-1*var(--lv-cierre)),var(--lv-cierre))}
+.lv-marco i:nth-child(3){bottom:-2px;left:-2px;border-right:0;border-top:0;border-bottom-left-radius:14px;transform:translate(var(--lv-cierre),calc(-1*var(--lv-cierre)))}
+.lv-marco i:nth-child(4){bottom:-2px;right:-2px;border-left:0;border-top:0;border-bottom-right-radius:14px;transform:translate(calc(-1*var(--lv-cierre)),calc(-1*var(--lv-cierre)))}
+.lv-marco[data-s=verde] i{border-color:var(--lv-verde)}.lv-marco[data-s=ambar] i{border-color:var(--lv-ambar)}
+@media (prefers-reduced-motion:reduce){.lv-marco,.lv-marco i{transition:none}}
 .lv-guia{position:absolute;left:0;right:0;text-align:center;z-index:2;padding:0 24px;text-shadow:0 1px 4px rgba(0,0,0,.6)}
 .lv-guia b{display:block;font-size:17px;font-weight:600}.lv-guia span{font-size:15px;color:rgba(255,255,255,.75)}
 .lv-guia.lv-movido span{color:var(--lv-ambar);font-weight:600}
@@ -1778,7 +1798,8 @@
 .lv-chip{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;font-weight:600;letter-spacing:-.08px;
   padding:4px 10px;border-radius:999px;background:rgba(28,28,30,.7);color:#fff}
 .lv-chip::before{content:"";width:8px;height:8px;border-radius:50%;background:rgba(235,235,245,.3)}
-.lv-chip[data-s=verde]::before{background:var(--lv-verde)}.lv-chip[data-s=ambar]::before{background:var(--lv-ambar)}.lv-chip[data-s=rojo]::before{background:var(--lv-rojo)}
+.lv-chip[data-s=verde]{color:var(--lv-verde)}.lv-chip[data-s=ambar]{color:var(--lv-ambar)}.lv-chip[data-s=rojo]{color:var(--lv-rojo)}
+.lv-chip[data-s]::before{background:currentColor}
 .lv-bajo{bottom:0;flex-direction:column;align-items:stretch;padding:0 24px max(20px,env(safe-area-inset-bottom));
   background:linear-gradient(transparent,rgba(0,0,0,.6) 35%)}
 .lv-zoom{display:flex;align-items:center;gap:12px;padding:0 0 14px;font-size:13px;color:rgba(255,255,255,.8)}
@@ -1952,7 +1973,7 @@
       raiz.className = 'lv'
       raiz.innerHTML = `
         <video class="lv-video" playsinline muted autoplay></video>
-        <div class="lv-marco" data-s=""></div>
+        <div class="lv-marco" data-s=""><i></i><i></i><i></i><i></i></div>
         <div class="lv-guia"><b>${tx('marco')}</b><span>${tx(_vertical ? 'marcoV' : 'marco2')}</span></div>
         <div class="lv-vivo"><code>${tx('preparando')}</code><br><span class="lv-chip" hidden></span></div>
         <div class="lv-bar lv-top">
@@ -1972,7 +1993,8 @@
       const video = $('video'), marco = $('.lv-marco'), guia = $('.lv-guia'), vivo = $('.lv-vivo')
       const code = vivo.querySelector('code'), chip = vivo.querySelector('.lv-chip')
       let stream = null, track = null, zoomHw = null, zoomDig = 1, vivoActivo = true, ocupado = false
-      let previas = [], ultimo = null, avisado = false, tempo = null
+      let previas = [], ultimo = null, tempo = null
+      const avisados = new Set()
       /* VIN vertical: el marco se pone de pie y cada fotograma se gira un
          cuarto antes de guardarlo, así que el lector y el editor lo ven en
          horizontal como siempre. Si el VIN se lee de arriba abajo y no de
@@ -2113,15 +2135,17 @@
           chip.hidden = false
           chip.dataset.s = color
           chip.textContent = tx(color)
-          if (color === 'verde' && !avisado) { avisado = true; try { navigator.vibrate && navigator.vibrate(35) } catch (e) {} }
-          if (color !== 'verde') avisado = false
+          /* Un toquecito la primera vez que ESTE VIN se pone verde. Se
+             recuerdan todos los ya avisados y no sólo el último: si la
+             lectura baila entre dos VIN que se diferencian en una letra, no
+             vibra sin parar; con otro auto sí. */
+          if (color === 'verde' && !avisados.has(vin)) { avisados.add(vin); vibrar(40) }
           ultimo = vin
         } else {
           code.textContent = leidoTxt ? leidoTxt.slice(0, 20) : tx('buscando')
           marco.dataset.s = leidoTxt ? 'rojo' : ''
           chip.hidden = true
           ultimo = null
-          avisado = false
         }
       }
 
@@ -2225,7 +2249,7 @@
         b.setAttribute('aria-pressed', String(vertical))
         modo++
         bufer.length = 0; previas = []; recientes.length = 0
-        invertido = false; fallosGiro = 0; techo = 0; flojos = 0; ultimo = null; avisado = false
+        invertido = false; fallosGiro = 0; techo = 0; flojos = 0; ultimo = null; avisados.clear()
         quietoVisible = false; guia.classList.remove('lv-movido')
         guiaTexto.textContent = tx(vertical ? 'marcoV' : 'marco2')
         marco.dataset.s = ''; chip.hidden = true; code.textContent = tx('buscando')
@@ -2246,7 +2270,7 @@
           if (!video.videoWidth || capturando) return
           capturando = true
           const tToque = performance.now()
-          try { navigator.vibrate && navigator.vibrate(20) } catch (e) {}
+          vibrar(20)
           /* Lo que se lee y se guarda es lo mejor del último segundo, no el
              fotograma del toque. Si todavía no hay nada guardado (se captura
              nada más abrir), el fotograma de ahora, como antes. */
@@ -2400,7 +2424,7 @@
         g.rect(0, 0, W, H)
         g.rect(x, y, w, h)
         g.fill('evenodd')
-        const c = { verde: '#3ddc6a', ambar: '#ffc23d', rojo: '#ff5a4f' }[color()] || '#fff'
+        const c = { verde: '#30d158', ambar: '#ffd60a', rojo: '#ff453a' }[color()] || '#fff'
         g.strokeStyle = c
         g.lineWidth = 2
         g.strokeRect(x, y, w, h)
@@ -2873,7 +2897,7 @@
 
     raiz.insertAdjacentHTML('beforeend', `
       <video class="lv-video" playsinline muted autoplay></video>
-      <div class="lv-marco" data-s=""></div>
+      <div class="lv-marco" data-s=""><i></i><i></i><i></i><i></i></div>
       <div class="lv-guia"><b>${tx('barrasGuia')}</b><span>${tx('barrasGuia2')}</span></div>
       <div class="lv-vivo"><code>${tx('buscandoBarras')}</code></div>
       <div class="lv-bar lv-top">
@@ -2929,7 +2953,7 @@
         recorte = recortarYAmpliar(lienzoFoto, { x: x / lienzoFoto.width, y: y / lienzoFoto.height, w: w / lienzoFoto.width, h: hh / lienzoFoto.height }, 560)
           .toDataURL('image/jpeg', 0.82)
       }
-      try { navigator.vibrate && navigator.vibrate(35) } catch (e2) {}
+      vibrar(40)
       cerrar({ vin: h.vin, semaforo: semaforo(h.vin), confianza: 100, foto: lienzoFoto.toDataURL('image/jpeg', 0.85), recorte,
         emparejado: null, soloFoto: false, origen: 'barras', formato: h.formato })
     }

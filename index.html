@@ -51,12 +51,16 @@
   --pildora:rgba(15,122,55,.13);
   --radio:26px;
   --letra:"Figtree",-apple-system,BlinkMacSystemFont,system-ui,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  /* Los VIN van en la monoespaciada del sistema: cada letra ocupa lo mismo
+     y un 0 no se confunde con una O al compararlos de un vistazo. */
+  --mono:ui-monospace,"SF Mono","Roboto Mono",Menlo,monospace;
 }
 @media (prefers-color-scheme:dark){
   :root{
     --fondo:#04170c; --fondo2:#020c06;
-    --celda:#0d2617; --campo:#143221; --hoja:#0a1f13;
-    --texto:#eafbef; --sec:rgba(234,251,239,.62); --ter:rgba(234,251,239,.3);
+    /* La tarjeta un punto más clara que el fondo: antes casi se fundían. */
+    --celda:#122d1c; --campo:#1a3b27; --hoja:#0f2718;
+    --texto:#eafbef; --sec:rgba(234,251,239,.68); --ter:rgba(234,251,239,.34);
     --sep:rgba(234,251,239,.1); --relleno:rgba(61,220,122,.12); --relleno2:rgba(61,220,122,.2);
     --tinte:#4ade80; --boton:#18a04a; --boton2:#12843c; --brillo:#3ddc7a; --chip:rgba(61,220,122,.16);
     --rojo:#ff5a4f; --ambar:#ffb020; --verde:#3ddc7a;
@@ -87,56 +91,62 @@ main{padding:max(16px,env(safe-area-inset-top)) 18px calc(118px + env(safe-area-
 
 /* ---- Cabecera de Registrar: el saludo, como en las apps de puntos ---- */
 .saludo{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 4px 20px}
-.saludo h1{margin:0;font-size:27px;line-height:32px;font-weight:700;letter-spacing:-.6px}
+.saludo h1{margin:0;font-size:27px;line-height:32px;font-weight:800;letter-spacing:-.6px}
 .saludo p{margin:2px 0 0;font-size:15px;color:var(--sec)}
 .perfil{width:44px;height:44px;border-radius:50%;border:1.5px solid var(--tinte);background:none;color:var(--tinte);
   display:grid;place-items:center;flex:none;padding:0}
 .perfil svg{width:24px;height:24px}
 
-/* ---- Accesos rápidos en círculos ---- */
-.rapidos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 22px}
-.rapido{display:flex;flex-direction:column;align-items:center;gap:8px;border:0;background:none;padding:0;color:var(--texto);
-  font-size:13.5px;line-height:17px;font-weight:600;text-align:center;letter-spacing:-.1px;position:relative}
-.rapido .aro{width:68px;height:68px;border-radius:50%;padding:3px;display:grid;place-items:center;
-  background:conic-gradient(from 210deg,var(--brillo),#9be7b4,var(--tinte),var(--brillo))}
-.rapido .aro span{width:100%;height:100%;border-radius:50%;background:var(--celda);display:grid;place-items:center;color:var(--tinte);
-  box-shadow:inset 0 0 0 3px var(--celda)}
-.rapido .aro svg{width:28px;height:28px}
+/* ---- Accesos rápidos en círculos ----
+   Pequeños y en verde oscuro: son atajos, no lo principal. El verde vivo
+   se reserva para el botón de escanear, el número de hoy y la pestaña. */
+.rapidos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 16px}
+.rapido{display:flex;flex-direction:column;align-items:center;gap:7px;border:0;background:none;padding:0;color:var(--texto);
+  font-size:12.5px;line-height:15px;font-weight:600;text-align:center;letter-spacing:-.1px;position:relative}
+.rapido .aro{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:var(--celda);box-shadow:var(--sombra)}
+.rapido .aro span{width:100%;height:100%;border-radius:50%;display:grid;place-items:center;color:var(--tinte)}
+.rapido .aro svg{width:24px;height:24px}
 .rapido:active .aro{transform:scale(.94)}
 .rapido .aro{transition:transform .15s}
-.rapido .cuenta{top:-2px;left:calc(50% + 18px)}
+.rapido .cuenta{top:-2px;left:calc(50% + 14px)}
 
-/* ---- Tarjeta grande de hoy ---- */
-.tarjeta{background:var(--celda);border-radius:var(--radio);box-shadow:var(--sombra);margin:0 0 14px;overflow:hidden}
+/* ---- Tarjeta grande de hoy: la protagonista ---- */
+.tarjeta{background:var(--celda);border-radius:var(--radio);box-shadow:var(--sombra);margin:0 0 18px;overflow:hidden}
 .hero{padding:22px 22px 20px}
-.hero-num{display:flex;align-items:baseline;gap:10px;color:var(--tinte)}
-.hero-num b{font-size:60px;line-height:62px;font-weight:800;letter-spacing:-2px;font-variant-numeric:tabular-nums}
-.hero-num span{font-size:22px;font-weight:600;letter-spacing:-.3px}
-.hero-sub{margin:4px 0 18px;font-size:17px;color:var(--tinte);font-weight:500}
-.hero-sub b{font-weight:800}
+.hero-num{display:flex;align-items:baseline;gap:10px;color:var(--texto)}
+/* El número de hoy en el verde del logo, como el botón: es lo que se busca. */
+.hero-num b{font-size:60px;line-height:62px;font-weight:800;letter-spacing:-2px;font-variant-numeric:tabular-nums;
+  color:var(--brillo);background:linear-gradient(180deg,var(--brillo),var(--boton));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero-num span{font-size:21px;font-weight:600;letter-spacing:-.3px;color:var(--sec)}
+.hero-sub{margin:4px 0 18px;font-size:16px;color:var(--sec);font-weight:400}
+.hero-sub b{font-weight:700;color:var(--texto)}
 .hero .escanear{margin:0}
-.hero-pie{display:flex;align-items:center;gap:10px;padding:14px 22px;border-top:1.5px solid var(--fondo);font-size:16px}
-.hero-pie .mas{flex:1}
-.hero-pie button{border:0;background:none;color:var(--tinte);font-weight:700;font-size:16px;display:flex;align-items:center;gap:4px;padding:6px 0;min-height:44px}
+.hero-pie{display:flex;align-items:center;gap:10px;padding:12px 22px;border-top:1px solid var(--sep);font-size:15.5px;color:var(--sec)}
+.hero-pie .ico-fila{width:32px;height:32px;background:var(--campo);color:var(--sec)}
+.hero-pie .ico-fila svg{width:18px;height:18px}
+.hero-pie .mas{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hero-pie button{border:0;background:none;color:var(--tinte);font-weight:700;font-size:15.5px;display:flex;align-items:center;gap:4px;padding:6px 0;min-height:44px;flex:none}
 
-/* ---- Tarjetas con un número grande a la derecha ---- */
-.cifra{display:flex;align-items:center;gap:14px;width:100%;padding:18px 20px;border:0;text-align:left;color:var(--texto);
-  background:var(--celda);border-radius:var(--radio);box-shadow:var(--sombra);margin:0 0 12px}
-.cifra .chip{width:48px;height:48px;border-radius:50%;background:var(--chip);color:var(--tinte);display:grid;place-items:center;flex:none}
-.cifra .chip svg{width:24px;height:24px;stroke-width:2}
-.cifra .mas{flex:1;min-width:0}
-.cifra .mas b{display:block;font-size:20px;line-height:24px;font-weight:700;letter-spacing:-.4px}
-.cifra .mas span{display:block;font-size:14.5px;line-height:19px;color:var(--sec);margin-top:2px}
-.cifra .n{font-size:34px;font-weight:800;color:var(--tinte);font-variant-numeric:tabular-nums;letter-spacing:-1px;flex:none}
-.cifra.alerta .chip{background:rgba(229,53,43,.12);color:var(--rojo)}
-.cifra.alerta .n,.cifra.alerta .mas b{color:var(--rojo)}
-.cifra:active{transform:scale(.99)}
+/* ---- Los chips: dos a media pantalla, con el número grande ---- */
+.cifras{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 6px}
+.cifra{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;min-height:44px;padding:14px 16px 12px;border:0;text-align:left;color:var(--texto);
+  background:var(--celda);border-radius:22px;box-shadow:var(--sombra);margin:0;min-width:0}
+.cifra .chip{display:none}
+.cifra .mas{display:flex;align-items:center;gap:6px;min-width:0;max-width:100%;color:var(--sec)}
+.cifra .mas svg{width:16px;height:16px;stroke-width:2;flex:none;color:var(--tinte)}
+.cifra .mas b{font-size:13.5px;line-height:17px;font-weight:600;letter-spacing:-.1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cifra .n{font-size:32px;line-height:36px;font-weight:800;color:var(--texto);font-variant-numeric:tabular-nums;letter-spacing:-1px;flex:none}
+/* El de la cola de subida ocupa la fila entera: sólo sale cuando hay algo. */
+.cifra.ancha{grid-column:1/-1;flex-direction:row;align-items:center;justify-content:space-between;padding:12px 16px}
+.cifra.ancha .n{font-size:26px}
+.cifra.alerta .mas,.cifra.alerta .mas svg,.cifra.alerta .n{color:var(--rojo)}
+.cifra:active{transform:scale(.98)}
 .cifra{transition:transform .12s}
 
 /* ---- Listas ---- */
-.grupo-cab{display:flex;justify-content:space-between;align-items:baseline;font-size:15px;line-height:20px;font-weight:700;
+.grupo-cab{display:flex;justify-content:space-between;align-items:baseline;font-size:15px;line-height:20px;font-weight:800;
   color:var(--texto);margin:22px 8px 10px;letter-spacing:-.2px}
-.grupo-cab>span+span{font-weight:500;color:var(--sec)}
+.grupo-cab>span+span{font-weight:400;color:var(--sec)}
 .grupo{background:var(--celda);border-radius:var(--radio);overflow:hidden;margin:0 0 26px;box-shadow:var(--sombra)}
 .grupo-pie{font-size:13.5px;line-height:18px;color:var(--sec);margin:-18px 12px 26px}
 .fila{position:relative;display:flex;align-items:center;gap:12px;width:100%;min-height:52px;padding:13px 20px;
@@ -156,13 +166,26 @@ button.fila:active,label.fila:active,a.fila:active,.fila[data-id]:active{backgro
 .ico-fila{width:36px;height:36px;border-radius:50%;background:var(--chip);color:var(--tinte);display:grid;place-items:center;flex:none}
 .ico-fila svg{width:20px;height:20px;stroke-width:2}
 
-/* Los seis últimos del VIN: grandes y en cifras alineadas. */
-.vin6{font-size:23px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.3px;min-width:92px;flex:none;color:var(--tinte)}
+/* Los seis últimos del VIN: grandes, en monoespaciada y del color del
+   texto; sólo se tiñen de rojo si están repetidos. */
+.vin6{display:block;font:800 22px/26px var(--mono);font-variant-numeric:tabular-nums;letter-spacing:.5px;color:var(--texto)}
+/* El VIN entero: 17 letras en monoespaciada caben en una línea a 15.5 px
+   incluso en el teléfono de 320. */
+.vin{display:block;font:600 15.5px/21px var(--mono);font-variant-numeric:tabular-nums;letter-spacing:.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .vrow{cursor:pointer}
-.vrow .mas{font-weight:700}
+.vrow .mas{font-weight:600}
 .vrow.pending .vin6{color:var(--sec)}
-.punto{width:10px;height:10px;border-radius:50%;flex:none;background:var(--ter)}
-.punto.verde{background:var(--verde)}.punto.ambar{background:var(--ambar)}.punto.rojo{background:var(--rojo)}
+/* La miniatura del VIN delante de cada fila: el recorte que guardó el
+   lector en este teléfono; si no lo hay, un auto. */
+.mini{width:64px;height:28px;border-radius:7px;flex:none;background:var(--campo);color:var(--ter);display:grid;place-items:center;overflow:hidden}
+/* El recorte es mucho más ancho que el hueco: se enseña su final, que es
+   donde están los seis últimos que se leen al lado. */
+.mini img{width:100%;height:100%;object-fit:cover;object-position:right center;display:block}
+.mini svg{width:20px;height:20px}
+.fila.con-mini+.fila::before{left:96px}
+.fila .estado{font-weight:600}
+.sin-vin{display:block;font-weight:600}
+.estado.verde{color:var(--verde)}.estado.ambar{color:var(--ambar)}.estado.rojo{color:var(--rojo)}
 /* VIN repetido: en rojo y con su nombre, para verlo sin buscarlo. */
 .rep-et{display:inline-block;font-size:12px;line-height:19px;font-weight:800;letter-spacing:.4px;color:#fff;background:var(--rojo);
   border-radius:7px;padding:0 7px;margin:0 6px 2px 0;vertical-align:1px;max-width:100%;white-space:normal}
@@ -184,7 +207,10 @@ button.secondary{display:flex;align-items:center;justify-content:center;gap:8px;
 button.danger{color:var(--rojo)}
 button.primary:disabled,button.secondary:disabled{opacity:.4}
 button.primary:active,button.secondary:active,.boton:active{filter:brightness(.94);transform:scale(.99)}
-.escanear{min-height:58px;font-size:18px;margin-bottom:12px}
+/* El botón principal: el único con el verde vivo del logo y una sombra
+   verde suave debajo, para que flote sobre la tarjeta. */
+.escanear{min-height:60px;font-size:18px;margin-bottom:12px;border-radius:20px;
+  background:linear-gradient(180deg,var(--brillo),var(--boton));box-shadow:0 1px 0 rgba(255,255,255,.3) inset,0 10px 24px rgba(37,185,88,.32)}
 .escanear svg{width:24px;height:24px;stroke-width:2}
 .icobtn{width:20px;height:20px;flex:none}
 .gcico{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;display:block;flex:none}
@@ -213,6 +239,10 @@ input.inp::placeholder{color:var(--ter)}
 
 /* ---- Reportes ---- */
 .resumen-num{font-size:56px;line-height:60px;font-weight:800;letter-spacing:-2px;color:var(--tinte);font-variant-numeric:tabular-nums}
+/* En la tabla, los VIN en monoespaciada y los seis últimos en negrita. */
+table.reptable td:nth-child(2),table.reptable td:nth-child(3){font-family:var(--mono);letter-spacing:.2px}
+table.reptable td:nth-child(2) b{font-weight:800}
+table.reptable td small{font-family:var(--letra);font-size:12px}
 /* Alto fijo: en el ordenador el gráfico ocupaba media pantalla. */
 .grafico{position:relative;height:220px;padding:16px 16px 10px}
 #rep_insightsList{list-style:none;margin:0;padding:0}
@@ -284,8 +314,12 @@ table.reptable tr[data-id]:active{background:var(--relleno)}
 .kpis{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 6px}
 .kpi{position:relative;background:var(--celda);border-radius:22px;box-shadow:var(--sombra);padding:16px 16px 14px;display:flex;flex-direction:column;min-width:0}
 .kpi-k{font-size:13.5px;font-weight:700;color:var(--sec)}
-.kpi-v{font-size:30px;line-height:36px;font-weight:800;letter-spacing:-.8px;color:var(--tinte);font-variant-numeric:tabular-nums;margin:4px 0 2px}
+.kpi-v{font-size:30px;line-height:36px;font-weight:800;letter-spacing:-1px;color:var(--tinte);font-variant-numeric:tabular-nums;margin:4px 0 2px}
 .kpi:nth-child(3) .kpi-v{font-size:22px;line-height:36px;letter-spacing:-.4px}
+/* "1 cada 37 min" no cabe en media pantalla: que parta en dos líneas
+   pegadas en vez de dejar "min" colgando a 36 px de alto. Más específica
+   que la regla que inyecta graficos.js, para ganarle. */
+.kpis .kpi.kpi-chico .kpi-v{line-height:27px;margin:7px 0 5px}
 .kpi-s{font-size:12.5px;color:var(--sec);line-height:16px}
 .kpi.alerta .kpi-s{color:var(--rojo);font-weight:700}
 .kpi-d{display:flex;align-items:flex-start;gap:4px;font-size:12.5px;line-height:16px;color:var(--sec);margin-top:6px;font-weight:600}
@@ -376,7 +410,9 @@ nav.tabs button.active .ic{stroke-width:2.2}
 .cerrarX::after{content:"";position:absolute;inset:-8px}
 .sheet img{display:block;width:100%;border-radius:18px;margin:0 0 14px;max-height:230px;object-fit:cover;background:#000}
 .sheet .hint{margin:0 0 14px}
-#rev_vin6{font-size:30px;font-weight:800;text-align:center;letter-spacing:5px;font-variant-numeric:tabular-nums;color:var(--tinte)}
+#rev_vin6{font:800 28px/1.2 var(--mono);text-align:center;letter-spacing:4px;font-variant-numeric:tabular-nums;color:var(--texto)}
+#rev_vinFull,#conf_vinFull,#conf_vin6{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:.5px}
+#conf_vin6{font-weight:800;font-size:22px;letter-spacing:3px}
 #photoScrim .sheet{background:transparent;padding:12px}
 #photoScrim .sheet::before{display:none}
 #photoScrim img{max-height:80vh;object-fit:contain}
@@ -414,6 +450,46 @@ nav.tabs button.active .ic{stroke-width:2.2}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 .toast.mal{background:rgba(180,30,24,.94)}
 
+/* ---- La pantalla del PIN ----
+   Tapa la app entera hasta que este teléfono tiene su sesión. El teclado
+   es propio y grande en vez del del sistema: en Android el teclado
+   numérico cambia con cada marca y a veces tapa el botón de Entrar; así
+   siempre es el mismo y cabe en la pantalla sin desplazar. */
+.pin{position:fixed;inset:0;z-index:2147483600;overflow:auto;display:flex;flex-direction:column;align-items:center;
+  padding:max(16px,env(safe-area-inset-top)) 20px max(16px,env(safe-area-inset-bottom));
+  background:linear-gradient(180deg,var(--fondo) 0,var(--fondo2) 100%);color:var(--texto)}
+.pin-caja{width:100%;max-width:340px;margin:auto;display:flex;flex-direction:column;align-items:center;text-align:center}
+.pin img{width:72px;height:72px;border-radius:20px;margin:0 0 12px}
+.pin h2{margin:0;font-size:26px;line-height:30px;font-weight:800;letter-spacing:-.6px}
+.pin-texto{margin:6px 0 0;font-size:16px;line-height:21px;color:var(--sec)}
+.pin-aviso{margin:0;font-size:14.5px;line-height:19px;min-height:19px;color:var(--tinte);font-weight:600}
+.pin-aviso.mal{color:var(--rojo)}
+.pin-puntos{display:flex;gap:14px;margin:16px 0 10px;height:18px;align-items:center}
+.pin-puntos i{width:16px;height:16px;border-radius:50%;border:2px solid var(--tinte);transition:background .12s}
+.pin-puntos i.extra{border-style:dashed;opacity:.55}
+.pin-puntos i.on{background:var(--tinte);border-style:solid;opacity:1}
+.pin-puntos.tiembla{animation:pin-tiembla .4s}
+@keyframes pin-tiembla{20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+.pin-teclas{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;margin-top:10px}
+.pin-teclas button{min-height:clamp(48px,8.5vh,66px);border:0;border-radius:18px;background:var(--celda);box-shadow:var(--sombra);
+  font-size:26px;font-weight:600;color:var(--texto);font-variant-numeric:tabular-nums;display:grid;place-items:center;padding:0}
+.pin-teclas button:active{background:var(--relleno)}
+.pin-teclas button.suave{background:none;box-shadow:none;font-size:17px;font-weight:700;color:var(--tinte)}
+.pin-teclas button svg{width:30px;height:30px}
+.pin .primary{margin-top:14px}
+.pin-pie{margin:12px 0 0;font-size:13.5px;line-height:18px;color:var(--sec)}
+.oculto{visibility:hidden}
+/* En pantallas bajas (320x568) el logo y los huecos se encogen para que el
+   botón de Entrar siga a la vista sin desplazar. */
+@media (max-height:620px){
+  .pin img{width:44px;height:44px;margin-bottom:6px}
+  .pin h2{font-size:22px;line-height:26px}
+  .pin-puntos{margin:10px 0 6px}
+  .pin-teclas{gap:8px}
+  .pin .primary{margin-top:10px;min-height:50px}
+  .pin-pie{margin-top:8px}
+}
+
 /* El lector y el resumen del día (archivos compartidos con SOO) con el
    verde de la app. */
 .lv{--lv-acento:var(--boton)}
@@ -425,18 +501,29 @@ nav.tabs button.active .ic{stroke-width:2.2}
   nav.tabs,.siderail,.segctrl{background:var(--celda)}
 }
 @media (prefers-reduced-transparency:reduce){nav.tabs,.siderail,.segctrl{background:var(--celda);-webkit-backdrop-filter:none;backdrop-filter:none}}
-@media (prefers-reduced-motion:reduce){.sheet,.scrim,.toast,nav.tabs .lente,.rapido .aro,.cifra{transition:none}}
+/* Al cambiar de pestaña, la sección entra con un fundido corto y subiendo
+   8 px: se nota el cambio sin que estorbe. Las hojas tienen el suyo. */
+@keyframes entra{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+main>section.entra{animation:entra .16s ease-out}
+@media (prefers-reduced-motion:reduce){
+  .sheet,.scrim,.toast,nav.tabs .lente,.rapido .aro,.cifra{transition:none}
+  main>section.entra{animation:none}
+  .pin-puntos.tiembla{animation:none}
+}
 @media (max-width:360px){
   main{padding-left:14px;padding-right:14px}
   .fila{padding-left:16px;padding-right:14px;gap:10px}
-  .vin6{font-size:19px;min-width:70px;letter-spacing:0}
+  .vin6{font-size:19px;line-height:24px;letter-spacing:.2px}
   .fila .val{font-size:15px}
   .rep-et{font-size:11px;letter-spacing:0;padding:0 5px}
+  .mini{width:56px;height:26px}
+  .fila.con-mini+.fila::before{left:82px}
 }
 @media (max-width:350px){
-  .rapido .aro{width:60px;height:60px}
-  .rapido{font-size:12.5px}
+  .rapido .aro{width:52px;height:52px}
+  .rapido{font-size:12px}
   .hero-num b{font-size:52px}
+  .cifra .n{font-size:28px}
   nav.tabs button{font-size:10.5px}
 }
 @media print{
@@ -499,20 +586,9 @@ nav.tabs button.active .ic{stroke-width:2.2}
       </div>
       <div id="instalar_pasos"></div>
     </div>
-    <!-- Los atajos en círculos: lo que se usa a diario, a un toque. -->
-    <div class="rapidos">
-      <label class="rapido" for="galInput"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-gallery"/></svg></span></span>Foto de galería</label>
-      <!-- Aparte de la cámara que lee letras: si el auto trae el VIN en código de
-           barras (etiqueta de la puerta o del parabrisas), se lee entero y sin errores. -->
-      <button class="rapido" id="btnBarras" type="button"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-barcode"/></svg></span></span>Código de barras</button>
-      <!-- Al acabar el día, la hoja de cada trabajador: sus autos con la
-           foto del VIN y los números del día, para mandarla por WhatsApp. -->
-      <button class="rapido" id="btnResumen" type="button"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-report"/></svg></span></span>Resumen del día</button>
-      <button class="rapido" type="button" data-ir="reportes"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-vehicle"/></svg></span></span>Reportes</button>
-    </div>
-
     <!-- Lo de hoy, en grande, y la cámara con marco: se apunta al VIN, se
-         ve en verde cuando se lee bien y se captura. -->
+         ve en verde cuando se lee bien y se captura. Va lo primero porque
+         es lo que se hace cada vez que se abre la app. -->
     <div class="tarjeta">
       <div class="hero">
         <div class="hero-num"><b id="heroCount">0</b><span id="heroUnidad">autos hoy</span></div>
@@ -526,12 +602,28 @@ nav.tabs button.active .ic{stroke-width:2.2}
       </div>
     </div>
 
-    <button class="cifra" type="button" data-ir="pendientes"><span class="chip"><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-check"/></svg></span>
-      <span class="mas"><b>Por confirmar</b><span>Chasis que falta revisar</span></span><span class="n" id="nPend">0</span></button>
-    <button class="cifra" type="button" id="cifraRep"><span class="chip"><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-tag"/></svg></span>
-      <span class="mas"><b>VIN repetidos hoy</b><span>Mismos seis últimos que otro auto</span></span><span class="n" id="nRep">0</span></button>
-    <button class="cifra" type="button" id="cifraCola" hidden><span class="chip"><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-sync"/></svg></span>
-      <span class="mas"><b>Sin subir todavía</b><span>Guardados en el teléfono sin señal</span></span><span class="n" id="nCola">0</span></button>
+    <!-- Los atajos en círculos: lo que se usa a diario, a un toque. -->
+    <div class="rapidos">
+      <label class="rapido" for="galInput"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-gallery"/></svg></span></span>Foto de galería</label>
+      <!-- Aparte de la cámara que lee letras: si el auto trae el VIN en código de
+           barras (etiqueta de la puerta o del parabrisas), se lee entero y sin errores. -->
+      <button class="rapido" id="btnBarras" type="button"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-barcode"/></svg></span></span>Código de barras</button>
+      <!-- Al acabar el día, la hoja de cada trabajador: sus autos con la
+           foto del VIN y los números del día, para mandarla por WhatsApp. -->
+      <button class="rapido" id="btnResumen" type="button"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-report"/></svg></span></span>Resumen del día</button>
+      <button class="rapido" type="button" data-ir="reportes"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-vehicle"/></svg></span></span>Reportes</button>
+    </div>
+
+    <!-- Dos chips a media pantalla: lo que falta por confirmar y los
+         repetidos de hoy. El de la cola sólo sale cuando hay algo sin subir. -->
+    <div class="cifras">
+      <button class="cifra" type="button" data-ir="pendientes">
+        <span class="mas"><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-check"/></svg><b>Por confirmar</b></span><span class="n" id="nPend">0</span></button>
+      <button class="cifra" type="button" id="cifraRep">
+        <span class="mas"><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-tag"/></svg><b>Repetidos hoy</b></span><span class="n" id="nRep">0</span></button>
+      <button class="cifra ancha" type="button" id="cifraCola" hidden>
+        <span class="mas"><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-sync"/></svg><b>Sin subir todavía</b></span><span class="n" id="nCola">0</span></button>
+    </div>
     <input type="file" id="galInput" accept="image/*" hidden>
     <div id="ocrStatus" class="hint"></div>
     <div class="grupo-cab"><span>Hoy</span><span><span id="todayCount">0</span> autos</span></div>
@@ -605,6 +697,13 @@ nav.tabs button.active .ic{stroke-width:2.2}
     <div class="grupo">
       <button class="fila" id="set_instalar" type="button"><span class="mas">Tenerla como app en el teléfono</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </div>
+
+    <div class="grupo-cab"><span>Acceso</span></div>
+    <div class="grupo">
+      <button class="fila accion" id="pin_cambiar" type="button"><span class="mas">Cambiar PIN</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="fila peligro" id="pin_salir" type="button"><span class="mas">Salir de este teléfono</span></button>
+    </div>
+    <p class="grupo-pie" id="pin_nota">El PIN es uno para todo el equipo. Al salir, este teléfono vuelve a pedirlo; los demás siguen dentro.</p>
 
     <div class="grupo-cab"><span>Espacio</span></div>
     <div class="grupo">
@@ -723,6 +822,28 @@ nav.tabs button.active .ic{stroke-width:2.2}
   </div>
 </div>
 
+<!-- La entrada con PIN. Tapa la app entera hasta que este teléfono tiene
+     su sesión; después sólo vuelve a salir desde Ajustes (cambiar el PIN o
+     salir) o cuando el servidor deja de reconocer la sesión. -->
+<div class="pin" id="pin" hidden>
+  <div class="pin-caja">
+    <img src="icon-192.png" alt="">
+    <h2 id="pin_titulo">Registro VIN</h2>
+    <p class="pin-texto" id="pin_texto">Escribe el PIN del equipo</p>
+    <div class="pin-puntos" id="pin_puntos" aria-hidden="true"><i></i><i></i><i></i><i></i><i class="extra"></i><i class="extra"></i></div>
+    <p class="pin-aviso" id="pin_aviso" aria-live="polite"></p>
+    <div class="pin-teclas" id="pin_teclas">
+      <button type="button" data-d="1">1</button><button type="button" data-d="2">2</button><button type="button" data-d="3">3</button>
+      <button type="button" data-d="4">4</button><button type="button" data-d="5">5</button><button type="button" data-d="6">6</button>
+      <button type="button" data-d="7">7</button><button type="button" data-d="8">8</button><button type="button" data-d="9">9</button>
+      <button type="button" class="suave oculto" id="pin_cancelar" data-a="x">Cancelar</button>
+      <button type="button" data-d="0">0</button>
+      <button type="button" class="suave" id="pin_borrar" aria-label="Borrar"><svg class="gcico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 6H9l-6 6 6 6h12a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1z"/><path d="m12 9 6 6M18 9l-6 6"/></svg></button>
+    </div>
+    <button class="primary" id="pin_entrar" type="button" disabled>Entrar</button>
+    <p class="pin-pie" id="pin_pie">De 4 a 6 números. Se escribe una vez por teléfono.</p>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <!-- El lector de VIN: el mismo archivo que usa SOO, byte a byte. Se
@@ -740,17 +861,265 @@ const CLOUD = {
 const LSKEY_SUPERVISOR = "vinlog_supervisor_name";
 const LSKEY_LASTWORKER = "vinlog_last_worker_name";
 const LSKEY_QUEUE = "vinlog_pending_queue_v1";
+const LSKEY_TOKEN = "vinlog_token";
 
 /* ===================== Conexión ===================== */
+/* La sesión de este teléfono (ver "PIN de entrada"): va en la cabecera
+   x-vin-token y el servidor la exige en todo lo que lee o escribe. */
+/* También en memoria: si el teléfono no deja guardar (almacenamiento
+   bloqueado), la sesión dura al menos mientras la app siga abierta, en vez
+   de pedir el PIN sin fin. */
+let tokenMem = "";
+const getToken = () => { try { return tokenMem || localStorage.getItem(LSKEY_TOKEN) || ""; } catch (e) { return tokenMem; } };
+const setToken = t => { tokenMem = t || ""; try { if (t) localStorage.setItem(LSKEY_TOKEN, t); else localStorage.removeItem(LSKEY_TOKEN); } catch (e) {} };
 async function rpc(fn, body){
-  const r = await fetch(CLOUD.url + "/rest/v1/rpc/" + fn, { method: "POST",
-    headers: { "Content-Type": "application/json", "apikey": CLOUD.key, "Authorization": "Bearer " + CLOUD.key },
-    body: JSON.stringify(body) });
-  if (!r.ok) { throw new Error("HTTP " + r.status); }
-  /* Cualquier cambio en los registros deja viejo el historial de repetidos. */
-  if (/insert|update|delete|confirmar|borrar/.test(fn)) repHistEn = 0;
-  const t = await r.text(); return t ? JSON.parse(t) : null;
+  const headers = { "Content-Type": "application/json", "apikey": CLOUD.key, "Authorization": "Bearer " + CLOUD.key };
+  const token = getToken();
+  if (token) headers["x-vin-token"] = token;
+  const r = await fetch(CLOUD.url + "/rest/v1/rpc/" + fn, { method: "POST", headers, body: JSON.stringify(body) });
+  const t = await r.text();
+  if (!r.ok) {
+    /* El servidor cuenta qué pasó en el cuerpo (message y code): se guarda
+       en el error para que quien llama distinga "PIN incorrecto" de "no
+       existe la función" sin tener que mirar la red. */
+    let d = null; try { d = JSON.parse(t); } catch (e) {}
+    const e = new Error((d && d.message) || ("HTTP " + r.status));
+    e.status = r.status; e.codigo = d && d.code;
+    /* Sesión que el servidor ya no reconoce (o alguien puso el PIN mientras
+       este teléfono seguía sin él): se olvida y se vuelve a pedir el PIN.
+       Sólo si el rechazo es el de la sesión ("Sin acceso", código 28000) y
+       no cualquier 401, y sólo si el token rechazado es el de ahora: la
+       respuesta tardía de una subida lenta no puede echar a quien acaba de
+       entrar con un token nuevo. */
+    if (((d && d.code === "28000") || /Sin acceso/.test(t)) && token === getToken()) Pin.expulsar();
+    throw e;
+  }
+  /* Cualquier cambio en los registros deja vieja la memoria de Datos. */
+  if (/insert|update|delete|confirmar|borrar|liberar|lectura/.test(fn)) Datos.invalidar();
+  return t ? JSON.parse(t) : null;
 }
+
+/* ===================== PIN de entrada ===================== */
+/* Un PIN del equipo, de 4 a 6 números, que cada teléfono escribe una vez.
+   El servidor lo comprueba y devuelve un token (una sesión) que se guarda
+   en el teléfono; sin él la base contesta "Sin acceso" y se vuelve aquí.
+
+   Mientras la base no tenga las funciones del PIN (la migración sin
+   aplicar), la app entra sin token y lo avisa, para no dejar al equipo
+   fuera por un despliegue a medias. Y si todavía no hay PIN guardado, el
+   primero que entre lo deja puesto: se dice antes de que escriba nada.
+
+   La misma pantalla sirve para cambiar el PIN desde Ajustes, en tres pasos
+   (el actual, el nuevo y el nuevo otra vez: un número mal tecleado dejaría
+   fuera a todo el equipo). */
+let pinSinActivar = false;
+const Pin = (() => {
+  let digitos = "", modo = "entrar", paso = 0, actual = "", nuevo = "", primerUso = false, ocupado = false, resolver = null, promesa = null, porExpulsion = false;
+  const el = id => document.getElementById(id);
+  const PASOS = [["Cambiar PIN", "Escribe el PIN actual"], ["PIN nuevo", "Escribe el PIN nuevo"], ["PIN nuevo", "Escríbelo otra vez para comprobarlo"]];
+  const sinFuncion = e => !!e && (e.status === 404 || e.codigo === "PGRST202");
+  function pintar(){
+    el("pin_puntos").querySelectorAll("i").forEach((p, i) => p.classList.toggle("on", i < digitos.length));
+    const b = el("pin_entrar");
+    b.disabled = ocupado || digitos.length < 4;
+    b.textContent = modo === "entrar" ? "Entrar" : (paso < 2 ? "Seguir" : "Guardar PIN");
+  }
+  function aviso(txt, mal){ const a = el("pin_aviso"); a.textContent = txt || ""; a.classList.toggle("mal", !!mal); }
+  function tiembla(){ const p = el("pin_puntos"); p.classList.remove("tiembla"); void p.offsetWidth; p.classList.add("tiembla"); }
+  function tecla(d){
+    if (ocupado) return;
+    if (d === "borrar") digitos = digitos.slice(0, -1); else if (digitos.length < 6) digitos += d;
+    aviso(""); pintar();
+  }
+  function irAlPaso(n){
+    paso = n; digitos = "";
+    el("pin_titulo").textContent = PASOS[n][0]; el("pin_texto").textContent = PASOS[n][1];
+    pintar();
+  }
+  function abrir(m){
+    if (!el("pin").hidden && modo === "entrar" && m === "entrar" && promesa) return promesa;
+    /* Si había otra petición esperando (cambiar el PIN), se da por cancelada. */
+    if (resolver) { const r = resolver; resolver = promesa = null; r(false); }
+    modo = m; paso = 0; digitos = ""; actual = nuevo = ""; primerUso = false; ocupado = false;
+    el("pin_cancelar").classList.toggle("oculto", m === "entrar");
+    el("pin_pie").textContent = m === "entrar" ? "De 4 a 6 números. Se escribe una vez por teléfono."
+      : "Los demás teléfonos siguen dentro con el PIN nuevo; no hace falta que vuelvan a entrar.";
+    if (m === "entrar") { el("pin_titulo").textContent = "Registro VIN"; el("pin_texto").textContent = "Escribe el PIN del equipo"; }
+    else irAlPaso(0);
+    aviso(""); pintar();
+    el("pin").hidden = false; sincronizarAtras();
+    if (m === "entrar") avisarPrimerUso();
+    promesa = new Promise(r => { resolver = r; });
+    return promesa;
+  }
+  function cerrar(valor){
+    el("pin").hidden = true; sincronizarAtras();
+    const r = resolver; resolver = promesa = null; if (r) r(valor);
+  }
+  async function avisarPrimerUso(){
+    try {
+      if ((await rpc("vin_log_hay_pin", {})) === false) {
+        primerUso = true;
+        el("pin_texto").textContent = "Todavía no hay PIN. El que escribas queda como el del equipo: compártelo sólo con quien registre autos.";
+      }
+    } catch (e) {
+      if (!sinFuncion(e) || modo !== "entrar") return;
+      /* Si la base acaba de echar a este teléfono es que el PIN ya está
+         activo: que falte esta función es un despliegue a medias, y entrar
+         sin PIN sería un ir y venir sin fin. Se espera aquí. */
+      if (porExpulsion) { aviso("La base está terminando de activar el PIN. Espera un minuto y vuelve a abrir la app.", true); return; }
+      pinSinActivar = true; setToken(""); cerrar(true); toast("Falta activar el PIN en la base (Ajustes)");
+    }
+  }
+  async function entrar(){
+    ocupado = true; pintar(); aviso("Comprobando…");
+    try {
+      const token = await rpc("vin_log_entrar", { p_pin: digitos, p_nombre: getSupervisorName().trim() || null });
+      if (!token) throw new Error("El servidor no devolvió sesión");
+      setToken(String(token)); pinSinActivar = false; ocupado = false; porExpulsion = false;
+      if (primerUso) toast("✓ Este PIN queda como el del equipo. Compártelo sólo con quien registre autos.");
+      cerrar(true);
+    } catch (e) {
+      ocupado = false;
+      if (sinFuncion(e) && !porExpulsion) { pinSinActivar = true; setToken(""); cerrar(true); toast("Falta activar el PIN en la base (Ajustes)"); return; }
+      digitos = ""; pintar(); tiembla();
+      aviso(/incorrecto/i.test(e.message) ? "PIN incorrecto" : e.status ? e.message : "Sin conexión. Inténtalo de nuevo", true);
+    }
+  }
+  async function cambiar(){
+    if (paso === 0) { actual = digitos; irAlPaso(1); return; }
+    if (paso === 1) { nuevo = digitos; irAlPaso(2); return; }
+    if (digitos !== nuevo) { tiembla(); irAlPaso(1); aviso("No coinciden. Escribe el nuevo otra vez", true); return; }
+    ocupado = true; pintar(); aviso("Guardando…");
+    try {
+      await rpc("vin_log_cambiar_pin", { p_actual: actual, p_nuevo: nuevo });
+      ocupado = false; cerrar(true); toast("✓ PIN cambiado");
+    } catch (e) {
+      ocupado = false;
+      /* Si mientras tanto la base echó a este teléfono, la pantalla ya es
+         la de entrar: no se le ponen encima los textos de cambiar. */
+      if (modo !== "cambiar") { pintar(); return; }
+      if (sinFuncion(e)) { pinSinActivar = true; cerrar(false); toast("⚠︎ Falta activar el PIN en la base"); return; }
+      tiembla(); irAlPaso(0);
+      aviso(/incorrecto/i.test(e.message) ? "El PIN actual no es correcto" : e.status ? e.message : "Sin conexión. Inténtalo de nuevo", true);
+    }
+  }
+  function enviar(){
+    if (ocupado || digitos.length < 4) return;
+    if (modo === "entrar") entrar(); else cambiar();
+  }
+  /* Lo que estaba a la vista se vuelve a pedir con la sesión nueva. */
+  function trasEntrar(){
+    Datos.invalidar(); refreshOpenTabs();
+    if (!document.getElementById("tab-pendientes").hidden) loadPendientes();
+    if (!document.getElementById("tab-ajustes").hidden) loadEspacio();
+  }
+  document.addEventListener("DOMContentLoaded", () => {
+    el("pin_teclas").querySelectorAll("[data-d]").forEach(b => b.onclick = () => tecla(b.dataset.d));
+    el("pin_borrar").onclick = () => tecla("borrar");
+    el("pin_entrar").onclick = enviar;
+    el("pin_cancelar").onclick = () => { if (modo !== "entrar") cerrar(false); };
+    /* Con teclado físico (o el de Samsung DeX) también se escribe. */
+    document.addEventListener("keydown", e => {
+      if (el("pin").hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (/^[0-9]$/.test(e.key)) tecla(e.key);
+      else if (e.key === "Backspace") tecla("borrar");
+      else if (e.key === "Enter") enviar();
+      else if (e.key === "Escape" && modo !== "entrar") cerrar(false);
+      else return;
+      e.preventDefault();
+    });
+  });
+  return {
+    /* Pide el PIN y resuelve cuando este teléfono ya tiene sesión. */
+    pedir: () => abrir("entrar"),
+    cambiar: () => { if (!el("pin").hidden) return; abrir("cambiar"); },
+    /* Salir borra también la sesión en la base: un token copiado de este
+       teléfono deja de valer. Si no hay señal, se borra aquí igualmente. */
+    salir: () => { rpc("vin_log_salir", {}).catch(() => {}).then(() => { setToken(""); porExpulsion = false; abrir("entrar").then(ok => { if (ok) trasEntrar(); }); }); },
+    expulsar: () => {
+      if (!getToken() && !el("pin").hidden && modo === "entrar") return;
+      setToken(""); porExpulsion = true;
+      /* La cámara y el resumen van por encima de todo: se cierran para que
+         la pantalla del PIN quede de verdad delante. */
+      document.querySelectorAll(".lv [data-a=x], .ifd [data-a=x]").forEach(b => { try { b.click(); } catch (e) {} });
+      if (modo !== "entrar" || el("pin").hidden) abrir("entrar").then(ok => { if (ok) trasEntrar(); });
+    },
+    abierta: () => !el("pin").hidden,
+    enCambio: () => !el("pin").hidden && modo !== "entrar"
+  };
+})();
+
+/* ===================== Datos ===================== */
+/* Una sola descarga para todo. Antes, abrir la app pedía la lista seis
+   veces (hoy, tres meses para los repetidos y dos para el lector) y
+   Reportes dos más, siempre sobre los mismos registros. Aquí se bajan los
+   últimos 90 días una vez —en tramos de un mes, porque el servidor corta
+   las respuestas largas— y de esta memoria salen la lista de hoy, los
+   repetidos, los chasis que conoce el lector y los reportes que caben en
+   esos 90 días; lo más antiguo (semestre, meses viejos) sigue pidiéndose a
+   la red. Vale tres minutos, y cualquier cambio en los registros la deja
+   vieja. Sin señal se sirve lo último descargado y se avisa una vez. */
+const Datos = (() => {
+  const DIAS = 90, TRAMO = 30 * 864e5, VIGENCIA = 3 * 60 * 1000, REINTENTO = 15 * 1000;
+  let filas = null, bajadoEn = 0, falloEn = 0, promesa = null, avisadoEn = 0, gen = 0, sucio = false;
+  const fresco = () => !!filas && Date.now() - bajadoEn < VIGENCIA;
+  const ordenar = fs => fs.sort((a, b) => new Date(b.client_at) - new Date(a.client_at));
+  /* Un rango cualquiera, pedido en tramos de un mes y ya ordenado. */
+  function enTramos(from, to){
+    const ps = [];
+    for (let a = +from; a < +to; a += TRAMO)
+      ps.push(rpc("vin_log_lista", { p_from: new Date(a).toISOString(), p_to: new Date(Math.min(a + TRAMO, +to)).toISOString() }));
+    return Promise.all(ps).then(partes => ordenar([].concat(...partes.map(x => x || []))));
+  }
+  /* Si algo cambia mientras se baja (un guardado, la cola subiendo), lo
+     bajado ya nace viejo: se guarda para pintar, pero no se da por fresco,
+     y quien lo pidió vuelve a bajar. Sin esto el auto recién guardado
+     tardaba tres minutos en salir en la lista. */
+  function bajar(){
+    if (promesa) return promesa;
+    const fin = Date.now() + 864e5, g = gen;
+    promesa = enTramos(fin - DIAS * 864e5, fin).then(fs => {
+      filas = fs; falloEn = 0;
+      if (g === gen) { bajadoEn = Date.now(); sucio = false; } else bajadoEn = 0;
+      return filas;
+    }).catch(e => { falloEn = Date.now(); throw e; }).finally(() => { promesa = null; });
+    return promesa;
+  }
+  /* Todo lo de los 90 días. Si no se puede bajar y hay algo de antes, se
+     sirve eso y se avisa; sin nada guardado falla, como siempre. Tras un
+     fallo no se vuelve a intentar en unos segundos: cada pantalla lo pide
+     y sin señal sería pedirlo sin parar. */
+  async function todo(){
+    if (fresco()) return filas;
+    if (filas && Date.now() - falloEn < REINTENTO) return filas;
+    try {
+      let fs = await bajar();
+      if (!fresco()) fs = await bajar();
+      return fs;
+    }
+    catch (e) {
+      if (!filas) throw e;
+      if (Date.now() - avisadoEn > 30000) { avisadoEn = Date.now(); toast("📶 Sin conexión — se muestra lo último descargado"); }
+      return filas;
+    }
+  }
+  const entre = (fs, from, to) => { const a = +from, b = +to; return (fs || []).filter(r => { const t = new Date(r.client_at).getTime(); return t >= a && t < b; }); };
+  /* Un día de margen: la descarga empezó 90 días antes de su momento, y
+     desde entonces ha pasado un rato. */
+  const cubre = from => +from >= Date.now() - (DIAS - 1) * 864e5;
+  /* Los registros entre dos fechas, de memoria si caben en los 90 días y
+     de la red si no. Siempre del más nuevo al más viejo, como el servidor. */
+  async function lista(from, to){
+    if (cubre(from)) return entre(await todo(), from, to);
+    return enTramos(from, to);
+  }
+  /* "sucio" es viejo por un cambio propio (se guardó, se borró): esa
+     memoria no se enseña mientras llega la buena, o la fila recién borrada
+     volvería a salir un momento. Viejo sólo por tiempo sí se enseña. */
+  return { todo, lista, entre, fresco, enMemoria: () => filas, sucio: () => sucio,
+    invalidar: () => { bajadoEn = 0; gen++; sucio = true; } };
+})();
 
 /* ===================== VIN repetido ===================== */
 /* Dos registros con los mismos seis últimos del VIN son casi siempre el
@@ -759,30 +1128,15 @@ async function rpc(fn, body){
    reporte, en el CSV y en el resumen del día. No se impide guardar: un auto
    puede volver de verdad, y eso lo decide una persona.
 
-   Se compara con los últimos 90 días, pedidos en tramos de un mes (el
-   servidor corta las respuestas largas), y se guarda tres minutos para no
-   bajarlo en cada vistazo. Sin señal no se marca nada: mejor callar que
-   avisar de un repetido que no existe. */
-const REP_TRAMOS = 3, REP_VIGENCIA = 3 * 60 * 1000;
-let repHist = null, repHistEn = 0, repHistPromesa = null;
+   Se compara con los últimos 90 días, los mismos que guarda Datos. Sin
+   señal y sin nada descargado no se marca nada: mejor callar que avisar
+   de un repetido que no existe. */
 function claveVin(r){
   const v = String((r && (r.vin_full || r.vin6)) || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   return v.length >= 6 ? v.slice(-6) : null;
 }
-const repFresco = () => repHist && Date.now() - repHistEn < REP_VIGENCIA;
-function historialRepetidos(){
-  if (repFresco()) return Promise.resolve(repHist);
-  if (repHistPromesa) return repHistPromesa;
-  const fin = Date.now() + 86400000, mes = 30 * 86400000, tramos = [];
-  for (let k = 0; k < REP_TRAMOS; k++)
-    tramos.push(rpc("vin_log_lista", { p_from: new Date(fin - (k + 1) * mes).toISOString(), p_to: new Date(fin - k * mes).toISOString() }));
-  repHistPromesa = Promise.all(tramos).then(partes => {
-    repHist = [].concat(...partes.map(x => x || []));
-    repHistEn = Date.now();
-    return repHist;
-  }).catch(() => null).finally(() => { repHistPromesa = null; });
-  return repHistPromesa;
-}
+const repFresco = () => Datos.fresco();
+const historialRepetidos = () => Datos.todo().catch(() => null);
 /* Para cada fila de "filas", los otros registros con sus mismos seis
    últimos: id → [otros, del más antiguo al más nuevo]. */
 function repetidosDe(filas, hist){
@@ -821,8 +1175,8 @@ const vinSemaforo = v => LectorVIN.semaforo(v);
 async function vinesConocidos(){
   try {
     const hasta = new Date(Date.now() + 864e5), desde = new Date(Date.now() - 60 * 864e5);
-    const rows = await rpc("vin_log_lista", { p_from: desde.toISOString(), p_to: hasta.toISOString() });
-    return (rows || []).filter(r => r.vin_full).map(r => ({ vin: r.vin_full, cuando: r.client_at }));
+    const rows = await Datos.lista(desde, hasta);
+    return rows.filter(r => r.vin_full).map(r => ({ vin: r.vin_full, cuando: r.client_at }));
   } catch (e) { return []; }
 }
 
@@ -845,43 +1199,156 @@ function setLastWorkerName(n){ try { localStorage.setItem(LSKEY_LASTWORKER, n); 
 function toLocalInputValue(d){ const p = n => String(n).padStart(2, "0"); return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":" + p(d.getMinutes()); }
 function startOfDay(d){ const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 function endOfDayExclusive(d){ const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() + 1); return x; }
+/* La foto de respaldo, más ligera antes de subirla. El lector la deja a
+   1600 px porque la necesita así para leer, pero como respaldo basta con
+   1280: pesa cerca de la mitad en la base, en la cola sin señal y en cada
+   descarga. El recorte del VIN no se toca. Si algo falla, va la original. */
+function aligerarFoto(dataUrl, lado, calidad){
+  return new Promise(ok => {
+    if (!dataUrl || !/^data:image\//.test(dataUrl)) return ok(dataUrl);
+    const im = new Image();
+    im.onload = () => {
+      try {
+        const e = (lado || 1280) / Math.max(im.width, im.height, 1);
+        if (e >= 1) return ok(dataUrl);
+        const c = document.createElement("canvas");
+        c.width = Math.round(im.width * e); c.height = Math.round(im.height * e);
+        const g = c.getContext("2d"); g.imageSmoothingQuality = "high";
+        g.drawImage(im, 0, 0, c.width, c.height);
+        const chica = c.toDataURL("image/jpeg", calidad || 0.78);
+        ok(chica.length < dataUrl.length ? chica : dataUrl);
+      } catch (err) { ok(dataUrl); }
+    };
+    im.onerror = () => ok(dataUrl);
+    im.src = dataUrl;
+  });
+}
 
 /* ===================== Cola sin conexion ===================== */
-function getQueue(){ try { return JSON.parse(localStorage.getItem(LSKEY_QUEUE)) || []; } catch (e) { return []; } }
+/* La cola vive en IndexedDB y no en localStorage: localStorage tiene unos
+   5 MB en total, y con fotos de unos 100 KB en base64 se llenaba a los
+   cuarenta autos; una tarde sin señal no cabía. IndexedDB guarda cientos
+   de megas. Si el teléfono no la deja usar (modo privado, memoria
+   bloqueada) se vuelve a localStorage, que es mejor que nada. Lo que
+   hubiera en localStorage de versiones anteriores pasa a la cola nueva al
+   arrancar, una sola vez. */
+const COLA_BD = "registro-vin-cola", COLA_ALMACEN = "cola";
+let colaBD = null;
+const pedirCola = (db, modo, fn) => new Promise((ok, no) => {
+  const tx = db.transaction(COLA_ALMACEN, modo);
+  const r = fn(tx.objectStore(COLA_ALMACEN));
+  tx.oncomplete = () => ok(r && r.result);
+  tx.onerror = () => no(tx.error);
+  tx.onabort = () => no(tx.error);
+});
+const colaLocal = () => { try { return JSON.parse(localStorage.getItem(LSKEY_QUEUE)) || []; } catch (e) { return []; } };
+/* La base de la cola, abierta una vez. Resuelve null si no se puede usar. */
+function abrirCola(){
+  if (colaBD) return colaBD;
+  colaBD = new Promise((ok, no) => {
+    try {
+      /* Hay teléfonos donde abrir la base no contesta nunca (memoria en
+         limpieza): a los tres segundos se sigue con localStorage en vez de
+         dejar el botón de guardar colgado. */
+      setTimeout(() => no(new Error("sin respuesta")), 3000);
+      const r = indexedDB.open(COLA_BD, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore(COLA_ALMACEN, { autoIncrement: true });
+      r.onsuccess = () => ok(r.result);
+      r.onerror = () => no(r.error);
+      r.onblocked = () => no(new Error("bloqueada"));
+    } catch (e) { no(e); }
+  }).then(async db => {
+    /* Se quitan de localStorage ANTES de pasarlos: con la app abierta en
+       dos sitios a la vez, el segundo ya no los encuentra y no los duplica.
+       Si el traslado falla, vuelven a su sitio. */
+    const viejos = colaLocal();
+    try { localStorage.removeItem(LSKEY_QUEUE); } catch (e) {}
+    if (viejos.length) {
+      try { await pedirCola(db, "readwrite", s => viejos.forEach(p => s.add(p))); }
+      catch (e) { try { localStorage.setItem(LSKEY_QUEUE, JSON.stringify(viejos)); } catch (e2) {} throw e; }
+    }
+    return db;
+  }).catch(() => null);
+  return colaBD;
+}
+/* Cada registro con su clave en la base, para poder quitar sólo el que
+   ya subió sin pisar lo que se guardó mientras tanto. */
+async function leerCola(){
+  const db = await abrirCola();
+  if (!db) return colaLocal().map((p, i) => ({ clave: i, p }));
+  try {
+    const pares = [];
+    await pedirCola(db, "readonly", s => {
+      const r = s.openCursor();
+      r.onsuccess = () => { const c = r.result; if (c) { pares.push({ clave: c.key, p: c.value }); c.continue(); } };
+    });
+    return pares;
+  } catch (e) { return []; }
+}
+async function getQueue(){ return (await leerCola()).map(x => x.p); }
 /* Devuelve si de verdad se guardo. Antes se tragaba el error en silencio:
-   cuando la memoria del telefono se llena —y se llena rapido, cada foto son
-   unos 115 KB en base64 contra un limite de unos 5 MB— el guardado fallaba y
-   se seguia diciendo "guardado en el telefono". La foto se perdia y el auto
-   quedaba sin registrar creyendo que estaba. */
-function setQueue(q){
-  try { localStorage.setItem(LSKEY_QUEUE, JSON.stringify(q)); return true; }
+   cuando la memoria del telefono se llena el guardado fallaba y se seguia
+   diciendo "guardado en el telefono". La foto se perdia y el auto quedaba
+   sin registrar creyendo que estaba. */
+async function setQueue(q){
+  const db = await abrirCola();
+  if (!db) { try { localStorage.setItem(LSKEY_QUEUE, JSON.stringify(q)); return true; } catch (e) { return false; } }
+  try { await pedirCola(db, "readwrite", s => { s.clear(); q.forEach(p => s.add(p)); }); return true; }
   catch (e) { return false; }
 }
+async function quitarDeCola(clave){
+  const db = await abrirCola();
+  if (!db) return;
+  try { await pedirCola(db, "readwrite", s => s.delete(clave)); } catch (e) {}
+}
+/* ¿El fallo es de conexión (o de sesión, que se arregla al volver a
+   entrar) y vale la pena guardar para subir después? Un "no" del servidor
+   —datos que no acepta— no se arregla reintentando: quedaría en la cola
+   para siempre diciendo "sin conexión". */
+const valeEncolar = e => !e || e.status == null || e.status >= 500 || [401, 403, 408, 429].includes(e.status);
 /* Un registro en la cola todavía no tiene id; su recorte se guarda con esta
    clave y pasa al id de verdad cuando se sube. */
 const claveCola = p => "cola:" + p.p_client_at + ":" + (p.p_worker_name || "");
-function queueOffline(params){
-  const q = getQueue(); q.push(params);
-  return setQueue(q);
+async function queueOffline(params){
+  const db = await abrirCola();
+  if (!db) { const q = colaLocal(); q.push(params); return setQueue(q); }
+  try { await pedirCola(db, "readwrite", s => s.add(params)); return true; }
+  catch (e) { return false; }
 }
-async function flushQueue(){
-  const q = getQueue();
-  if (!q.length) return;
-  const remaining = [];
-  for (const item of q) {
-    try {
-      const id = await rpc("vin_log_insert", item);
-      /* El recorte del VIN esperaba con una clave provisional: pasa al id. */
-      const rc = await InformeDia.leerRecorte(claveCola(item));
-      if (id && rc) await InformeDia.guardarRecorte(id, rc);
-    } catch (e) { remaining.push(item); }
-  }
-  setQueue(remaining);
-  renderQueueBadge();
-  if (remaining.length < q.length) loadToday();
+/* Una subida a la vez: la llaman el reloj, el evento "online", el botón y
+   la vuelta a primer plano, y dos a la vez subirían el mismo auto dos veces. */
+let subiendoCola = null;
+function flushQueue(){
+  if (subiendoCola) return subiendoCola;
+  subiendoCola = (async () => {
+    if (navigator.onLine === false) return;
+    const cola = await leerCola();
+    if (!cola.length) return;
+    let subidos = 0;
+    const hechas = new Set();
+    for (const { clave, p: item } of cola) {
+      try {
+        /* Si una subida anterior llegó pero se perdió la respuesta, el
+           servidor reconoce el registro (misma hora y trabajador) y
+           devuelve el que ya tenía: reintentar no duplica el auto. */
+        const id = await rpc("vin_log_insert", item);
+        await quitarDeCola(clave); subidos++; hechas.add(claveCola(item));
+        /* El recorte del VIN esperaba con una clave provisional: pasa al id. */
+        const rc = await InformeDia.leerRecorte(claveCola(item));
+        if (id && rc) await InformeDia.guardarRecorte(id, rc);
+      } catch (e) {}
+    }
+    /* Sin IndexedDB no hay claves. Se vuelve a leer la lista y se quita
+       sólo lo subido: reescribirla con la foto del principio borraría lo
+       que se guardó mientras tanto. */
+    if (!(await abrirCola()) && hechas.size) await setQueue(colaLocal().filter(p => !hechas.has(claveCola(p))));
+    renderQueueBadge();
+    if (subidos) loadToday();
+  })().finally(() => { subiendoCola = null; });
+  return subiendoCola;
 }
-function renderQueueBadge(){
-  const n = getQueue().length;
+async function renderQueueBadge(){
+  const n = (await getQueue()).length;
   const el = document.getElementById("queueBadge");
   el.hidden = n === 0;
   el.textContent = n === 1 ? "1 registro guardado en el teléfono, pendiente de subir." : n + " registros guardados en el teléfono, pendientes de subir.";
@@ -889,7 +1356,19 @@ function renderQueueBadge(){
   document.getElementById("nCola").textContent = n;
 }
 window.addEventListener("online", flushQueue);
-setInterval(flushQueue, 45000);
+/* El reloj que reintenta la subida sólo corre con la app delante: en
+   segundo plano gastaría batería y datos sin que nadie mire. Al volver se
+   sube lo pendiente y, si pasó un rato, se refresca la lista de hoy. */
+let relojCola = null, ocultaDesde = 0;
+function arrancarRelojCola(){ if (!relojCola) relojCola = setInterval(flushQueue, 45000); }
+function pararRelojCola(){ clearInterval(relojCola); relojCola = null; }
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { pararRelojCola(); ocultaDesde = Date.now(); return; }
+  arrancarRelojCola();
+  flushQueue();
+  if (ocultaDesde && Date.now() - ocultaDesde > 3 * 60 * 1000) { loadToday(); renderPendientesBadge(); }
+});
+arrancarRelojCola();
 
 /* ===================== Captura ===================== */
 let pendingReview = null, editingId = null;
@@ -941,11 +1420,13 @@ async function guardarRapido(seguir){
   const params = {
     p_vin_full: null, p_vin6: null, p_make: null, p_model: null, p_color: null,
     p_worker_name: worker, p_supervisor_name: supervisor,
-    p_client_at: new Date().toISOString(), p_photo_data: foto,
+    p_client_at: new Date().toISOString(), p_photo_data: null,
   };
   const btn = document.getElementById("cap_save"); btn.disabled = true; btn.textContent = "Guardando…";
   let guardado = false;
   try {
+    /* Sube la ligera; el lector de fondo sigue leyendo sobre la original. */
+    params.p_photo_data = await aligerarFoto(foto);
     const id = await rpc("vin_log_insert", params);
     if (id && recorte) await InformeDia.guardarRecorte(id, recorte);
     toast("✓ Guardado — el lector sigue por su cuenta");
@@ -953,9 +1434,11 @@ async function guardarRapido(seguir){
     if (id) leerEnSegundoPlano(id, foto);
   } catch (e) {
     /* Sin señal se encola igual: la foto es lo que no se puede perder. */
-    if (queueOffline(params)) {
+    if (!valeEncolar(e)) {
+      toast("⚠︎ No se pudo guardar: " + e.message);
+    } else if (await queueOffline(params)) {
       if (recorte) InformeDia.guardarRecorte(claveCola(params), recorte);
-      toast("📶 Sin conexión — guardado en el teléfono"); cerrarVistazo(); renderQueueBadge(); guardado = true;
+      toast("📶 Sin conexión — guardado en el teléfono"); cerrarVistazo(); renderQueueBadge(); renderTodayList(todayRows); guardado = true;
     } else {
       /* No se cierra la ventana: la foto sigue en pantalla y se puede
          reintentar cuando haya señal. Cerrarla seria perderla. */
@@ -980,7 +1463,7 @@ async function leerEnSegundoPlano(id, foto){
     await rpc("vin_log_set_lectura", {
       p_id: id, p_vin_full: leido,
       p_vin6: leido ? vin6of(leido) : null, p_estado: leido ? vinSemaforo(leido) : "rojo" });
-    renderPendientesBadge();
+    renderPendientesBadge(); loadToday();
   } catch (e) { /* si falla, se queda por confirmar, que es lo correcto */ }
 }
 
@@ -1129,7 +1612,7 @@ async function saveReview(){
   /* Esto ya lo acaba de revisar una persona, asi que entra confirmado y con
      su semaforo: mandarlo otra vez a "Por confirmar" seria trabajo inventado. */
   const vinRevisado = fields.p_vin_full;
-  const params = { ...fields, p_client_at: clientAt, p_photo_data: photo,
+  const params = { ...fields, p_client_at: clientAt, p_photo_data: await aligerarFoto(photo),
     p_confirmado: true,
     p_estado: vinRevisado ? vinSemaforo(vinRevisado) : null };
   try {
@@ -1139,9 +1622,11 @@ async function saveReview(){
     if (nuevo && pendingReview && pendingReview.recorte) InformeDia.guardarRecorte(nuevo, pendingReview.recorte);
     toast("✓ Registrado"); closeReview(); loadToday();
   } catch (e) {
-    if (queueOffline(params)) {
+    if (!valeEncolar(e)) {
+      toast("⚠︎ No se pudo guardar: " + e.message);
+    } else if (await queueOffline(params)) {
       if (pendingReview && pendingReview.recorte) InformeDia.guardarRecorte(claveCola(params), pendingReview.recorte);
-      toast("📶 Sin conexión — guardado en el teléfono, se sube solo"); closeReview(); renderQueueBadge();
+      toast("📶 Sin conexión — guardado en el teléfono, se sube solo"); closeReview(); renderQueueBadge(); renderTodayList(todayRows);
     } else {
       toast("⚠︎ No cabe en el teléfono. Conéctate a la red y vuelve a guardar.");
     }
@@ -1153,7 +1638,9 @@ async function deleteEntry(){
   const btn = document.getElementById("rev_delete"); const originalHtml = btn.innerHTML;
   btn.disabled = true; btn.textContent = "Eliminando…";
   try {
-    await rpc("vin_log_delete", { p_id: editingId });
+    const borrado = editingId;
+    await rpc("vin_log_delete", { p_id: borrado });
+    todayRows = todayRows.filter(r => String(r.id) !== String(borrado)); renderTodayList(todayRows);
     toast("✓ Eliminado"); closeReview(); refreshOpenTabs();
   } catch (e) { toast("⚠︎ No se pudo eliminar. Revisa tu conexión."); }
   finally { btn.disabled = false; btn.innerHTML = originalHtml; }
@@ -1182,7 +1669,7 @@ async function cargarGenteDelDia(){
   caja.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">Cargando…</span></div>';
   try {
     const d0 = new Date(dia + "T00:00");
-    resFilas = await rpc("vin_log_lista", { p_from: startOfDay(d0).toISOString(), p_to: endOfDayExclusive(d0).toISOString() }) || [];
+    resFilas = await Datos.lista(startOfDay(d0), endOfDayExclusive(d0));
   } catch (e) { caja.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">No se pudo cargar. Revisa la conexión.</span></div>'; return; }
   const gente = new Map();
   for (const r of resFilas) {
@@ -1210,7 +1697,7 @@ async function generarResumen(dia, clave, formato){
   let media = null;
   try {
     const desde = new Date(d0); desde.setDate(desde.getDate() - 30);
-    const hist = await rpc("vin_log_lista", { p_from: startOfDay(desde).toISOString(), p_to: startOfDay(d0).toISOString() }) || [];
+    const hist = await Datos.lista(startOfDay(desde), startOfDay(d0));
     const porDia = {};
     for (const r of hist) if (normNombre(r.worker_name) === clave) { const k = fechaLocal(new Date(r.client_at)); porDia[k] = (porDia[k] || 0) + 1; }
     const v = Object.values(porDia);
@@ -1276,23 +1763,46 @@ async function generarResumen(dia, clave, formato){
 /* ===================== Hoy ===================== */
 let todayRows = [];
 async function loadToday(){
-  const now = new Date();
+  const de = startOfDay(new Date()), a = endOfDayExclusive(new Date());
+  /* Primero lo que haya en memoria, aunque sea de hace un rato, para que
+     la lista salga al instante; lo fresco la repinta en cuanto llega. */
+  if (Datos.enMemoria() && !Datos.fresco() && !Datos.sucio()) { todayRows = Datos.entre(Datos.enMemoria(), de, a); renderTodayList(todayRows); }
   try {
-    const rows = await rpc("vin_log_lista", { p_from: startOfDay(now).toISOString(), p_to: endOfDayExclusive(now).toISOString() });
-    todayRows = rows || [];
-    renderTodayList(todayRows);
+    todayRows = await Datos.lista(de, a);
+    await renderTodayList(todayRows);
   } catch (e) { document.getElementById("todayList").innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">No se pudo cargar. Revisa la conexión.</span></div>'; }
 }
-function renderTodayList(rows){
-  const pend = getQueue().map((q, i) => ({ id: "cola-" + i, vin_full: q.p_vin_full, vin6: q.p_vin6, make: q.p_make, model: q.p_model, worker_name: q.p_worker_name, client_at: q.p_client_at, _pending: true }));
+async function renderTodayList(rows){
+  /* Lo que espera en la cola guarda su recorte con la clave provisional. */
+  const pend = (await getQueue()).map((q, i) => ({ id: "cola-" + i, _clave: claveCola(q), vin_full: q.p_vin_full, vin6: q.p_vin6, make: q.p_make, model: q.p_model, worker_name: q.p_worker_name, client_at: q.p_client_at, _pending: true }));
   const list = pend.concat(rows);
-  const reps = repetidosDe(list, repHist);
+  /* Los repetidos salen de la misma descarga que la lista: ya está fresca. */
+  const reps = repetidosDe(list, Datos.enMemoria());
   document.getElementById("todayCount").textContent = list.length;
   pintarHoy(list, reps);
-  document.getElementById("todayList").innerHTML = list.length ? list.map(r => rowHTML(r, reps.get(String(r.id)))).join("")
+  const caja = document.getElementById("todayList");
+  caja.innerHTML = list.length ? list.map(r => rowHTML(r, reps.get(String(r.id)))).join("")
     : '<div class="fila"><span class="mas" style="color:var(--sec)">Todavía no hay autos hoy. Escanea el primero.</span></div>';
-  document.querySelectorAll("#todayList .vrow[data-id]").forEach(el => el.onclick = () => openEditFromId(el.dataset.id, todayRows));
-  if (!repFresco()) historialRepetidos().then(h => { if (h) renderTodayList(todayRows); });
+  caja.querySelectorAll(".vrow[data-id]").forEach(el => el.onclick = () => openEditFromId(el.dataset.id, todayRows));
+  cargarMiniaturas(caja);
+}
+/* Las miniaturas del VIN se ponen después de pintar la lista, una a una y
+   sólo las 30 primeras: salen de IndexedDB y la lista no espera por ellas.
+   Si la lista se repinta a medias, lo que quedaba de la tanda anterior se
+   deja (las filas ya no existen). */
+const ICO_MINI = '<svg class="gcico" viewBox="0 0 24 24" aria-hidden="true"><use href="#ico-vehicle"/></svg>';
+function miniHTML(clave){ return '<span class="mini" data-mini="' + esc(clave) + '">' + ICO_MINI + '</span>'; }
+async function cargarMiniaturas(caja){
+  if (!window.InformeDia || !InformeDia.leerRecorte) return;
+  const huecos = [...caja.querySelectorAll(".mini[data-mini]")].slice(0, 30);
+  for (const m of huecos) {
+    if (!m.isConnected) return;
+    let rc = null;
+    try { rc = await InformeDia.leerRecorte(m.dataset.mini); } catch (e) {}
+    if (!rc || !m.isConnected) continue;
+    const img = new Image(); img.alt = ""; img.src = rc;
+    m.replaceChildren(img);
+  }
 }
 /* La tarjeta grande de arriba: cuántos van hoy, a qué hora el último y a
    qué ritmo, y cuántos repetidos. */
@@ -1329,17 +1839,18 @@ function moverLente(){
   l.style.transform = "translateX(" + b.offsetLeft + "px)";
 }
 
-/* Una fila por auto: los seis últimos del VIN delante, grandes, que es lo
-   que se busca; marca y modelo, y debajo quién y a qué hora. */
+/* Una fila por auto: la miniatura del VIN, los seis últimos grandes, que
+   es lo que se busca, y debajo quién lo hizo y la marca; la hora a la derecha. */
 function rowHTML(r, repetido){
   const time = new Date(r.client_at).toLocaleTimeString("es-AU", { hour: "2-digit", minute: "2-digit" });
   const makeModel = [r.make, r.model].filter(Boolean).join(" ");
   const idAttr = r._pending ? "" : ' data-id="' + esc(r.id) + '" role="button" tabindex="0"';
-  const sub = repetido ? ETIQ_REP + esc(textoRepetido(repetido))
-    : r._pending ? "Pendiente de subir" : esc(makeModel || "Sin marca ni modelo");
-  return '<div class="fila vrow' + (r._pending ? " pending" : "") + (repetido ? " repetido" : "") + '"' + idAttr + '>' +
-    '<span class="vin6">' + esc(r.vin6 || "—") + '</span>' +
-    '<span class="mas">' + esc(r.worker_name || "") +
+  const quien = esc(r.worker_name || "");
+  const sub = repetido ? (quien ? quien + " · " : "") + ETIQ_REP + esc(textoRepetido(repetido))
+    : [quien, r._pending ? "Pendiente de subir" : esc(makeModel || "Sin marca ni modelo")].filter(Boolean).join(" · ");
+  return '<div class="fila vrow con-mini' + (r._pending ? " pending" : "") + (repetido ? " repetido" : "") + '"' + idAttr + '>' +
+    miniHTML(r._pending ? r._clave : r.id) +
+    '<span class="mas"><span class="vin6">' + esc(r.vin6 || "—") + '</span>' +
       '<span class="sub">' + sub + '</span></span>' +
     '<span class="val">' + time + '</span>' + (r._pending ? "" : CHEV) + '</div>';
 }
@@ -1386,15 +1897,22 @@ async function loadReport(){
   /* El período anterior, del mismo largo, para comparar. Si falla, el
      reporte sale igual, sin comparación. */
   const ant = periodoAnterior(range);
-  const previo = rpc("vin_log_lista", { p_from: ant.from.toISOString(), p_to: ant.to.toISOString() }).catch(() => null);
+  const previo = Datos.lista(ant.from, ant.to).catch(() => null);
+  /* Un período reciente sale de memoria al instante y uno viejo tarda en
+     llegar de la red: si se cambia de período mientras tanto, la respuesta
+     lenta no puede pintar sus filas bajo la cabecera del otro. */
+  const mia = ++repPeticion;
   try {
-    repRows = await rpc("vin_log_lista", { p_from: range.from.toISOString(), p_to: range.to.toISOString() }) || [];
-    repPrev = await previo; renderReport();
-    if (!repFresco()) historialRepetidos().then(h => { if (h) renderReport(); });
+    const filas = await Datos.lista(range.from, range.to), antes = await previo;
+    if (mia !== repPeticion) return;
+    repRows = filas; repPrev = antes; renderReport();
+    /* Un período antiguo viene de la red y los repetidos de la memoria de
+       Datos: si está vieja, se refresca y se repinta una vez. */
+    if (!Datos.fresco()) Datos.todo().then(() => { if (mia === repPeticion) renderReport(); }, () => {});
   }
-  catch (e) { box.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">No se pudo cargar el reporte. Revisa la conexión.</span></div>'; }
+  catch (e) { if (mia !== repPeticion) return; box.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">No se pudo cargar el reporte. Revisa la conexión.</span></div>'; }
 }
-let repMarcas = new Map(), repPrev = null;
+let repMarcas = new Map(), repPrev = null, repPeticion = 0;
 const NOMBRE_PERIODO = { day: ["día", "días"], week: ["semana", "semanas"], fortnight: ["quincena", "quincenas"], month: ["mes", "meses"], semester: ["semestre", "semestres"] };
 function periodoAnterior(r){
   if (repPeriod === "month") return { from: new Date(r.from.getFullYear(), r.from.getMonth() - 1, 1), to: new Date(r.from) };
@@ -1445,7 +1963,7 @@ function cubetasTendencia(range, filas, previas){
 }
 function renderReport(){
   const total = repRows.length;
-  repMarcas = repetidosDe(repRows, repHist);
+  repMarcas = repetidosDe(repRows, Datos.enMemoria());
   const range = periodRange(repPeriod, repAnchor);
   const [uno] = NOMBRE_PERIODO[repPeriod];
   const actual = (range.from <= new Date() && new Date() < range.to)
@@ -1453,7 +1971,7 @@ function renderReport(){
     : (repPeriod === "month" || repPeriod === "semester" ? "el " : "la ") + uno + " elegid" + (repPeriod === "month" || repPeriod === "semester" ? "o" : "a");
   const anterior = repPeriod === "day" ? "día anterior" : uno + " anterior";
   const cubetas = cubetasTendencia(range, repRows, repPrev);
-  Graficos.indicadores(document.getElementById("rep_kpis"), { filas: repRows, anteriores: repPrev, nombreAnterior: anterior,
+  Graficos.indicadores(document.getElementById("rep_kpis"), { filas: repRows, anteriores: repPrev, nombreAnterior: anterior, periodo: repPeriod,
     repetidos: repMarcas.size, serie: cubetas.filter(c => !c.futuro).map(c => c.n) });
   document.getElementById("rep_tendTit").textContent = repPeriod === "day" ? "Autos por hora" : repPeriod === "semester" ? "Autos por semana" : "Autos por día";
   Graficos.tendencia(document.getElementById("rep_tend"), { cubetas,
@@ -1660,6 +2178,9 @@ function capasAhora(){
   if (tabActual !== "registrar") l.push("tab");
   document.querySelectorAll(".scrim.open").forEach(e => l.push(e));
   document.querySelectorAll("body > .lv, body > .ifd").forEach(e => l.push(e));
+  /* Cambiar el PIN se cancela con "atrás"; la entrada no: sin sesión no
+     hay nada detrás a lo que volver. */
+  if (Pin.enCambio()) l.push(document.getElementById("pin"));
   return l;
 }
 function sincronizarAtras(){
@@ -1699,8 +2220,16 @@ new MutationObserver(() => {
 }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
 
 function showTab(name){
+  const cambia = tabActual !== name;
   tabActual = name;
-  ["registrar", "pendientes", "reportes", "ajustes"].forEach(t => { document.getElementById("tab-" + t).hidden = t !== name; });
+  ["registrar", "pendientes", "reportes", "ajustes"].forEach(t => {
+    const s = document.getElementById("tab-" + t);
+    s.hidden = t !== name;
+    /* La entrada animada sólo al cambiar de verdad; se quita y se vuelve a
+       poner para que arranque de cero aunque la anterior no acabara. */
+    s.classList.remove("entra");
+    if (t === name && cambia) { void s.offsetWidth; s.classList.add("entra"); }
+  });
   document.querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
   moverLente();
   sincronizarAtras();
@@ -1730,14 +2259,19 @@ async function loadPendientes(){
     caja.innerHTML = pendientes.map(e => {
       const cuando = new Date(e.client_at).toLocaleString("es-AU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
       const rp = reps.get(String(e.id));
-      return '<div class="fila' + (rp ? " repetido" : "") + '" data-id="' + esc(e.id) + '" role="button" tabindex="0">' +
-        '<span class="punto ' + (ESTADO[e.vin_estado] ? e.vin_estado : "") + '"></span>' +
-        '<span class="mas">' + esc(e.vin_full || (e.vin6 ? "…" + e.vin6 : "Sin chasis")) +
+      /* El estado va como texto pequeño de su color, no como un punto suelto:
+         "Revísalo" se entiende; un círculo ámbar hay que adivinarlo. */
+      const estado = '<span class="estado ' + (ESTADO[e.vin_estado] ? e.vin_estado : "") + '">' + (ESTADO[e.vin_estado] || "Sin leer todavía") + '</span>';
+      return '<div class="fila con-mini' + (rp ? " repetido" : "") + '" data-id="' + esc(e.id) + '" role="button" tabindex="0">' +
+        miniHTML(e.id) +
+        '<span class="mas"><span class="' + (e.vin_full || e.vin6 ? "vin" : "sin-vin") + '">' + esc(e.vin_full || (e.vin6 ? "…" + e.vin6 : "Sin chasis")) + '</span>' +
           '<span class="sub">' + (rp ? ETIQ_REP + esc(textoRepetido(rp))
-            : (ESTADO[e.vin_estado] || "Sin leer todavía") + (e.worker_name ? ", " + esc(e.worker_name) : "")) + '</span></span>' +
-        '<span class="val">' + cuando + '</span>' + CHEV + '</div>';
+            : estado + (e.worker_name ? " · " + esc(e.worker_name) : "")) + '</span>' +
+          '<span class="sub">' + cuando + '</span></span>' +
+        CHEV + '</div>';
     }).join("");
     caja.querySelectorAll("[data-id]").forEach(el => el.onclick = () => abrirConfirmacion(el.dataset.id));
+    cargarMiniaturas(caja);
     renderPendientesBadge();
   } catch (e) { caja.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">No se pudo cargar. Revisa la conexión.</span></div>'; }
 }
@@ -1778,7 +2312,17 @@ function opciones(sel, valores, sufijo){
   });
 }
 
+/* Las filas del PIN en Ajustes: mientras la base no tenga el PIN activado
+   se dice ahí mismo qué falta, en vez de dejar botones que no hacen nada. */
+function pintarAcceso(){
+  document.getElementById("pin_cambiar").disabled = pinSinActivar;
+  document.getElementById("pin_salir").disabled = pinSinActivar;
+  document.getElementById("pin_nota").textContent = pinSinActivar
+    ? "Falta activar el PIN en la base: pega la migración vin_log_pin_de_entrada en el SQL Editor de Supabase. Hasta entonces la app entra sin clave."
+    : "El PIN es uno para todo el equipo. Al salir, este teléfono vuelve a pedirlo; los demás siguen dentro.";
+}
 async function loadEspacio(){
+  pintarAcceso();
   const sel = document.getElementById("esp_dias");
   const libSel = document.getElementById("esp_libDias");
   const borSel = document.getElementById("esp_borrarDias");
@@ -1867,6 +2411,11 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("photoScrim_close").onclick = closePhotoLightbox;
   document.getElementById("set_supervisor").value = getSupervisorName();
   document.getElementById("set_supervisorSave").onclick = () => { setSupervisorName(document.getElementById("set_supervisor").value.trim()); pintarSaludo(); toast("✓ Guardado"); };
+  document.getElementById("pin_cambiar").onclick = () => Pin.cambiar();
+  document.getElementById("pin_salir").onclick = async () => {
+    if (!(await preguntar("Salir de este teléfono", "Este teléfono volverá a pedir el PIN del equipo. Los demás siguen dentro.", "Salir"))) return;
+    Pin.salir();
+  };
   /* Una X en cada ventana, puesta desde aqui y no en el marcado, para que
      ninguna se quede sin ella al añadir otra mas adelante. Cada una sabe
      como cerrarse: no es lo mismo descartar una foto que cancelar una
@@ -1984,9 +2533,9 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("rep_next").onclick = () => { shiftAnchor(1); loadReport(); };
   document.getElementById("rep_export").onclick = exportReportCSV;
   document.getElementById("rep_pdf").onclick = () => window.print();
-  loadToday();
-  renderQueueBadge();
-  flushQueue();
+  /* Sin sesión en este teléfono no se pide nada a la base: primero el PIN. */
+  const arrancar = () => { loadToday(); renderQueueBadge(); flushQueue(); };
+  if (getToken()) arrancar(); else Pin.pedir().then(arrancar);
 });
 </script>
 </body>

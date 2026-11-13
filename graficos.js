@@ -4,7 +4,8 @@
    Antes había uno solo (autos por día, con Chart.js). Ahora cada gráfico
    contesta una pregunta del jefe:
 
-     indicadores    ¿cómo vamos frente al período anterior?
+     indicadores    ¿cómo vamos frente al período anterior, y cuál fue el
+                    mejor día? (si hay VIN repetidos, una banda roja arriba)
      tendencia      ¿qué días (u horas) se hizo más, y frente a antes?
      calor          ¿a qué día y hora se trabaja? (para los turnos)
      trabajadores   ¿quién hace cuántos, a qué ritmo y cuánto cambió?
@@ -19,6 +20,10 @@
 
    Cada marca lleva data-tip: al pasar el dedo o el ratón sale el dato
    exacto. El área que responde es más grande que la marca.
+
+   El CSS vive en index.html. Lo poco que sólo necesita este archivo (la
+   banda de repetidos y el tamaño del indicador de ritmo) se inyecta una
+   vez como <style id="viz-extra">, con las mismas variables de la app.
    ============================================================ */
 ;(function () {
   'use strict'
@@ -124,7 +129,46 @@
   }
 
   /* ---------- 1. Indicadores frente al período anterior ---------- */
+  /* Estilos propios de este archivo, una sola vez. La banda ocupa las dos
+     columnas de la rejilla de indicadores; el tamaño chico del ritmo va por
+     clase y no por posición, porque con la banda delante el ritmo deja de
+     ser el tercer hijo. */
+  function estilosExtra () {
+    if (document.getElementById('viz-extra')) return
+    const s = document.createElement('style')
+    s.id = 'viz-extra'
+    s.textContent = '.kpi-banda{grid-column:1/-1;display:flex;align-items:center;gap:10px;min-height:44px;padding:10px 16px;' +
+      'border-radius:16px;background:linear-gradient(rgba(229,53,43,.1),rgba(229,53,43,.1)) var(--celda);box-shadow:var(--sombra);' +
+      'color:var(--rojo);font-size:14.5px;line-height:19px;font-weight:700}' +
+      '.kpi-banda svg{width:20px;height:20px;flex:none;fill:currentColor}.kpi-banda b{font-weight:800;letter-spacing:.3px}' +
+      '.kpi.kpi-chico .kpi-v{font-size:22px;line-height:36px;letter-spacing:-.4px}' +
+      '.kpis .kpi:nth-child(3):not(.kpi-chico) .kpi-v{font-size:30px;letter-spacing:-.8px}'
+    document.head.appendChild(s)
+  }
+  /* El día del período con más autos: cuántos y qué día ("mié 23"). */
+  function mejorDia (filas, conMes) {
+    const porDia = new Map()
+    for (const r of filas) {
+      const d = new Date(r.client_at); if (isNaN(d)) continue
+      const k = claveDia(d)
+      if (!porDia.has(k)) porDia.set(k, { fecha: d, n: 0 })
+      porDia.get(k).n++
+    }
+    /* Con empate gana el primero del período, y se dice que hubo más. El
+       mes va siempre salvo en la semana: en un semestre "mié 23" no dice
+       cuál. */
+    let mejor = null, iguales = 0
+    for (const x of [...porDia.values()].sort((a, b) => a.fecha - b.fecha)) {
+      if (!mejor || x.n > mejor.n) { mejor = x; iguales = 0 } else if (x.n === mejor.n) iguales++
+    }
+    if (!mejor) return null
+    const f = mejor.fecha
+    const mes = conMes ? ' ' + f.toLocaleDateString('es-AU', { month: 'short' }).replace('.', '') : ''
+    return { n: mejor.n, etq: DIAS[diaSemana(f)].slice(0, 3).toLowerCase() + ' ' + f.getDate() + mes +
+      (iguales ? ' y ' + iguales + (iguales === 1 ? ' día más' : ' días más') : '') }
+  }
   function indicadores (cont, o) {
+    estilosExtra()
     const a = resumen(o.filas), p = resumen(o.anteriores || [])
     const delta = (va, vp, mejorSiBaja, fmt) => {
       if (va == null || vp == null || !o.anteriores || !o.anteriores.length) return '<span class="kpi-d">Sin datos del ' + esc(o.nombreAnterior) + '</span>'
@@ -140,11 +184,25 @@
       { k: 'Por día trabajado', v: a.dias ? num(a.porDia, 1) : '—', s: a.dias ? 'en ' + a.dias + (a.dias === 1 ? ' día' : ' días') : '',
         d: a.dias ? delta(a.porDia, p.dias ? p.porDia : null, false, x => num(x, 1)) : '' },
       { k: 'Ritmo', v: a.ritmo == null ? '—' : '1 cada ' + Math.round(a.ritmo) + ' min', s: 'mediana entre autos seguidos',
-        d: a.ritmo == null ? '' : delta(a.ritmo, p.ritmo, true, x => Math.round(x) + ' min') },
-      { k: 'VIN repetidos', v: num(o.repetidos || 0), s: o.repetidos ? 'revisa los marcados en rojo' : 'ningún auto apuntado dos veces',
-        alerta: !!o.repetidos }
+        d: a.ritmo == null ? '' : delta(a.ritmo, p.ritmo, true, x => Math.round(x) + ' min'), chico: true }
     ]
-    cont.innerHTML = tiles.map((t, i) => '<div class="kpi' + (t.alerta ? ' alerta' : '') + '"><span class="kpi-k">' + esc(t.k) + '</span>' +
+    /* El cuarto: el mejor día del período. Si el período es un solo día no
+       hay nada que comparar y se enseña cuántas personas trabajaron. */
+    /* Lo decide el período elegido, no cuántos días tienen autos: una
+       semana con un solo día trabajado sigue enseñando su mejor día. */
+    const mejor = mejorDia(o.filas, o.periodo !== 'week')
+    if (o.periodo ? o.periodo === 'day' : a.dias <= 1) {
+      const gente = new Set(o.filas.map(r => String(r.worker_name || '').trim().toLowerCase()).filter(Boolean)).size
+      tiles.push({ k: 'Personas', v: gente ? num(gente) : '—', s: gente === 1 ? 'una sola persona registró' : gente ? 'registraron autos este día' : '' })
+    } else {
+      tiles.push({ k: 'Mejor día', v: mejor ? num(mejor.n) : '—', s: mejor ? mejor.etq : '' })
+    }
+    /* Los repetidos ya no son un indicador que casi siempre dice 0: cuando
+       los hay, una banda roja encima de los cuatro, que no se puede pasar
+       por alto. Siempre hay cuatro .kpi en el DOM. */
+    const banda = o.repetidos ? '<div class="kpi-banda" role="alert"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.5 19 18H1Zm0 5.5a1 1 0 0 0-1 1v4a1 1 0 0 0 2 0V8a1 1 0 0 0-1-1Zm0 8.5a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4Z"/></svg>' +
+      '<span><b>VIN REPETIDO</b> · ' + num(o.repetidos) + (o.repetidos === 1 ? ' registro' : ' registros') + ': revisa los marcados en rojo</span></div>' : ''
+    cont.innerHTML = banda + tiles.map((t, i) => '<div class="kpi' + (t.chico ? ' kpi-chico' : '') + '"><span class="kpi-k">' + esc(t.k) + '</span>' +
       '<b class="kpi-v">' + esc(t.v) + '</b>' + (t.s ? '<span class="kpi-s">' + esc(t.s) + '</span>' : '') + (t.d || '') +
       (t.spark ? '<svg class="kpi-spark" data-i="' + i + '" aria-hidden="true"></svg>' : '') + '</div>').join('')
     const sp = cont.querySelector('.kpi-spark')
