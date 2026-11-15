@@ -224,11 +224,14 @@ input.inp:focus,select.inp:focus,textarea.inp:focus{outline:none;border-color:va
 input.inp::placeholder,textarea.inp::placeholder{color:var(--ter)}
 textarea.inp{display:block;min-height:76px;resize:vertical;font-family:inherit;line-height:22px}
 /* Novedades del auto: las de siempre a un toque y, debajo, texto libre. */
+.caja-extra{display:flex;flex-direction:column;gap:10px;padding:14px;margin:0 0 16px;border:1.5px solid var(--sep);border-radius:14px}
+.caja-tit{font-size:15.5px;font-weight:700;color:var(--texto)}
+.etiq.seg button{min-width:58px}
 .novedades{display:flex;flex-direction:column;gap:9px;font-size:14px;font-weight:600;color:var(--sec);margin:0 0 16px}
 .etiq{display:flex;flex-wrap:wrap;gap:8px}
 .etiq button{min-height:42px;padding:8px 14px;border-radius:21px;border:1px solid var(--sep);background:var(--celda);color:var(--texto);
   font-size:15px;font-weight:600;line-height:20px;text-align:left}
-.etiq button[aria-pressed=true]{background:var(--boton);border-color:var(--boton);color:#fff}
+.etiq button[aria-pressed=true],.etiq button[aria-checked=true]{background:var(--boton);border-color:var(--boton);color:#fff}
 .etiq button[aria-pressed=true]::before{content:"✓ "}
 .fila .sub.nov{color:var(--tinte);font-weight:600}
 .nov-et{display:inline-block;font-size:12.5px;line-height:18px;font-weight:700;color:var(--tinte);background:var(--relleno2);
@@ -770,9 +773,17 @@ main>section.entra{animation:entra .16s ease-out}
     <h3>Guardar sólo la foto</h3>
     <img id="cap_foto" alt="Foto del VIN">
     <label class="f">Trabajador<input class="inp" id="cap_worker" autocapitalize="words" enterkeyhint="done" placeholder="ej. Dani"></label>
+    <div class="caja-extra">
+      <span class="caja-tit" id="cap_eqTit">¿Cuántas personas hicieron este auto?</span>
+      <div class="etiq seg" id="cap_equipo" role="radiogroup" aria-labelledby="cap_eqTit"></div>
+      <input class="inp" id="cap_con" autocapitalize="words" enterkeyhint="done" maxlength="55" placeholder="¿Con quién? ej. Pedro, Juan" aria-label="Con quién lo hizo" hidden>
+    </div>
+    <div class="caja-extra">
+      <label class="caja-tit" for="cap_notas">Notas importantes</label>
+      <textarea class="inp" id="cap_notas" rows="3" maxlength="1000" placeholder="ej. rayón en la puerta, el cliente pidió algo, tardó por el barro"></textarea>
+      <div class="etiq" id="cap_etiq" role="group" aria-label="Notas rápidas"></div>
+    </div>
     <label class="f">Supervisor<input class="inp" id="cap_supervisor" autocapitalize="words" enterkeyhint="done" placeholder="ej. Raúl"></label>
-    <div class="novedades"><span id="cap_novTit">Novedades (opcional)</span><div class="etiq" id="cap_etiq" role="group" aria-labelledby="cap_novTit"></div>
-      <textarea class="inp" id="cap_notas" rows="2" maxlength="1000" placeholder="Algo más que contar, ej. llegó con barro seco" aria-labelledby="cap_novTit"></textarea></div>
     <p class="hint">El lector intenta leerla por su cuenta; lo que no consiga queda en Por confirmar.</p>
     <button class="primary" id="cap_save" type="button">Guardar y escanear otro</button>
     <button class="secondary" id="cap_cancel" type="button">Cancelar</button>
@@ -815,10 +826,18 @@ main>section.entra{animation:entra .16s ease-out}
     <label class="f">Modelo (opcional)<input class="inp" id="rev_model" placeholder="ej. CX-5"></label>
     <label class="f">Color (opcional)<input class="inp" id="rev_color" placeholder="ej. Blanco"></label>
     <label class="f">Trabajador<input class="inp" id="rev_worker" autocapitalize="words" enterkeyhint="done" placeholder="Quién lavó el auto"></label>
+    <div class="caja-extra">
+      <span class="caja-tit" id="rev_eqTit">¿Cuántas personas hicieron este auto?</span>
+      <div class="etiq seg" id="rev_equipo" role="radiogroup" aria-labelledby="rev_eqTit"></div>
+      <input class="inp" id="rev_con" autocapitalize="words" enterkeyhint="done" maxlength="55" placeholder="¿Con quién? ej. Pedro, Juan" aria-label="Con quién lo hizo" hidden>
+    </div>
+    <div class="caja-extra">
+      <label class="caja-tit" for="rev_notas">Notas importantes</label>
+      <textarea class="inp" id="rev_notas" rows="3" maxlength="1000" placeholder="ej. rayón en la puerta, el cliente pidió algo, tardó por el barro"></textarea>
+      <div class="etiq" id="rev_etiq" role="group" aria-label="Notas rápidas"></div>
+    </div>
     <label class="f">Supervisor<input class="inp" id="rev_supervisor" autocapitalize="words" enterkeyhint="done" placeholder="Quién sube esta foto"></label>
     <label class="f">Fecha y hora<input class="inp" type="datetime-local" id="rev_when"></label>
-    <div class="novedades"><span id="rev_novTit">Novedades (opcional)</span><div class="etiq" id="rev_etiq" role="group" aria-labelledby="rev_novTit"></div>
-      <textarea class="inp" id="rev_notas" rows="2" maxlength="1000" placeholder="Algo más que contar, ej. llegó con barro seco" aria-labelledby="rev_novTit"></textarea></div>
     <button class="primary" id="rev_save" type="button">Guardar</button>
     <button class="secondary danger" id="rev_delete" type="button" hidden>Eliminar registro</button>
     <button class="secondary" id="rev_cancel" type="button">Cancelar</button>
@@ -1253,22 +1272,44 @@ function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "
 /* Lo que pasa con un auto y no es el chasis. Las de siempre van a un toque
    y se guardan con su texto tal cual, para que reportes, CSV y resumen las
    enseñen sin traducir; lo demás, en la nota libre. */
-const NOVEDADES = ["Sin libro de mantenimiento", "Sin sticker de VIN", "Trabajo difícil", "Entre 2 personas"];
+const NOVEDADES = ["Sin libro de mantenimiento", "Sin sticker de VIN", "Trabajo difícil"];
+/* Cuántos lo hicieron: va como etiqueta ("Entre 3 personas", "Con: Pedro,
+   Juan") para que reportes y CSV lo enseñen sin más. */
+const EQUIPO = [["1", "Solo"], ["2", "2"], ["3", "3"], ["4", "4 o más"]];
+const etiqEquipo = n => n === "4" ? "Entre 4 o más personas" : "Entre " + n + " personas";
+function marcarEquipo(pref, n){
+  document.querySelectorAll("#" + pref + "_equipo button").forEach(b => b.setAttribute("aria-checked", String(b.dataset.n === n)));
+  const con = document.getElementById(pref + "_con"); con.hidden = n === "1"; if (n === "1") con.value = "";
+}
 function montarNovedades(pref){
   const caja = document.getElementById(pref + "_etiq");
   caja.innerHTML = NOVEDADES.map(t => '<button type="button" aria-pressed="false">' + esc(t) + "</button>").join("");
   caja.querySelectorAll("button").forEach(b => b.onclick = () => b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true")));
+  const eq = document.getElementById(pref + "_equipo");
+  eq.innerHTML = EQUIPO.map(([n, t]) => '<button type="button" role="radio" aria-checked="false" data-n="' + n + '">' + esc(t) + "</button>").join("");
+  eq.querySelectorAll("button").forEach(b => b.onclick = () => marcarEquipo(pref, b.dataset.n));
+  marcarEquipo(pref, "1");
 }
 function ponerNovedades(pref, etiquetas, notas){
-  const marcadas = new Set(etiquetas || []);
+  const l = etiquetas || [];
+  const marcadas = new Set(l);
   document.querySelectorAll("#" + pref + "_etiq button").forEach(b => b.setAttribute("aria-pressed", String(marcadas.has(b.textContent))));
+  const e = l.find(x => /^Entre \d/.test(x)); const m = e && e.match(/^Entre (\d)/);
+  marcarEquipo(pref, m ? String(Math.min(4, +m[1])) : "1");
+  const con = l.find(x => /^Con: /.test(x));
+  if (con) document.getElementById(pref + "_con").value = con.slice(5);
   document.getElementById(pref + "_notas").value = notas || "";
 }
 function leerNovedades(pref){
-  return {
-    etiquetas: [...document.querySelectorAll("#" + pref + "_etiq button[aria-pressed=true]")].map(b => b.textContent),
-    notas: document.getElementById(pref + "_notas").value.trim()
-  };
+  const etiquetas = [...document.querySelectorAll("#" + pref + "_etiq button[aria-pressed=true]")].map(b => b.textContent);
+  const sel = document.querySelector("#" + pref + "_equipo button[aria-checked=true]");
+  const n = sel ? sel.dataset.n : "1";
+  if (n !== "1") {
+    etiquetas.push(etiqEquipo(n));
+    const con = document.getElementById(pref + "_con").value.trim();
+    if (con) etiquetas.push("Con: " + con);
+  }
+  return { etiquetas, notas: document.getElementById(pref + "_notas").value.trim() };
 }
 const tieneNovedades = r => !!((r.etiquetas && r.etiquetas.length) || r.notas);
 /* En una línea: "Sin libro de mantenimiento, Entre 2 personas. Llegó con barro". */

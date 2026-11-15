@@ -115,14 +115,14 @@
        - "tipico" es la mediana (un auto raro no la mueve) y "autosHora"
          sale del tiempo trabajando, no del reloj. */
   /* La jornada de siempre: más o menos de 9 a 4, y un break sin pagar de
-     13:00 a 13:35. Las horas de entrada y salida varían, así que no se
+     13:00 a 13:30. Las horas de entrada y salida varían, así que no se
      recorta nada fuera de ese horario: sólo
        - el break se descuenta de la espera que lo atraviesa (un auto que
          empezó 12:50 y se registró 13:55 son 30 min de trabajo, no 65);
        - el primer auto del día cuenta desde las 9:00, si se registró
          después; si alguien llegó tarde esa espera sale larga y cae como
          pausa, igual que cualquier otra. */
-  const JORNADA = { inicio: 9 * 60, breakDe: 13 * 60, breakA: 13 * 60 + 35 }
+  const JORNADA = { inicio: 9 * 60, breakDe: 13 * 60, breakA: 13 * 60 + 30 }
   function minutosSinBreak (a, b) {
     const d = new Date(a), x = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60
     const g = (b - a) / 60000, y = x + g
