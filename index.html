@@ -200,7 +200,6 @@ button.fila:active,label.fila:active,a.fila:active,.fila[data-id]:active{backgro
 .aviso-rep{background:rgba(201,48,42,.09);color:var(--rojo);border-radius:12px;padding:14px 16px;margin:0 0 16px;font-size:15px;line-height:1.35}
 .aviso-rep b{display:block;font-size:17px;font-weight:800;margin-bottom:2px}
 #rep_insightsList li.mal{color:var(--rojo);font-weight:700}
-#askScrim.repetido #ask_title{color:var(--rojo)}
 
 /* ---- Botones ---- */
 button.primary,.boton{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:54px;
@@ -386,6 +385,8 @@ nav.tabs button.active .ic{stroke-width:2.2}
 .scrim{position:fixed;inset:0;background:rgba(2,20,10,.38);display:flex;align-items:flex-end;opacity:0;pointer-events:none;
   transition:opacity .25s;z-index:30}
 .scrim.open{opacity:1;pointer-events:auto}
+/* La pregunta va siempre encima de la ficha que la abre. */
+#askScrim{z-index:31}
 .sheet{position:relative;background:var(--hoja);width:100%;max-width:680px;margin:0 auto;max-height:94vh;max-height:94dvh;
   overflow:auto;border-radius:18px 18px 0 0;padding:22px 18px calc(22px + env(safe-area-inset-bottom));
   transform:translateY(100%);transition:transform .4s cubic-bezier(.32,.72,0,1);scroll-padding-top:64px}
@@ -439,9 +440,9 @@ nav.tabs button.active .ic{stroke-width:2.2}
 .toast{position:fixed;left:50%;bottom:calc(78px + env(safe-area-inset-bottom));transform:translate(-50%,12px);
   background:rgba(8,32,18,.88);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);color:#fff;padding:13px 20px;border-radius:12px;
   font-size:15px;font-weight:600;line-height:20px;box-shadow:0 10px 30px rgba(4,33,15,.25);
-  opacity:0;transition:opacity .2s,transform .2s;z-index:50;max-width:min(88vw,420px);text-align:center;pointer-events:none}
+  opacity:0;transition:opacity .2s,transform .2s;z-index:2147483500;max-width:min(88vw,420px);text-align:center;pointer-events:none}
 .toast.show{opacity:1;transform:translate(-50%,0)}
-.toast.mal{background:rgba(180,30,24,.94)}
+.toast.mal{background:#c9302a;font-weight:700}
 
 /* ---- La pantalla del PIN ----
    Tapa la app entera hasta que este teléfono tiene su sesión. El teclado
@@ -1182,12 +1183,12 @@ function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "
 /* El aviso breve. Los mensajes del código empiezan con un signo (✓, ⚠︎,
    📶): aquí decide el color y se quita, para que en pantalla quede sólo
    la frase, como en los avisos del sistema. */
-let tT; function toast(m){
+let tT; function toast(m, ms){
   const t = document.getElementById("toast");
   const mal = /^\s*⚠/.test(m);
   t.textContent = String(m).replace(/^\s*(✓|⚠︎?|📶)\s*/u, "");
   t.classList.toggle("mal", mal);
-  t.classList.add("show"); clearTimeout(tT); tT = setTimeout(() => t.classList.remove("show"), 2600);
+  t.classList.add("show"); clearTimeout(tT); tT = setTimeout(() => t.classList.remove("show"), ms || 2600);
 }
 function getSupervisorName(){ try { return localStorage.getItem(LSKEY_SUPERVISOR) || ""; } catch (e) { return ""; } }
 function setSupervisorName(n){ try { localStorage.setItem(LSKEY_SUPERVISOR, n); } catch (e) {} }
@@ -1537,36 +1538,33 @@ function preguntar(titulo, texto, textoOk){
   });
 }
 
-/* Avisa si ese chasis ya se registro, sin impedirlo: un auto puede volver de
-   verdad. En los quince registros de prueba habia dos duplicados exactos del
-   mismo minuto —un doble toque en el boton—, y al dueño le pagan por auto
-   terminado, asi que un duplicado es una factura de mas.
-   Si la comprobacion falla por falta de señal no se bloquea el guardado:
-   quedarse sin registrar el auto es peor que registrarlo dos veces. */
-async function avisarSiRepetido(vinFull, vin6, excluir){
-  let previo = null;
+/* Busca si ese chasis ya se registró. No pregunta ni frena: un auto
+   puede volver de verdad, y la ventana de "¿registrarlo igual?" salía
+   detrás de la ficha y obligaba a guardar dos veces. Se guarda siempre y,
+   si es repetido, sale un aviso rojo bien visible; además queda en rojo
+   en la lista, en Por confirmar, en Reportes, en el CSV y en el resumen.
+   Sin señal no se sabe: devuelve null y se guarda igual. */
+async function buscarRepetido(vinFull, vin6, excluir){
   try {
     /* Por los seis últimos y no por el VIN entero: el lector puede leer mal
        el principio, y lo que se busca a ojo en la placa es el final. */
     const seis = claveVin({ vin_full: vinFull, vin6 });
-    if (!seis) return true;
+    if (!seis) return null;
     const r = await rpc("vin_log_repetidos", { p_vin_full: null, p_vin6: seis, p_excluir: excluir || null });
-    previo = Array.isArray(r) ? r[0] : r;
-  } catch (e) { return true; }
-  if (!previo || !previo.veces) return true;
-  const cuando = previo.ultima
-    ? new Date(previo.ultima).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
-    : "antes";
-  const quien = previo.quien ? " por " + previo.quien : "";
-  const scrim = document.getElementById("askScrim");
-  scrim.classList.add("repetido");
-  const seguir = await preguntar(
-    "VIN REPETIDO",
-    "Los últimos seis del VIN ya se registraron " + (previo.veces > 1 ? previo.veces + " veces, la última " : "") +
-    "el " + cuando + quien + ". Si el auto ha vuelto, regístralo igual. Si es por error, cancela.",
-    "Registrarlo igual");
-  scrim.classList.remove("repetido");
-  return seguir;
+    const previo = Array.isArray(r) ? r[0] : r;
+    if (!previo || !previo.veces) return null;
+    const cuando = previo.ultima
+      ? new Date(previo.ultima).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+      : "antes";
+    return "Los últimos seis, " + seis + ", ya se registraron " +
+      (previo.veces > 1 ? previo.veces + " veces, la última " : "") + "el " + cuando +
+      (previo.quien ? " por " + previo.quien : "") + ".";
+  } catch (e) { return null; }
+}
+/* El aviso del repetido: rojo, arriba de todo y más tiempo que un aviso
+   normal, para que se lea. */
+function avisarRepetido(texto, hecho){
+  toast("⚠︎ VIN REPETIDO — " + hecho.toLowerCase() + " igual. " + texto, 6500);
 }
 
 async function saveReview(){
@@ -1595,9 +1593,6 @@ async function saveReview(){
     finally { btn.disabled = false; btn.textContent = "Guardar"; }
     return;
   }
-  if (!(await avisarSiRepetido(fields.p_vin_full, fields.p_vin6, null))) {
-    btn.disabled = false; btn.textContent = "Guardar"; return;
-  }
   const photo = pendingReview ? pendingReview.photo : null;
   /* Sin foto no se registra. La foto es el respaldo de que el auto se hizo;
      un registro sin ella no demuestra nada, y en las pruebas aparecio uno
@@ -1609,6 +1604,7 @@ async function saveReview(){
   /* Esto ya lo acaba de revisar una persona, asi que entra confirmado y con
      su semaforo: mandarlo otra vez a "Por confirmar" seria trabajo inventado. */
   const vinRevisado = fields.p_vin_full;
+  const repetido = await buscarRepetido(fields.p_vin_full, fields.p_vin6, null);
   const params = { ...fields, p_client_at: clientAt, p_photo_data: await aligerarFoto(photo),
     p_confirmado: true,
     p_estado: vinRevisado ? vinSemaforo(vinRevisado) : null };
@@ -1617,7 +1613,8 @@ async function saveReview(){
     /* La foto del VIN, recortada, se queda en este teléfono para el resumen
        del día: así sale al momento, sin volver a buscarla en la foto. */
     if (nuevo && pendingReview && pendingReview.recorte) InformeDia.guardarRecorte(nuevo, pendingReview.recorte);
-    toast("✓ Registrado"); closeReview(); loadToday();
+    if (repetido) avisarRepetido(repetido, "Registrado"); else toast("✓ Registrado");
+    closeReview(); loadToday();
   } catch (e) {
     if (!valeEncolar(e)) {
       toast("⚠︎ No se pudo guardar: " + e.message);
@@ -2478,10 +2475,10 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("conf_ok").onclick = async () => {
     const vinFull = document.getElementById("conf_vinFull").value.trim().toUpperCase();
     const vin6 = document.getElementById("conf_vin6").value.trim().toUpperCase();
-    if (vinFull && !(await avisarSiRepetido(vinFull, vin6, confId))) return;
+    const repetido = vinFull || vin6 ? await buscarRepetido(vinFull, vin6, confId) : null;
     try {
       await rpc("vin_log_confirmar", { p_id: confId, p_vin_full: vinFull || null, p_vin6: vin6 || null });
-      toast("✓ Confirmado"); cerrarConfirmacion(); loadPendientes(); loadToday();
+      if (repetido) avisarRepetido(repetido, "Confirmado"); else toast("✓ Confirmado"); cerrarConfirmacion(); loadPendientes(); loadToday();
     } catch (e) { toast("⚠︎ No se pudo confirmar"); }
   };
   /* Volver a leer con el editor del lector, para cuando la lectura de fondo
