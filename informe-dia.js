@@ -187,7 +187,7 @@
       g.fillText(recortarTexto(g, [(d.fechaTexto || fechaLarga(d.fecha, d.idioma)), d.lugar].filter(Boolean).join(' · '), W - 120), M + 120, y + 174)
     } })
 
-    const kpis = (d.kpis || []).slice(0, 4)
+    const kpis = (d.kpis || []).slice(0, 6)
     if (kpis.length) {
       const filas = Math.ceil(kpis.length / 2), hk = 168, gap = 20
       out.push({ alto: 40 + filas * hk + (filas - 1) * gap, dibujar (g, y) {
@@ -282,7 +282,7 @@
     const autos = d.sinLista ? [] : (d.autos || [])
     if (!d.sinLista) out.push({ alto: 110, dibujar (g, y) {
       g.fillStyle = C.tinta; fuente(g, 800, 30)
-      g.fillText(L.vehiculos.replace('{n}', autos.length), M, y + 84)
+      g.fillText((d.tituloLista || L.vehiculos).replace('{n}', autos.length), M, y + 84)
     } })
     if (!autos.length && !d.sinLista) {
       out.push({ alto: 90, dibujar (g, y) { g.fillStyle = C.suave; fuente(g, 500, 24); g.fillText(L.ninguno, M, y + 50) } })
@@ -487,17 +487,22 @@
       if (src) { try { recortes[i] = await cargarImagen(src) } catch (e) {} }
       hechos++; if (alAvanzar) alAvanzar(hechos, autos.length)
     }
-    for (let i = 0; i < autos.length; i += 2) await Promise.all([uno(i), i + 1 < autos.length ? uno(i + 1) : null])
+    /* De cuatro en cuatro: con un mes entero, de dos en dos se hacía eterno. */
+    for (let i = 0; i < autos.length; i += 4) await Promise.all([0, 1, 2, 3].map(k => i + k < autos.length ? uno(i + k) : null))
     let logo = null
     if (d.marca && d.marca.logo) { try { logo = await cargarImagen(d.marca.logo) } catch (e) {} }
     const bs = bloques(d, L, recortes, logo)
     /* Sólo lo que se pidió: la foto o el PDF. Hacer los dos cada vez era
        el doble de espera para quien sólo quería uno. */
-    if (formato === 'pdf') {
+    /* Una foto de más de 30.000 puntos de alto no la pinta ningún teléfono
+       (un mes del equipo, con la foto de cada auto, pasa de ahí): entonces
+       sale en PDF, que va por páginas. */
+    const altoTotal = bs.reduce((a, b) => a + b.alto, 0)
+    if (formato === 'pdf' || altoTotal > 30000) {
       const paginas = pintarPaginas(bs, d, L)
       const vistas = []
       for (const c of paginas) vistas.push(await aBlob(c, 0.8))
-      return { pdf: await pdfDe(paginas), vistas }
+      return { pdf: await pdfDe(paginas), vistas, cambiado: formato !== 'pdf' }
     }
     const larga = pintarLarga(bs)
     const imagen = await aBlob(larga, 0.9)
@@ -509,14 +514,14 @@
     es: {
       titulo: 'Resumen del día', repetido: 'VIN REPETIDO', novedades: 'Novedades ({n})', conNovedad: 'NOVEDAD', vehiculos: 'Vehículos del día ({n})', ninguno: 'Ningún vehículo registrado este día.',
       pagina: 'Página {i} de {n}', preparando: 'Preparando el resumen…',
-      fotos: 'Preparando las fotos del VIN {i} de {n}…', compartir: 'Compartir', descargar: 'Descargar',
+      fotos: 'Preparando las fotos {i} de {n}…', compartir: 'Compartir', descargar: 'Descargar', largo: 'Son muchas fotos para una sola imagen: se preparó en PDF.',
       enFoto: 'en foto', enPdf: 'en PDF', cerrar: 'Cerrar', error: 'No se pudo preparar el resumen.',
       bajado: 'Guardado en Descargas'
     },
     en: {
       titulo: 'Daily summary', repetido: 'REPEATED VIN', novedades: 'Notes ({n})', conNovedad: 'NOTE', vehiculos: 'Vehicles of the day ({n})', ninguno: 'No vehicles recorded this day.',
       pagina: 'Page {i} of {n}', preparando: 'Preparing the summary…',
-      fotos: 'Preparing the VIN photos {i} of {n}…', compartir: 'Share', descargar: 'Download',
+      fotos: 'Preparing the photos {i} of {n}…', compartir: 'Share', descargar: 'Download', largo: 'Too many photos for one image: prepared as a PDF.',
       enFoto: 'as photo', enPdf: 'as PDF', cerrar: 'Close', error: 'The summary could not be prepared.',
       bajado: 'Saved to Downloads'
     }
@@ -612,14 +617,15 @@
     let hecho = null
     const urls = []
     const cerrar = () => { raiz.remove(); document.body.style.overflow = prev; urls.forEach(u => URL.revokeObjectURL(u)) }
-    const nombre = nombreArchivo(d) + (formato === 'pdf' ? '.pdf' : '.jpg')
-    const tipo = formato === 'pdf' ? 'application/pdf' : 'image/jpeg'
+    const esPdf = () => formato === 'pdf' || !!(hecho && hecho.pdf)
     raiz.onclick = async e => {
       const b = e.target.closest('[data-a]'); if (!b) return
       const a = b.dataset.a
       if (a === 'x') return cerrar()
       if (!hecho) return
-      const blob = formato === 'pdf' ? hecho.pdf : hecho.imagen
+      const blob = esPdf() ? hecho.pdf : hecho.imagen
+      const nombre = nombreArchivo(d) + (esPdf() ? '.pdf' : '.jpg')
+      const tipo = esPdf() ? 'application/pdf' : 'image/jpeg'
       if (a === 'compartir') {
         const r = await compartir(blob, nombre, tipo, titulo)
         if (r === 'descargado') nota.textContent = L.bajado
@@ -628,6 +634,7 @@
     generar(d, (i, n) => { estado.textContent = L.fotos.replace('{i}', i).replace('{n}', n) }, formato)
       .then(r => {
         hecho = r
+        if (r.cambiado) nota.textContent = L.largo
         const vista = raiz.querySelector('.ifd-vista'); vista.innerHTML = ''
         for (const v of r.vistas) {
           const u = URL.createObjectURL(v); urls.push(u)

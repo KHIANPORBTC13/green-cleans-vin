@@ -225,6 +225,12 @@ input.inp::placeholder,textarea.inp::placeholder{color:var(--ter)}
 textarea.inp{display:block;min-height:76px;resize:vertical;font-family:inherit;line-height:22px}
 /* Novedades del auto: las de siempre a un toque y, debajo, texto libre. */
 .caja-extra{display:flex;flex-direction:column;gap:10px;padding:14px;margin:0 0 16px;border:1.5px solid var(--sep);border-radius:14px}
+.sheet.otra .solo-vin{display:none}
+.rep-fotos{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;padding:10px}
+.rep-fotos figure{margin:0;break-inside:avoid;border:1px solid var(--sep);border-radius:10px;overflow:hidden;background:var(--relleno2)}
+.rep-fotos img{display:block;width:100%;height:96px;object-fit:contain;background:#dfe6e2}
+.rep-fotos figcaption{font-size:11.5px;line-height:15px;padding:5px 7px;color:var(--texto);word-break:break-word}
+.rep-fotos .sinf{display:flex;align-items:center;justify-content:center;height:96px;font-size:12px;color:var(--sec)}
 .caja-tit{font-size:15.5px;font-weight:700;color:var(--texto)}
 .etiq.seg button{min-width:58px}
 .novedades{display:flex;flex-direction:column;gap:9px;font-size:14px;font-weight:600;color:var(--sec);margin:0 0 16px}
@@ -624,7 +630,9 @@ main>section.entra{animation:entra .16s ease-out}
       <!-- Al acabar el día, la hoja de cada trabajador: sus autos con la
            foto del VIN y los números del día, para mandarla por WhatsApp. -->
       <button class="rapido" id="btnResumen" type="button"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-report"/></svg></span></span>Resúmenes</button>
-      <button class="rapido" type="button" data-ir="reportes"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-vehicle"/></svg></span></span>Reportes</button>
+      <!-- Autos de otra sección (de venta, Car4us): foto general del auto
+           y los datos escritos; se cuentan aparte de los autos normales. -->
+      <button class="rapido" id="btnOtra" type="button"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-vehicle"/></svg></span></span>Otra sección</button>
     </div>
 
     <!-- Dos chips a media pantalla: lo que falta por confirmar y los
@@ -638,8 +646,9 @@ main>section.entra{animation:entra .16s ease-out}
         <span class="mas"><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-sync"/></svg><b>Sin subir todavía</b></span><span class="n" id="nCola">0</span></button>
     </div>
     <input type="file" id="galInput" accept="image/*" hidden>
+    <input type="file" id="otraInput" accept="image/*" capture="environment" hidden>
     <div id="ocrStatus" class="hint"></div>
-    <div class="grupo-cab"><span>Hoy</span><span><span id="todayCount">0</span> autos</span></div>
+    <div class="grupo-cab"><span>Hoy</span><span><span id="todayCount">0 autos</span></span></div>
     <div class="grupo" id="todayList"></div>
     <p class="aviso-cola" id="queueBadge" hidden></p>
   </section>
@@ -684,6 +693,9 @@ main>section.entra{animation:entra .16s ease-out}
       <div class="grupo-cab"><span>Marcas</span></div>
       <div class="grupo viz" id="rep_marcas"></div>
 
+      <div class="grupo-cab" id="rep_otrasCab" hidden><span>Otras secciones</span><span id="rep_otrasN"></span></div>
+      <div class="grupo" id="rep_otras" hidden></div>
+
       <div class="grupo-cab" id="rep_novCab" hidden><span>Novedades</span><span id="rep_novN"></span></div>
       <div class="grupo" id="rep_nov" hidden></div>
 
@@ -692,11 +704,14 @@ main>section.entra{animation:entra .16s ease-out}
 
       <div class="grupo-cab"><span>Registros</span></div>
       <div class="grupo tablewrap"><div id="rep_table"></div></div>
+
+      <div class="grupo-cab" id="rep_fotosCab" hidden><span>Fotos de respaldo</span><span id="rep_fotosN"></span></div>
+      <div class="grupo rep-fotos" id="rep_fotos" hidden></div>
     </div>
 
     <div class="grupo">
       <button class="fila accion" id="btnResumenRep" type="button"><span class="mas">Resumen del equipo o por trabajador (día, semana, quincena, mes)</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <button class="fila accion" id="rep_pdf" type="button"><span class="mas">Imprimir o guardar en PDF</span></button>
+      <button class="fila accion" id="rep_pdf" type="button"><span class="mas" id="rep_pdfTxt">Imprimir o guardar en PDF (con las fotos)</span></button>
       <button class="fila accion" id="rep_export" type="button"><span class="mas">Exportar CSV</span></button>
     </div>
   </section>
@@ -819,9 +834,13 @@ main>section.entra{animation:entra .16s ease-out}
     <h3 id="rev_title">Confirmar registro</h3>
     <img id="rev_photo" hidden>
     <div id="rev_ocrHint" class="hint"></div>
-    <div id="rev_rep" class="aviso-rep" role="alert" hidden></div>
-    <label class="f">Últimos 6 del VIN (opcional)<input class="inp" id="rev_vin6" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" maxlength="8" autocapitalize="characters"></label>
-    <label class="f">VIN completo (opcional)<input class="inp" id="rev_vinFull" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" autocapitalize="characters"></label>
+    <div id="rev_rep" class="aviso-rep solo-vin" role="alert" hidden></div>
+    <div class="caja-extra">
+      <span class="caja-tit" id="rev_secTit">¿Qué trabajo es?</span>
+      <div class="etiq seg" id="rev_seccion" role="radiogroup" aria-labelledby="rev_secTit"></div>
+    </div>
+    <label class="f solo-vin">Últimos 6 del VIN (opcional)<input class="inp" id="rev_vin6" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" maxlength="8" autocapitalize="characters"></label>
+    <label class="f solo-vin">VIN completo (opcional)<input class="inp" id="rev_vinFull" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" autocapitalize="characters"></label>
     <label class="f">Marca (opcional)<input class="inp" id="rev_make" placeholder="ej. Mazda"></label>
     <label class="f">Modelo (opcional)<input class="inp" id="rev_model" placeholder="ej. CX-5"></label>
     <label class="f">Color (opcional)<input class="inp" id="rev_color" placeholder="ej. Blanco"></label>
@@ -1288,7 +1307,40 @@ function marcarEquipo(pref, n){
   document.querySelectorAll("#" + pref + "_equipo button").forEach(b => b.setAttribute("aria-checked", String(b.dataset.n === n)));
   const con = document.getElementById(pref + "_con"); con.hidden = n === "1"; if (n === "1") con.value = "";
 }
+/* Autos de otra sección de la empresa (de venta, Car4us). Se trabajan
+   igual, pero no cuentan como auto normal sino como servicio aparte, y no
+   llevan VIN: una foto general del auto y los datos escritos. La sección
+   va como etiqueta, así viaja por donde ya viajan las demás. */
+const SECCIONES = {
+  venta: { tag: "Sección: Autos de venta", corto: "Auto de venta", uno: "auto de venta", varios: "autos de venta" },
+  car4us: { tag: "Sección: Car4us", corto: "Car4us", uno: "auto Car4us", varios: "autos Car4us" }
+};
+const seccionDe = r => { const l = (r && r.etiquetas) || []; for (const k in SECCIONES) if (l.includes(SECCIONES[k].tag)) return k; return null; };
+const esNormal = r => !seccionDe(r);
+const etiquetasVisibles = r => ((r && r.etiquetas) || []).filter(t => !/^Sección: /.test(t));
+/* "1 auto de venta + 2 autos Car4us", o "" si no hay ninguno. */
+function textoOtras(filas){
+  const partes = [];
+  for (const k in SECCIONES) { const c = filas.filter(r => seccionDe(r) === k).length; if (c) partes.push(c + " " + (c === 1 ? SECCIONES[k].uno : SECCIONES[k].varios)); }
+  return partes.join(" + ");
+}
+/* "4 autos + 1 auto de venta". */
+function textoCuenta(filas){
+  const n = filas.filter(esNormal).length, o = textoOtras(filas);
+  return n + (n === 1 ? " auto" : " autos") + (o ? " + " + o : "");
+}
+function marcarSeccion(pref, k){
+  const caja = document.getElementById(pref + "_seccion"); if (!caja) return;
+  caja.querySelectorAll("button").forEach(b => b.setAttribute("aria-checked", String(b.dataset.s === (k || ""))));
+  caja.closest(".sheet").classList.toggle("otra", !!k);
+}
 function montarNovedades(pref){
+  const sec = document.getElementById(pref + "_seccion");
+  if (sec) {
+    sec.innerHTML = '<button type="button" role="radio" aria-checked="true" data-s="">Auto normal</button>' +
+      Object.keys(SECCIONES).map(k => '<button type="button" role="radio" aria-checked="false" data-s="' + k + '">' + esc(SECCIONES[k].corto) + "</button>").join("");
+    sec.querySelectorAll("button").forEach(b => b.onclick = () => marcarSeccion(pref, b.dataset.s));
+  }
   const caja = document.getElementById(pref + "_etiq");
   caja.innerHTML = NOVEDADES.map(t => '<button type="button" aria-pressed="false">' + esc(t) + "</button>").join("");
   caja.querySelectorAll("button").forEach(b => b.onclick = () => b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true")));
@@ -1303,6 +1355,7 @@ function ponerNovedades(pref, etiquetas, notas){
   document.querySelectorAll("#" + pref + "_etiq button").forEach(b => b.setAttribute("aria-pressed", String(marcadas.has(b.textContent))));
   const e = l.find(x => /^Entre \d/.test(x)); const m = e && e.match(/^Entre (\d)/);
   marcarEquipo(pref, m ? String(Math.min(4, +m[1])) : "1");
+  marcarSeccion(pref, seccionDe({ etiquetas: l }));
   const con = l.find(x => /^Con: /.test(x));
   if (con) document.getElementById(pref + "_con").value = con.slice(5);
   document.getElementById(pref + "_notas").value = notas || "";
@@ -1316,11 +1369,13 @@ function leerNovedades(pref){
     const con = document.getElementById(pref + "_con").value.trim();
     if (con) etiquetas.push("Con: " + con);
   }
+  const sec = document.querySelector("#" + pref + "_seccion button[aria-checked=true]");
+  if (sec && sec.dataset.s) etiquetas.unshift(SECCIONES[sec.dataset.s].tag);
   return { etiquetas, notas: document.getElementById(pref + "_notas").value.trim() };
 }
-const tieneNovedades = r => !!((r.etiquetas && r.etiquetas.length) || r.notas);
+const tieneNovedades = r => !!(etiquetasVisibles(r).length || r.notas);
 /* En una línea: "Sin libro de mantenimiento, Entre 2 personas. Llegó con barro". */
-const textoNovedades = r => [(r.etiquetas || []).join(", "), r.notas || ""].filter(Boolean).join(". ");
+const textoNovedades = r => [etiquetasVisibles(r).join(", "), r.notas || ""].filter(Boolean).join(". ");
 /* El aviso breve. Los mensajes del código empiezan con un signo (✓, ⚠︎,
    📶): aquí decide el color y se quita, para que en pantalla quede sólo
    la frase, como en los avisos del sistema. */
@@ -1638,6 +1693,7 @@ function openReview(data){
   } else {
     hint = "⚠︎ No se detectó texto legible. El VIN es opcional: puedes guardar igual con la foto de respaldo y completarlo después.";
   }
+  if (!data.skipHint && seccionDe({ etiquetas: data.etiquetas })) hint = "Auto de otra sección: no lleva VIN y se cuenta aparte de los autos normales. Elige la sección y escribe marca, modelo y color.";
   document.getElementById("rev_ocrHint").textContent = hint;
   const sc = document.getElementById("reviewScrim"); sc.classList.add("open");
   revisarRepetidoEnFicha();
@@ -1728,6 +1784,9 @@ async function saveReview(){
     p_worker_name: worker, p_supervisor_name: supervisor,
   };
   const nov = leerNovedades("rev");
+  const otra = seccionDe({ etiquetas: nov.etiquetas });
+  /* De otra sección no hay VIN: lo que hubiera en los campos escondidos no se guarda. */
+  if (otra) { fields.p_vin_full = null; fields.p_vin6 = null; }
   const whenLocal = document.getElementById("rev_when").value;
   const clientAt = whenLocal ? new Date(whenLocal).toISOString() : new Date().toISOString();
   const btn = document.getElementById("rev_save"); btn.disabled = true; btn.textContent = "Guardando…";
@@ -1750,6 +1809,8 @@ async function saveReview(){
   }
   /* Esto ya lo acaba de revisar una persona, asi que entra confirmado y con
      su semaforo: mandarlo otra vez a "Por confirmar" seria trabajo inventado. */
+  /* La foto general del auto, en chico, es su miniatura y su respaldo en los resúmenes. */
+  if (otra && pendingReview && !pendingReview.recorte) pendingReview.recorte = await aligerarFoto(photo, 640, 0.72);
   const vinRevisado = fields.p_vin_full;
   const repetido = await buscarRepetido(fields.p_vin_full, fields.p_vin6, null);
   const params = { ...fields, p_client_at: clientAt, p_photo_data: await aligerarFoto(photo),
@@ -1826,32 +1887,35 @@ async function cargarGenteDelDia(){
   const gente = new Map();
   for (const x of resFilas) {
     const k = normNombre(x.worker_name); if (!k) continue;
-    const g = gente.get(k) || { nombre: String(x.worker_name).trim(), n: 0 };
-    g.n++; gente.set(k, g);
+    const g = gente.get(k) || { nombre: String(x.worker_name).trim(), n: 0, filas: [] };
+    g.n++; g.filas.push(x); gente.set(k, g);
   }
   if (!resFilas.length) { caja.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">En ese período no hay autos registrados.</span></div>'; return; }
   /* Primero todo el equipo, después cada persona. Dos botones por fila: la
      foto es para WhatsApp, el PDF para imprimir o archivar. */
-  const fila = (k, nombre, n) =>
-    '<div class="resfila"><div class="resnom"><b>' + esc(nombre) + '</b><span class="hint" style="margin:0">' + n + ' auto' + (n === 1 ? '' : 's') + '</span></div>' +
+  const fila = (k, nombre, filas) =>
+    '<div class="resfila"><div class="resnom"><b>' + esc(nombre) + '</b><span class="hint" style="margin:0">' + esc(textoCuenta(filas)) + '</span></div>' +
     '<button class="primary" type="button" data-w="' + esc(k) + '" data-f="foto">Foto</button>' +
     '<button class="primary" type="button" data-w="' + esc(k) + '" data-f="pdf">PDF</button></div>';
-  caja.innerHTML = fila("*", "Todo el equipo", resFilas.length) +
-    [...gente.entries()].sort((a, b) => b[1].n - a[1].n).map(([k, g]) => fila(k, g.nombre, g.n)).join("");
+  caja.innerHTML = fila("*", "Todo el equipo", resFilas) +
+    [...gente.entries()].sort((a, b) => b[1].n - a[1].n).map(([k, g]) => fila(k, g.nombre, g.filas)).join("");
   caja.querySelectorAll("[data-w]").forEach(b => b.onclick = () => generarResumen(b.dataset.w, b.dataset.f));
 }
 async function generarResumen(clave, formato){
   const equipo = clave === "*", dia1 = resPeriodo === "day";
   const r = rangoResumen();
-  const filas = resFilas.filter(x => equipo || normNombre(x.worker_name) === clave)
+  /* "todas" es todo lo que hizo (para la lista y las fotos); "filas", los
+     autos normales, que son los que cuentan en los números. */
+  const todas = resFilas.filter(x => equipo || normNombre(x.worker_name) === clave)
     .sort((a, b) => new Date(a.client_at) - new Date(b.client_at));
-  if (!filas.length) return;
-  const nombre = equipo ? "Todo el equipo" : String(filas[0].worker_name).trim();
+  if (!todas.length) return;
+  const filas = todas.filter(esNormal), otras = todas.filter(x => !esNormal(x));
+  const nombre = equipo ? "Todo el equipo" : String(todas[0].worker_name).trim();
   const n = filas.length;
   const hora = d => d.toLocaleTimeString("es-AU", { hour: "2-digit", minute: "2-digit", hour12: false });
   const fechaCorta = d => d.toLocaleDateString("es-AU", { day: "2-digit", month: "2-digit" });
   const num = (v, dec) => Number(v).toLocaleString("de-DE", { minimumFractionDigits: dec, maximumFractionDigits: dec });
-  const dias = new Set(filas.map(x => fechaLocal(new Date(x.client_at))));
+  const dias = new Set(todas.map(x => fechaLocal(new Date(x.client_at))));
   /* La media de antes, para comparar: la de los 30 días previos por día
      trabajado (en el día) o el período anterior igual (en los demás). */
   let ref = null, refTxt = "";
@@ -1860,7 +1924,7 @@ async function generarResumen(clave, formato){
       const desde = new Date(r.from); desde.setDate(desde.getDate() - 30);
       const hist = await Datos.lista(desde, r.from);
       const porDia = {};
-      for (const x of hist) if (equipo || normNombre(x.worker_name) === clave) { const k = fechaLocal(new Date(x.client_at)); porDia[k] = (porDia[k] || 0) + 1; }
+      for (const x of hist) if (esNormal(x) && (equipo || normNombre(x.worker_name) === clave)) { const k = fechaLocal(new Date(x.client_at)); porDia[k] = (porDia[k] || 0) + 1; }
       const v = Object.values(porDia);
       if (v.length) { ref = v.reduce((a, b) => a + b, 0) / v.length; refTxt = "frente a la media (" + num(ref, 1) + ")"; }
     } else {
@@ -1871,7 +1935,7 @@ async function generarResumen(clave, formato){
       const enCurso = r.to > new Date();
       const hasta = enCurso ? new Date(Math.min(ant.to, ant.from.getTime() + (Date.now() - r.from.getTime()))) : ant.to;
       const hist = await Datos.lista(ant.from, hasta);
-      ref = hist.filter(x => equipo || normNombre(x.worker_name) === clave).length;
+      ref = hist.filter(x => esNormal(x) && (equipo || normNombre(x.worker_name) === clave)).length;
       refTxt = (enCurso ? "frente a los mismos días del período anterior (" : "frente al período anterior (") + ref + ")";
     }
   } catch (e) {}
@@ -1882,8 +1946,8 @@ async function generarResumen(clave, formato){
   const ritmo = tp.tipico == null ? null : Math.round(tp.tipico);
   const pausasTxt = tp.pausas ? Graficos.duracion(tp.pausaMin) + " en " + tp.pausas + (tp.pausas === 1 ? " pausa" : " pausas") : "";
   const reps = repetidosDe(filas, (await historialRepetidos()) || resFilas);
-  const nNov = filas.filter(tieneNovedades).length;
-  const t0 = new Date(filas[0].client_at), t1 = new Date(filas[n - 1].client_at);
+  const nNov = todas.filter(tieneNovedades).length;
+  const t0 = new Date(todas[0].client_at), t1 = new Date(todas[todas.length - 1].client_at);
   const kpis = [
     { etiqueta: "Vehículos", valor: String(n),
       nota: dif == null ? null : (dif >= 0 ? "+" : "") + num(dif, dia1 ? 1 : 0) + " " + refTxt,
@@ -1897,11 +1961,18 @@ async function generarResumen(clave, formato){
     { etiqueta: "VIN repetidos", valor: String(reps.size), nota: reps.size ? "revisa los marcados en rojo" : "ninguno",
       tono: reps.size ? "mal" : "bien" }
   ];
+  if (otras.length) kpis.splice(1, 0, { etiqueta: "Otras secciones", valor: "+" + otras.length, nota: textoOtras(otras) + ", aparte de los autos normales" });
   if (nNov) kpis.push({ etiqueta: "Con novedades", valor: String(nNov), nota: "notas, sin libro, entre varios…" });
   const graficos = [];
   if (equipo) {
     const porP = {};
     for (const x of filas) { const k = String(x.worker_name || "Sin nombre").trim(); porP[k] = (porP[k] || 0) + 1; }
+    if (otras.length) {
+      const porO = {};
+      for (const x of otras) { const k = String(x.worker_name || "Sin nombre").trim(); (porO[k] = porO[k] || []).push(x); }
+      graficos.push({ tipo: "barras", titulo: "Otras secciones, por trabajador", datos: Object.entries(porO).sort((a, b) => b[1].length - a[1].length).slice(0, 12)
+        .map(([k, l]) => ({ etiqueta: k + " · " + textoOtras(l), valor: l.length })) });
+    }
     graficos.push({ tipo: "barras", titulo: "Por trabajador", datos: Object.entries(porP).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([etiqueta, valor]) => {
       const t = Graficos.tiempos(filas.filter(x => String(x.worker_name || "Sin nombre").trim() === etiqueta));
       return { etiqueta: etiqueta + (t.tipico != null ? " · " + Math.round(t.tipico) + " min" : ""), valor };
@@ -1925,30 +1996,22 @@ async function generarResumen(clave, formato){
     kpis,
     alerta: reps.size ? reps.size + (reps.size === 1 ? " auto tiene" : " autos tienen") +
       " los mismos seis últimos del VIN que otro registro. Revisa que no sea el mismo auto apuntado dos veces." : null,
-    frase: nombre + (equipo ? " registró " : " registró ") + n + " auto" + (n === 1 ? "" : "s") +
-      (dia1 ? (n > 1 ? " entre las " + hora(t0) + " y las " + hora(t1) : " a las " + hora(t0))
+    frase: nombre + " registró " + textoCuenta(todas) +
+      (dia1 ? (todas.length > 1 ? " entre las " + hora(t0) + " y las " + hora(t1) : " a las " + hora(t0))
             : " en " + dias.size + (dias.size === 1 ? " día" : " días") + " (" + fmtRange(r) + ")") +
       (ritmo ? ", a " + ritmo + " minutos por auto" + (pausasTxt && dia1 ? " sin contar " + pausasTxt : "") : "") + ".",
     graficos,
-    /* Un período largo lleva cientos de autos: la hoja enseña números,
-       gráficos y las novedades auto por auto, sin la ficha de cada uno. El
-       listado completo está en el CSV de Reportes. */
-    sinLista: !dia1,
-    autos: filas.map(x => ({
-      vin: x.vin_full || (x.vin6 ? "…" + x.vin6 : "—"),
+    /* Todos los registros con su foto de respaldo, en cualquier período.
+       En el día se busca el recorte del VIN; en períodos largos va la foto
+       guardada tal cual, que es mucho más rápido con cientos de autos. */
+    tituloLista: "Registros y fotos de respaldo ({n})",
+    autos: todas.map(x => ({
+      vin: seccionDe(x) ? SECCIONES[seccionDe(x)].corto : (x.vin_full || (x.vin6 ? "…" + x.vin6 : "—")),
       hora: (dia1 ? "" : fechaCorta(new Date(x.client_at)) + " ") + hora(new Date(x.client_at)) + (equipo && x.worker_name ? " · " + String(x.worker_name).trim() : ""),
       repetido: reps.has(String(x.id)) ? textoRepetido(reps.get(String(x.id))) : null,
       novedad: tieneNovedades(x) ? textoNovedades(x) : null,
       detalle: [x.make, x.model, x.color].filter(Boolean).join(" ") || (x.supervisor_name ? "Supervisor: " + x.supervisor_name : ""),
-      recorte: !dia1 ? null : async () => {
-        let rc = await InformeDia.leerRecorte(x.id);
-        if (rc || !x.tiene_foto) return rc;
-        const foto = await rpc("vin_log_foto", { p_id: x.id });
-        if (!foto) return null;
-        rc = await LectorVIN.recortarVin(foto);
-        if (rc) InformeDia.guardarRecorte(x.id, rc);
-        return rc;
-      }
+      recorte: () => fotoRespaldo(x, dia1)
     })),
     pie: "Generado por Registro VIN el " + new Date().toLocaleString("es-AU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) + " · con lo registrado en el sistema."
   }, formato);
@@ -1972,7 +2035,7 @@ async function renderTodayList(rows){
   const list = pend.concat(rows);
   /* Los repetidos salen de la misma descarga que la lista: ya está fresca. */
   const reps = repetidosDe(list, Datos.enMemoria());
-  document.getElementById("todayCount").textContent = list.length;
+  document.getElementById("todayCount").textContent = textoCuenta(list);
   pintarHoy(list, reps);
   const caja = document.getElementById("todayList");
   caja.innerHTML = list.length ? list.map(r => rowHTML(r, reps.get(String(r.id)))).join("")
@@ -2000,7 +2063,9 @@ async function cargarMiniaturas(caja){
 }
 /* La tarjeta grande de arriba: cuántos van hoy, a qué hora el último y a
    qué ritmo, y cuántos repetidos. */
-function pintarHoy(list, reps){
+function pintarHoy(todos, reps){
+  /* El número grande son los autos normales; los de otra sección van al lado. */
+  const list = todos.filter(esNormal), otras = textoOtras(todos);
   const n = list.length;
   document.getElementById("heroCount").textContent = n;
   document.getElementById("heroUnidad").textContent = n === 1 ? "auto hoy" : "autos hoy";
@@ -2012,8 +2077,9 @@ function pintarHoy(list, reps){
     const tip = window.Graficos ? Graficos.ritmo(list) : null;
     sub = "El último, a las <b>" + hora(horas[n - 1]) + "</b>" + (tip ? ". <b>" + Math.round(tip) + " min</b> por auto." : ".");
   }
+  if (otras) sub = (n ? sub + " " : "") + "Además, <b>" + esc(otras) + "</b>.";
   document.getElementById("heroSub").innerHTML = sub;
-  const nRep = list.filter(r => reps.has(String(r.id))).length;
+  const nRep = todos.filter(r => reps.has(String(r.id))).length;
   document.getElementById("nRep").textContent = nRep;
   document.getElementById("cifraRep").classList.toggle("alerta", nRep > 0);
 }
@@ -2042,9 +2108,10 @@ function rowHTML(r, repetido){
   const quien = esc(r.worker_name || "");
   const sub = repetido ? (quien ? quien + " · " : "") + ETIQ_REP + esc(textoRepetido(repetido))
     : [quien, r._pending ? "Pendiente de subir" : esc(makeModel || "Sin marca ni modelo")].filter(Boolean).join(" · ");
+  const sec = seccionDe(r);
   return '<div class="fila vrow con-mini' + (r._pending ? " pending" : "") + (repetido ? " repetido" : "") + '"' + idAttr + '>' +
     miniHTML(r._pending ? r._clave : r.id) +
-    '<span class="mas"><span class="vin6">' + esc(r.vin6 || "—") + '</span>' +
+    '<span class="mas"><span class="vin6">' + esc(sec ? SECCIONES[sec].corto : (r.vin6 || "—")) + '</span>' +
       '<span class="sub">' + sub + '</span>' +
       (tieneNovedades(r) ? '<span class="sub nov">' + esc(textoNovedades(r)) + '</span>' : "") + '</span>' +
     '<span class="val">' + time + '</span>' + (r._pending ? "" : CHEV) + '</div>';
@@ -2156,8 +2223,12 @@ function cubetasTendencia(range, filas, previas){
   }
   return cubetas;
 }
+/* Los autos normales del período: es lo que cuentan los gráficos. Los de
+   otra sección salen aparte, en su bloque. */
+let repNorm = [], repPrevNorm = null;
 function renderReport(){
-  const total = repRows.length;
+  repNorm = repRows.filter(esNormal); repPrevNorm = repPrev ? repPrev.filter(esNormal) : repPrev;
+  const total = repNorm.length;
   repMarcas = repetidosDe(repRows, Datos.enMemoria());
   const range = periodRange(repPeriod, repAnchor);
   const [uno] = NOMBRE_PERIODO[repPeriod];
@@ -2165,30 +2236,30 @@ function renderReport(){
     ? (repPeriod === "day" ? "hoy" : (repPeriod === "month" || repPeriod === "semester" ? "este " : "esta ") + uno)
     : (repPeriod === "month" || repPeriod === "semester" ? "el " : "la ") + uno + " elegid" + (repPeriod === "month" || repPeriod === "semester" ? "o" : "a");
   const anterior = repPeriod === "day" ? "día anterior" : uno + " anterior";
-  const cubetas = cubetasTendencia(range, repRows, repPrev);
-  Graficos.indicadores(document.getElementById("rep_kpis"), { filas: repRows, anteriores: repPrev, nombreAnterior: anterior, periodo: repPeriod,
+  const cubetas = cubetasTendencia(range, repNorm, repPrevNorm);
+  Graficos.indicadores(document.getElementById("rep_kpis"), { filas: repNorm, anteriores: repPrevNorm, nombreAnterior: anterior, periodo: repPeriod,
     repetidos: repMarcas.size, serie: cubetas.filter(c => !c.futuro).map(c => c.n) });
   document.getElementById("rep_tendTit").textContent = repPeriod === "day" ? "Autos por hora" : repPeriod === "semester" ? "Autos por semana" : "Autos por día";
   Graficos.tendencia(document.getElementById("rep_tend"), { cubetas,
     titulo: document.getElementById("rep_tendTit").textContent, nombreActual: actual.charAt(0).toUpperCase() + actual.slice(1),
-    nombreAnterior: anterior, conAnterior: !!(repPrev && repPrev.length) });
+    nombreAnterior: anterior, conAnterior: !!(repPrevNorm && repPrevNorm.length) });
   /* El mapa de calor necesita varios días para decir algo. */
   const conCalor = repPeriod !== "day";
   document.getElementById("rep_calorCab").hidden = !conCalor;
   document.getElementById("rep_calor").hidden = !conCalor;
-  if (conCalor) Graficos.calor(document.getElementById("rep_calor"), { filas: repRows, semanas: Math.max(1, Math.round((range.to - range.from) / (7 * 864e5))) });
-  Graficos.trabajadores(document.getElementById("rep_byWorker"), { filas: repRows, anteriores: repPrev, nombreAnterior: anterior });
-  Graficos.jornada(document.getElementById("rep_jornada"), { filas: repRows });
-  Graficos.marcas(document.getElementById("rep_marcas"), { filas: repRows });
+  if (conCalor) Graficos.calor(document.getElementById("rep_calor"), { filas: repNorm, semanas: Math.max(1, Math.round((range.to - range.from) / (7 * 864e5))) });
+  Graficos.trabajadores(document.getElementById("rep_byWorker"), { filas: repNorm, anteriores: repPrevNorm, nombreAnterior: anterior });
+  Graficos.jornada(document.getElementById("rep_jornada"), { filas: repNorm });
+  Graficos.marcas(document.getElementById("rep_marcas"), { filas: repNorm });
   renderReportInsights(total, repMarcas.size, cubetas);
-  renderNovedades();
+  renderNovedades(); renderOtras(); prepararFotosReporte();
 
   const box = document.getElementById("rep_table");
-  if (!total) { box.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">Sin registros en este período.</span></div>'; return; }
-  box.innerHTML = '<table class="reptable"><thead><tr><th>Fecha</th><th>Últimos 6</th><th>VIN</th><th>Marca</th><th>Modelo</th><th>Color</th><th>Trabajador</th><th>Supervisor</th><th>Novedades</th><th></th></tr></thead><tbody>' +
+  if (!repRows.length) { box.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">Sin registros en este período.</span></div>'; return; }
+  box.innerHTML = '<table class="reptable"><thead><tr><th>Fecha</th><th>Últimos 6</th><th>VIN</th><th>Marca</th><th>Modelo</th><th>Color</th><th>Trabajador</th><th>Supervisor</th><th>Sección</th><th>Novedades</th><th></th></tr></thead><tbody>' +
     repRows.map(r => { const rp = repMarcas.get(String(r.id)); return '<tr data-id="' + esc(r.id) + '"' + (rp ? ' class="repetido"' : '') + '><td>' + new Date(r.client_at).toLocaleString("es-AU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) +
-      '</td><td><b>' + esc(r.vin6 || "—") + '</b>' + (rp ? '<br>' + ETIQ_REP + '<br><small>' + esc(textoRepetido(rp)) + '</small>' : '') + '</td><td>' + esc(r.vin_full || "—") + '</td><td>' + esc(r.make || "—") + '</td><td>' + esc(r.model || "—") + '</td><td>' + esc(r.color || "—") + '</td><td>' + esc(r.worker_name) + '</td><td>' + esc(r.supervisor_name || "—") + '</td><td class="nov">' +
-      (r.etiquetas || []).map(t => '<span class="nov-et">' + esc(t) + '</span>').join("") + (r.notas ? (r.etiquetas && r.etiquetas.length ? "<br>" : "") + esc(r.notas) : "") + '</td><td>' +
+      '</td><td><b>' + esc(r.vin6 || "—") + '</b>' + (rp ? '<br>' + ETIQ_REP + '<br><small>' + esc(textoRepetido(rp)) + '</small>' : '') + '</td><td>' + esc(r.vin_full || "—") + '</td><td>' + esc(r.make || "—") + '</td><td>' + esc(r.model || "—") + '</td><td>' + esc(r.color || "—") + '</td><td>' + esc(r.worker_name) + '</td><td>' + esc(r.supervisor_name || "—") + '</td><td>' + (seccionDe(r) ? '<span class="nov-et">' + esc(SECCIONES[seccionDe(r)].corto) + '</span>' : "Normal") + '</td><td class="nov">' +
+      etiquetasVisibles(r).map(t => '<span class="nov-et">' + esc(t) + '</span>').join("") + (r.notas ? (etiquetasVisibles(r).length ? "<br>" : "") + esc(r.notas) : "") + '</td><td>' +
       (r.tiene_foto ? '<a href="#" class="photolink" data-id="' + esc(r.id) + '">Ver foto</a>' : "") + '</td></tr>'; }).join("") + '</tbody></table>';
   /* La foto se pide al tocarla, no antes. Venia dentro de la lista, asi que
      abrir el informe de un mes descargaba todas las fotos del periodo para
@@ -2206,6 +2277,76 @@ function renderReport(){
 }
 /* Los autos con novedades, juntos y arriba de la tabla: es lo que el jefe
    tiene que leer uno por uno. Arriba, cuántos de cada. */
+/* Otras secciones: cuántos de cada una y, por trabajador, "4 autos + 1
+   auto de venta", que es como lo cuenta el jefe. */
+function renderOtras(){
+  const otras = repRows.filter(r => !esNormal(r));
+  const cab = document.getElementById("rep_otrasCab"), box = document.getElementById("rep_otras");
+  cab.hidden = box.hidden = !otras.length;
+  if (!otras.length) { box.innerHTML = ""; return; }
+  document.getElementById("rep_otrasN").textContent = textoOtras(otras);
+  const gente = new Map();
+  for (const r of repRows) { const k = normNombre(r.worker_name); if (!k) continue; const g = gente.get(k) || { nombre: String(r.worker_name).trim(), filas: [] }; g.filas.push(r); gente.set(k, g); }
+  box.innerHTML = [...gente.values()].filter(g => g.filas.some(r => !esNormal(r))).sort((a, b) => b.filas.length - a.filas.length)
+    .map(g => '<div class="fila"><span class="mas"><b>' + esc(g.nombre) + '</b><span class="sub" style="white-space:normal">' + esc(textoCuenta(g.filas)) + "</span></span></div>").join("");
+}
+/* Las fotos de respaldo del período, en el propio reporte: se cargan al
+   pedirlas (o al imprimir), no al abrir, para no bajar un mes de fotos
+   sólo por mirar los números. */
+let fotosRep = new Map(), fotosPeticion = 0;
+function prepararFotosReporte(){
+  fotosPeticion++;
+  const con = repRows.filter(r => r.tiene_foto);
+  const cab = document.getElementById("rep_fotosCab"), box = document.getElementById("rep_fotos");
+  cab.hidden = box.hidden = !con.length;
+  document.getElementById("rep_fotosN").textContent = con.length ? con.length + (con.length === 1 ? " foto" : " fotos") : "";
+  box.innerHTML = con.length ? '<button class="secondary" id="rep_fotosVer" type="button" style="grid-column:1/-1">Ver las ' + con.length + " fotos de respaldo</button>" : "";
+  const b = document.getElementById("rep_fotosVer"); if (b) b.onclick = () => cargarFotosReporte();
+}
+/* La foto de respaldo de un registro, en chico: el recorte guardado en
+   este teléfono o, si no está, la foto original del sistema. */
+async function fotoRespaldo(r, conLocalizador){
+  let rc = null;
+  try { rc = await InformeDia.leerRecorte(r.id); } catch (e) {}
+  if (rc || !r.tiene_foto) return rc;
+  const foto = await rpc("vin_log_foto", { p_id: r.id });
+  if (!foto) return null;
+  if (conLocalizador && esNormal(r)) { try { rc = await LectorVIN.recortarVin(foto); } catch (e) { rc = null; } }
+  /* Si no se encuentra el VIN en la foto, va la foto entera: el respaldo
+     no puede faltar porque el lector no la entienda. */
+  if (!rc) rc = await aligerarFoto(foto, 640, 0.72);
+  if (rc) InformeDia.guardarRecorte(r.id, rc);
+  return rc;
+}
+async function cargarFotosReporte(alAvanzar){
+  const mia = ++fotosPeticion;
+  const con = repRows.filter(r => r.tiene_foto).sort((a, b) => new Date(a.client_at) - new Date(b.client_at));
+  const box = document.getElementById("rep_fotos");
+  const pie = r => esc([seccionDe(r) ? SECCIONES[seccionDe(r)].corto : (r.vin_full || (r.vin6 ? "…" + r.vin6 : "Sin VIN")), r.worker_name,
+    new Date(r.client_at).toLocaleString("es-AU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })].filter(Boolean).join(" · "));
+  box.innerHTML = con.map(r => '<figure data-f="' + esc(r.id) + '"><div class="sinf">Cargando…</div><figcaption>' + pie(r) + "</figcaption></figure>").join("");
+  let hechas = 0;
+  const una = async r => {
+    let src = fotosRep.get(String(r.id));
+    if (!src) { try { src = await fotoRespaldo(r, false); } catch (e) { src = null; } if (src) fotosRep.set(String(r.id), src); }
+    if (mia !== fotosPeticion) return;
+    const hueco = box.querySelector('figure[data-f="' + CSS.escape(String(r.id)) + '"] .sinf');
+    if (hueco) { if (src) { const im = new Image(); im.alt = "Foto de respaldo"; im.src = src; hueco.replaceWith(im); } else hueco.textContent = "Foto no disponible"; }
+    hechas++; if (alAvanzar) alAvanzar(hechas, con.length);
+  };
+  for (let i = 0; i < con.length && mia === fotosPeticion; i += 3) await Promise.all(con.slice(i, i + 3).map(una));
+  return mia === fotosPeticion;
+}
+async function imprimirReporte(){
+  const txt = document.getElementById("rep_pdfTxt"), antes = txt.textContent;
+  const btn = document.getElementById("rep_pdf"); btn.disabled = true;
+  try {
+    if (!document.querySelector("#rep_fotos figure") || document.querySelector("#rep_fotos .sinf"))
+      await cargarFotosReporte((i, n) => { txt.textContent = "Preparando las fotos " + i + " de " + n + "…"; });
+    await Promise.all([...document.querySelectorAll("#rep_fotos img")].map(im => im.decode ? im.decode().catch(() => {}) : null));
+  } finally { txt.textContent = antes; btn.disabled = false; }
+  window.print();
+}
 function renderNovedades(){
   const con = repRows.filter(tieneNovedades);
   const cab = document.getElementById("rep_novCab"), box = document.getElementById("rep_nov");
@@ -2213,10 +2354,10 @@ function renderNovedades(){
   if (!con.length) { box.innerHTML = ""; return; }
   document.getElementById("rep_novN").textContent = con.length + (con.length === 1 ? " auto" : " autos");
   const cuenta = new Map();
-  for (const r of con) for (const t of r.etiquetas || []) cuenta.set(t, (cuenta.get(t) || 0) + 1);
+  for (const r of con) for (const t of etiquetasVisibles(r)) cuenta.set(t, (cuenta.get(t) || 0) + 1);
   const resumen = [...cuenta.entries()].sort((a, b) => b[1] - a[1]).map(([t, n]) => esc(t) + " <b>" + n + "</b>").join(" · ");
   box.innerHTML = (resumen ? '<div class="fila"><span class="mas" style="font-weight:500">' + resumen + "</span></div>" : "") +
-    con.map(r => '<div class="fila vrow" data-id="' + esc(r.id) + '" role="button" tabindex="0"><span class="mas"><span class="vin6">' + esc(r.vin6 || "—") + "</span>" +
+    con.map(r => '<div class="fila vrow" data-id="' + esc(r.id) + '" role="button" tabindex="0"><span class="mas"><span class="vin6">' + esc(seccionDe(r) ? SECCIONES[seccionDe(r)].corto : (r.vin6 || "—")) + "</span>" +
       '<span class="sub">' + esc([r.worker_name, new Date(r.client_at).toLocaleString("es-AU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })].filter(Boolean).join(" · ")) + "</span>" +
       '<span class="sub nov" style="white-space:normal">' + esc(textoNovedades(r)) + "</span></span>" + CHEV + "</div>").join("");
   box.querySelectorAll("[data-id]").forEach(f => f.onclick = () => openEditFromId(f.dataset.id, repRows));
@@ -2229,10 +2370,10 @@ function renderReportInsights(total, repetidos, cubetas){
   const alerta = repetidos ? "VIN REPETIDO en " + repetidos + (repetidos === 1 ? " registro" : " registros") +
     " de este período: revisa que no sea el mismo auto apuntado dos veces. Están en rojo en la lista de abajo." : null;
   if (!total) {
-    bullets.push("Sin registros en este período todavía.");
+    bullets.push(repRows.length ? "Sin autos normales en este período; sólo de otras secciones: " + textoOtras(repRows) + "." : "Sin registros en este período todavía.");
   } else {
     const porPersona = new Map();
-    for (const r of repRows) { const k = String(r.worker_name || "").trim(); if (k) porPersona.set(k, (porPersona.get(k) || []).concat([r])); }
+    for (const r of repNorm) { const k = String(r.worker_name || "").trim(); if (k) porPersona.set(k, (porPersona.get(k) || []).concat([r])); }
     const gente = [...porPersona.entries()].map(([nombre, filas]) => ({ nombre, n: filas.length, ritmo: Graficos.ritmo(filas) })).sort((a, b) => b.n - a.n);
     if (gente.length) bullets.push(gente[0].nombre + " lavó " + gente[0].n + (gente[0].n === 1 ? " auto" : " autos") + ", el " + Math.round(gente[0].n / total * 100) + " % del período" +
       (gente.length > 1 ? ", entre " + gente.length + " personas." : "."));
@@ -2242,12 +2383,12 @@ function renderReportInsights(total, repetidos, cubetas){
     const mejor = cubetas.reduce((b, c) => (!b || c.n > b.n ? c : b), null);
     if (mejor && mejor.n && repPeriod !== "day") bullets.push("El " + (repPeriod === "semester" ? "mejor período fue la " + mejor.largo.charAt(0).toLowerCase() + mejor.largo.slice(1) : "mejor día fue el " + mejor.largo) + ", con " + mejor.n + " autos.");
     const porHora = new Map();
-    for (const r of repRows) { const h = new Date(r.client_at).getHours(); porHora.set(h, (porHora.get(h) || 0) + 1); }
+    for (const r of repNorm) { const h = new Date(r.client_at).getHours(); porHora.set(h, (porHora.get(h) || 0) + 1); }
     const pico = [...porHora.entries()].sort((a, b) => b[1] - a[1])[0];
     if (pico) bullets.push("La hora con más autos es de " + pico[0] + ":00 a " + (pico[0] + 1) + ":00 (" + pico[1] + " en el período).");
-    if (repPrev && repPrev.length) {
-      const d = total - repPrev.length;
-      bullets.push(d === 0 ? "Los mismos autos que en el período anterior." : (d > 0 ? d + " autos más" : -d + " autos menos") + " que en el período anterior (" + repPrev.length + ").");
+    if (repPrevNorm && repPrevNorm.length) {
+      const d = total - repPrevNorm.length;
+      bullets.push(d === 0 ? "Los mismos autos que en el período anterior." : (d > 0 ? d + " autos más" : -d + " autos menos") + " que en el período anterior (" + repPrevNorm.length + ").");
     }
     /* Si el período sigue abierto: a este paso, ¿cuántos saldrán al final? */
     const hechos = cubetas.filter(c => !c.futuro), quedan = cubetas.length - hechos.length;
@@ -2255,21 +2396,23 @@ function renderReportInsights(total, repetidos, cubetas){
     if (repPeriod !== "day" && quedan && trabajados >= 2) {
       const porCubeta = total / trabajados, dias = trabajados / hechos.length;
       bullets.push("A este paso, el período cerrará con unos " + Math.round(total + porCubeta * dias * quedan) + " autos" +
-        (repPrev && repPrev.length ? " (el anterior tuvo " + repPrev.length + ")." : "."));
+        (repPrevNorm && repPrevNorm.length ? " (el anterior tuvo " + repPrevNorm.length + ")." : "."));
     }
-    const flojos = gente.filter(g => g.n >= 3).map(g => ({ g, antes: (repPrev || []).filter(r => String(r.worker_name || "").trim().toLowerCase() === g.nombre.toLowerCase()).length }))
+    const flojos = gente.filter(g => g.n >= 3).map(g => ({ g, antes: (repPrevNorm || []).filter(r => String(r.worker_name || "").trim().toLowerCase() === g.nombre.toLowerCase()).length }))
       .filter(x => x.antes >= 5 && x.g.n < x.antes * 0.7 && !quedan);
     for (const x of flojos.slice(0, 2)) bullets.push(x.g.nombre + " bajó de " + x.antes + " a " + x.g.n + " autos frente al período anterior.");
+    const otras = textoOtras(repRows);
+    if (otras) bullets.push("Además, en otras secciones: " + otras + ". No cuentan como auto normal; el detalle por trabajador está en Otras secciones.");
     const conNov = repRows.filter(tieneNovedades).length;
     if (conNov) bullets.push(conNov + (conNov === 1 ? " auto tiene novedades" : " autos tienen novedades") + " (sin libro, sin sticker, trabajo difícil…): están en Novedades, arriba.");
   }
   list.innerHTML = (alerta ? '<li class="mal">' + esc(alerta) + "</li>" : "") + bullets.map(b => "<li>" + esc(b) + "</li>").join("");
 }
 function exportReportCSV(){
-  const rows = [["fecha_hora", "vin_ultimos6", "vin", "marca", "modelo", "color", "trabajador", "supervisor", "alerta", "novedades", "notas"]];
+  const rows = [["fecha_hora", "vin_ultimos6", "vin", "marca", "modelo", "color", "trabajador", "supervisor", "alerta", "novedades", "notas", "seccion"]];
   repRows.forEach(r => { const rp = repMarcas.get(String(r.id));
     rows.push([new Date(r.client_at).toLocaleString("es-AU"), r.vin6 || "", r.vin_full || "", r.make || "", r.model || "", r.color || "", r.worker_name, r.supervisor_name || "",
-      rp ? "VIN REPETIDO: " + textoRepetido(rp) : "", (r.etiquetas || []).join("; "), r.notas || ""]); });
+      rp ? "VIN REPETIDO: " + textoRepetido(rp) : "", etiquetasVisibles(r).join("; "), r.notas || "", seccionDe(r) ? SECCIONES[seccionDe(r)].corto : "Normal"]); });
   const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
@@ -2617,6 +2760,14 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("res_dia").onchange = cargarGenteDelDia;
   document.querySelectorAll("#res_periodo .seg").forEach(b => b.onclick = () => ponerPeriodoResumen(b.dataset.p));
   document.getElementById("res_cancel").onclick = () => document.getElementById("resScrim").classList.remove("open");
+  document.getElementById("btnOtra").onclick = () => document.getElementById("otraInput").click();
+  document.getElementById("otraInput").addEventListener("change", e => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    const fr = new FileReader();
+    fr.onload = async () => openReview({ photo: await aligerarFoto(fr.result, 1600, 0.85), vinFull: "", vin6: "", etiquetas: [SECCIONES.venta.tag] });
+    fr.readAsDataURL(f);
+  });
   document.getElementById("galInput").addEventListener("change", e => {
     const f = e.target.files[0]; e.target.value = "";
     if (f) abrirLector({ archivo: f });
@@ -2759,7 +2910,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("rep_prev").onclick = () => { shiftAnchor(-1); loadReport(); };
   document.getElementById("rep_next").onclick = () => { shiftAnchor(1); loadReport(); };
   document.getElementById("rep_export").onclick = exportReportCSV;
-  document.getElementById("rep_pdf").onclick = () => window.print();
+  document.getElementById("rep_pdf").onclick = imprimirReporte;
   /* Sin sesión en este teléfono no se pide nada a la base: primero el PIN. */
   const arrancar = () => { loadToday(); renderQueueBadge(); flushQueue(); };
   if (getToken()) arrancar(); else Pin.haceFalta().then(f => f ? Pin.pedir().then(arrancar) : arrancar());
