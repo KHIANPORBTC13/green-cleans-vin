@@ -100,11 +100,21 @@
   }
 
   /* ---------- Cálculos ---------- */
-  /* El ritmo: minutos entre un auto y el siguiente de la misma persona el
-     mismo día. Los huecos de más de 90 min son descansos o esperas, no
-     ritmo, y no cuentan. Se da la mediana: un par de huecos raros no la
-     mueven. */
-  function ritmo (filas) {
+  /* El tiempo por auto: minutos entre un auto y el siguiente de la misma
+     persona el mismo día. Es lo único que la app sabe del trabajo: cuándo
+     se registró cada auto.
+
+     Lo que antes fallaba: el resumen del día dividía toda la jornada entre
+     los autos, así que el almuerzo y las esperas contaban como trabajo y
+     el número salía peor de lo que era. Ahora hay UNA sola cuenta para
+     toda la app:
+       - una espera mucho más larga que lo normal de esa persona (más de
+         dos veces y media su tiempo típico, y nunca menos de 45 min ni más
+         de 2 h) es una PAUSA: se cuenta aparte y no como trabajo;
+       - lo demás es tiempo trabajando;
+       - "tipico" es la mediana (un auto raro no la mueve) y "autosHora"
+         sale del tiempo trabajando, no del reloj. */
+  function tiempos (filas) {
     const porPersonaDia = new Map()
     for (const r of filas) {
       const d = new Date(r.client_at); if (isNaN(d)) continue
@@ -112,20 +122,29 @@
       if (!porPersonaDia.has(k)) porPersonaDia.set(k, [])
       porPersonaDia.get(k).push(d.getTime())
     }
-    const huecos = []
+    const todos = []
     for (const l of porPersonaDia.values()) {
       l.sort((a, b) => a - b)
-      for (let i = 1; i < l.length; i++) { const g = (l[i] - l[i - 1]) / 60000; if (g > 0 && g <= 90) huecos.push(g) }
+      for (let i = 1; i < l.length; i++) { const g = (l[i] - l[i - 1]) / 60000; if (g > 0) todos.push(g) }
     }
-    if (!huecos.length) return null
-    huecos.sort((a, b) => a - b)
-    const m = huecos.length >> 1
-    return huecos.length % 2 ? huecos[m] : (huecos[m - 1] + huecos[m]) / 2
+    const vacio = { tipico: null, rapido: null, lento: null, activo: 0, pausas: 0, pausaMin: 0, autosHora: null, n: 0 }
+    if (!todos.length) return vacio
+    todos.sort((a, b) => a - b)
+    const cuantil = (l, q) => { const x = (l.length - 1) * q, a = Math.floor(x), b = Math.ceil(x); return l[a] + (l[b] - l[a]) * (x - a) }
+    const base = todos.filter(g => g <= 180)
+    const umbral = Math.min(120, Math.max(45, (base.length ? cuantil(base, 0.5) : 45) * 2.5))
+    const trabajo = todos.filter(g => g <= umbral), pausas = todos.filter(g => g > umbral)
+    if (!trabajo.length) return Object.assign(vacio, { pausas: pausas.length, pausaMin: pausas.reduce((a, b) => a + b, 0) })
+    const activo = trabajo.reduce((a, b) => a + b, 0)
+    return { tipico: cuantil(trabajo, 0.5), rapido: cuantil(trabajo, 0.25), lento: cuantil(trabajo, 0.75), activo,
+      pausas: pausas.length, pausaMin: pausas.reduce((a, b) => a + b, 0), autosHora: trabajo.length / (activo / 60), n: trabajo.length }
   }
+  function ritmo (filas) { return tiempos(filas).tipico }
   function resumen (filas) {
     const dias = new Set(filas.map(r => claveDia(new Date(r.client_at))))
     const n = filas.length
-    return { n, dias: dias.size, porDia: dias.size ? n / dias.size : 0, ritmo: ritmo(filas) }
+    const t = tiempos(filas)
+    return { n, dias: dias.size, porDia: dias.size ? n / dias.size : 0, ritmo: t.tipico, t }
   }
 
   /* ---------- 1. Indicadores frente al período anterior ---------- */
@@ -138,7 +157,7 @@
     const s = document.createElement('style')
     s.id = 'viz-extra'
     s.textContent = '.kpi-banda{grid-column:1/-1;display:flex;align-items:center;gap:10px;min-height:44px;padding:10px 16px;' +
-      'border-radius:16px;background:linear-gradient(rgba(229,53,43,.1),rgba(229,53,43,.1)) var(--celda);box-shadow:var(--sombra);' +
+      'border-radius:12px;background:linear-gradient(rgba(201,48,42,.09),rgba(201,48,42,.09)) var(--celda);box-shadow:var(--sombra);' +
       'color:var(--rojo);font-size:14.5px;line-height:19px;font-weight:700}' +
       '.kpi-banda svg{width:20px;height:20px;flex:none;fill:currentColor}.kpi-banda b{font-weight:800;letter-spacing:.3px}' +
       '.kpi.kpi-chico .kpi-v{font-size:22px;line-height:36px;letter-spacing:-.4px}' +
@@ -183,8 +202,9 @@
       { k: 'Autos lavados', v: num(a.n), d: delta(a.n, p.n, false, () => deltaPct(a.n, p.n)), spark: true },
       { k: 'Por día trabajado', v: a.dias ? num(a.porDia, 1) : '—', s: a.dias ? 'en ' + a.dias + (a.dias === 1 ? ' día' : ' días') : '',
         d: a.dias ? delta(a.porDia, p.dias ? p.porDia : null, false, x => num(x, 1)) : '' },
-      { k: 'Ritmo', v: a.ritmo == null ? '—' : '1 cada ' + Math.round(a.ritmo) + ' min', s: 'mediana entre autos seguidos',
-        d: a.ritmo == null ? '' : delta(a.ritmo, p.ritmo, true, x => Math.round(x) + ' min'), chico: true }
+      { k: 'Tiempo por auto', v: a.ritmo == null ? '—' : Math.round(a.ritmo) + ' min',
+        s: a.ritmo == null ? 'hacen falta dos autos seguidos' : num(a.t.autosHora, 1) + ' autos por hora, sin contar pausas',
+        d: a.ritmo == null ? '' : delta(a.ritmo, p.ritmo, true, x => Math.round(x) + ' min') }
     ]
     /* El cuarto: el mejor día del período. Si el período es un solo día no
        hay nada que comparar y se enseña cuántas personas trabajaron. */
@@ -323,12 +343,14 @@
       const pa = antes.get(t.nombre.toLowerCase()) || 0, dd = t.n - pa
       const cambio = !hayAntes ? '' : !pa ? 'nuevo en este período' : dd === 0 ? 'igual que el ' + o.nombreAnterior : (dd > 0 ? '+' : '−') + num(Math.abs(dd)) + ' frente al ' + o.nombreAnterior
       const tip = '<b>' + esc(t.nombre) + '</b>' + num(t.n) + ' autos, el ' + Math.round(t.n / total * 100) + ' % del total' +
-        '<span>' + (t.ritmo == null ? 'Ritmo sin datos' : 'Uno cada ' + Math.round(t.ritmo) + ' min') + '</span>' +
+        '<span>' + (t.ritmo == null ? 'Tiempo por auto sin datos' : Math.round(t.ritmo) + ' min por auto (de ' + Math.round(t.t.rapido) + ' a ' + Math.round(t.t.lento) + ' lo habitual)') + '</span>' +
+        (t.ritmo == null ? '' : '<span>' + min(t.t.activo) + ' trabajando' + (t.t.pausas ? ', ' + min(t.t.pausaMin) + ' en ' + t.t.pausas + (t.t.pausas === 1 ? ' pausa' : ' pausas') : '') + '</span>') +
         '<span>' + t.dias + (t.dias === 1 ? ' día' : ' días') + ', ' + num(t.porDia, 1) + ' por día</span>' +
         (hayAntes ? '<span>' + num(pa) + ' en el ' + esc(o.nombreAnterior) + '</span>' : '')
       return '<div class="tr-fila" data-tip="' + esc(tip) + '"><div class="tr-cab"><b>' + esc(t.nombre) + '</b><span class="tr-n">' + num(t.n) + '</span></div>' +
         '<div class="tr-pista"><i style="width:' + Math.max(2, t.n / mx * 100).toFixed(1) + '%"></i></div>' +
-        '<div class="tr-datos"><span>' + (t.ritmo == null ? 'ritmo —' : '1 cada ' + Math.round(t.ritmo) + ' min') + '</span>' +
+        '<div class="tr-datos"><span>' + (t.ritmo == null ? 'tiempo por auto —' : '<b>' + Math.round(t.ritmo) + ' min</b> por auto') + '</span>' +
+        (t.ritmo == null ? '' : '<span>' + num(t.t.autosHora, 1) + ' por hora</span>') +
         '<span>' + num(t.porDia, 1) + ' por día</span>' +
         (cambio ? '<span class="' + (pa && dd < 0 ? 'flojo' : '') + '">' + esc(cambio) + '</span>' : '') + '</div></div>'
     }).join('')
@@ -401,5 +423,5 @@
     conEtiqueta(cont)
   }
 
-  window.Graficos = { indicadores, tendencia, calor, trabajadores, jornada, marcas, resumen, ritmo, ocultar }
+  window.Graficos = { indicadores, tendencia, calor, trabajadores, jornada, marcas, resumen, ritmo, tiempos, duracion: min, ocultar }
 })()
