@@ -623,7 +623,7 @@ main>section.entra{animation:entra .16s ease-out}
       <button class="rapido" id="btnBarras" type="button"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-barcode"/></svg></span></span>Código de barras</button>
       <!-- Al acabar el día, la hoja de cada trabajador: sus autos con la
            foto del VIN y los números del día, para mandarla por WhatsApp. -->
-      <button class="rapido" id="btnResumen" type="button"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-report"/></svg></span></span>Resumen del día</button>
+      <button class="rapido" id="btnResumen" type="button"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-report"/></svg></span></span>Resúmenes</button>
       <button class="rapido" type="button" data-ir="reportes"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-vehicle"/></svg></span></span>Reportes</button>
     </div>
 
@@ -695,7 +695,7 @@ main>section.entra{animation:entra .16s ease-out}
     </div>
 
     <div class="grupo">
-      <button class="fila accion" id="btnResumenRep" type="button"><span class="mas">Resumen del día por trabajador</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="fila accion" id="btnResumenRep" type="button"><span class="mas">Resumen del equipo o por trabajador (día, semana, quincena, mes)</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <button class="fila accion" id="rep_pdf" type="button"><span class="mas">Imprimir o guardar en PDF</span></button>
       <button class="fila accion" id="rep_export" type="button"><span class="mas">Exportar CSV</span></button>
     </div>
@@ -846,9 +846,16 @@ main>section.entra{animation:entra .16s ease-out}
 
 <div class="scrim" id="resScrim">
   <div class="sheet">
-    <h3>Resumen del día</h3>
-    <p class="hint">Elige el día y, para cada trabajador, la foto (para WhatsApp) o el PDF (para imprimir). Lleva la foto del VIN de cada auto.</p>
-    <label class="f">Día<input class="inp" type="date" id="res_dia"></label>
+    <h3>Resumen</h3>
+    <p class="hint">Elige el período y saca el de todo el equipo o el de un trabajador: la foto (para WhatsApp) o el PDF (para imprimir).</p>
+    <div class="segctrl" id="res_periodo" role="tablist">
+      <button class="seg on" data-p="day" type="button">Día</button>
+      <button class="seg" data-p="week" type="button">Semana</button>
+      <button class="seg" data-p="fortnight" type="button">Quincena</button>
+      <button class="seg" data-p="month" type="button">Mes</button>
+    </div>
+    <label class="f"><span id="res_diaTit">Día</span><input class="inp" type="date" id="res_dia"></label>
+    <p class="hint" id="res_rango"></p>
     <div class="grupo" id="res_gente"></div>
     <button class="secondary" id="res_cancel" type="button">Cerrar</button>
   </div>
@@ -1789,7 +1796,8 @@ async function deleteEntry(){
    registros reales). */
 const normNombre = s => String(s || "").trim().toLowerCase();
 const fechaLocal = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-let resFilas = [];
+let resFilas = [], resPeriodo = "day";
+const TITULO_RESUMEN = { day: "del día", week: "de la semana", fortnight: "de la quincena", month: "del mes" };
 function abrirResumen(){
   const inp = document.getElementById("res_dia");
   const hoy = fechaLocal(new Date());
@@ -1798,101 +1806,143 @@ function abrirResumen(){
   document.getElementById("resScrim").classList.add("open");
   cargarGenteDelDia();
 }
+function ponerPeriodoResumen(p){
+  resPeriodo = p;
+  document.querySelectorAll("#res_periodo .seg").forEach(b => b.classList.toggle("on", b.dataset.p === p));
+  document.getElementById("res_diaTit").textContent = p === "day" ? "Día" : "Cualquier día del período";
+  cargarGenteDelDia();
+}
+function rangoResumen(){
+  return periodRange(resPeriodo, new Date(document.getElementById("res_dia").value + "T12:00"));
+}
 async function cargarGenteDelDia(){
-  const dia = document.getElementById("res_dia").value;
   const caja = document.getElementById("res_gente");
+  const r = rangoResumen();
+  document.getElementById("res_rango").textContent = resPeriodo === "day" ? "" : fmtRange(r);
   caja.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">Cargando…</span></div>';
   try {
-    const d0 = new Date(dia + "T00:00");
-    resFilas = await Datos.lista(startOfDay(d0), endOfDayExclusive(d0));
+    resFilas = await Datos.lista(r.from, r.to);
   } catch (e) { caja.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">No se pudo cargar. Revisa la conexión.</span></div>'; return; }
   const gente = new Map();
-  for (const r of resFilas) {
-    const k = normNombre(r.worker_name); if (!k) continue;
-    const g = gente.get(k) || { nombre: String(r.worker_name).trim(), n: 0 };
+  for (const x of resFilas) {
+    const k = normNombre(x.worker_name); if (!k) continue;
+    const g = gente.get(k) || { nombre: String(x.worker_name).trim(), n: 0 };
     g.n++; gente.set(k, g);
   }
-  if (!gente.size) { caja.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">Ese día no hay autos registrados.</span></div>'; return; }
-  /* Dos botones por persona y no uno: la foto es para mandar por WhatsApp,
-     el PDF para imprimir o archivar, y cada uno prepara sólo lo suyo. */
-  caja.innerHTML = [...gente.entries()].sort((a, b) => b[1].n - a[1].n).map(([k, g]) =>
-    '<div class="resfila"><div class="resnom"><b>' + esc(g.nombre) + '</b><span class="hint" style="margin:0">' + g.n + ' auto' + (g.n === 1 ? '' : 's') + '</span></div>' +
+  if (!resFilas.length) { caja.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">En ese período no hay autos registrados.</span></div>'; return; }
+  /* Primero todo el equipo, después cada persona. Dos botones por fila: la
+     foto es para WhatsApp, el PDF para imprimir o archivar. */
+  const fila = (k, nombre, n) =>
+    '<div class="resfila"><div class="resnom"><b>' + esc(nombre) + '</b><span class="hint" style="margin:0">' + n + ' auto' + (n === 1 ? '' : 's') + '</span></div>' +
     '<button class="primary" type="button" data-w="' + esc(k) + '" data-f="foto">Foto</button>' +
-    '<button class="primary" type="button" data-w="' + esc(k) + '" data-f="pdf">PDF</button></div>').join("");
-  caja.querySelectorAll("[data-w]").forEach(b => b.onclick = () => generarResumen(dia, b.dataset.w, b.dataset.f));
+    '<button class="primary" type="button" data-w="' + esc(k) + '" data-f="pdf">PDF</button></div>';
+  caja.innerHTML = fila("*", "Todo el equipo", resFilas.length) +
+    [...gente.entries()].sort((a, b) => b[1].n - a[1].n).map(([k, g]) => fila(k, g.nombre, g.n)).join("");
+  caja.querySelectorAll("[data-w]").forEach(b => b.onclick = () => generarResumen(b.dataset.w, b.dataset.f));
 }
-async function generarResumen(dia, clave, formato){
-  const filas = resFilas.filter(r => normNombre(r.worker_name) === clave)
+async function generarResumen(clave, formato){
+  const equipo = clave === "*", dia1 = resPeriodo === "day";
+  const r = rangoResumen();
+  const filas = resFilas.filter(x => equipo || normNombre(x.worker_name) === clave)
     .sort((a, b) => new Date(a.client_at) - new Date(b.client_at));
   if (!filas.length) return;
-  const nombre = String(filas[0].worker_name).trim();
-  const d0 = new Date(dia + "T00:00");
-  /* Su media de los últimos 30 días, contando sólo los días que trabajó:
-     compararse con uno mismo es lo que dice si el día fue bueno. */
-  let media = null;
-  try {
-    const desde = new Date(d0); desde.setDate(desde.getDate() - 30);
-    const hist = await Datos.lista(startOfDay(desde), startOfDay(d0));
-    const porDia = {};
-    for (const r of hist) if (normNombre(r.worker_name) === clave) { const k = fechaLocal(new Date(r.client_at)); porDia[k] = (porDia[k] || 0) + 1; }
-    const v = Object.values(porDia);
-    if (v.length) media = v.reduce((a, b) => a + b, 0) / v.length;
-  } catch (e) {}
+  const nombre = equipo ? "Todo el equipo" : String(filas[0].worker_name).trim();
   const n = filas.length;
-  const t0 = new Date(filas[0].client_at), t1 = new Date(filas[n - 1].client_at);
-  const minutos = (t1 - t0) / 60000;
   const hora = d => d.toLocaleTimeString("es-AU", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const fechaCorta = d => d.toLocaleDateString("es-AU", { day: "2-digit", month: "2-digit" });
   const num = (v, dec) => Number(v).toLocaleString("de-DE", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  const dias = new Set(filas.map(x => fechaLocal(new Date(x.client_at))));
+  /* La media de antes, para comparar: la de los 30 días previos por día
+     trabajado (en el día) o el período anterior igual (en los demás). */
+  let ref = null, refTxt = "";
+  try {
+    if (dia1) {
+      const desde = new Date(r.from); desde.setDate(desde.getDate() - 30);
+      const hist = await Datos.lista(desde, r.from);
+      const porDia = {};
+      for (const x of hist) if (equipo || normNombre(x.worker_name) === clave) { const k = fechaLocal(new Date(x.client_at)); porDia[k] = (porDia[k] || 0) + 1; }
+      const v = Object.values(porDia);
+      if (v.length) { ref = v.reduce((a, b) => a + b, 0) / v.length; refTxt = "frente a la media (" + num(ref, 1) + ")"; }
+    } else {
+      const d = new Date(r.from); d.setDate(d.getDate() - 1);
+      const ant = periodRange(resPeriodo, d);
+      const hist = await Datos.lista(ant.from, ant.to);
+      ref = hist.filter(x => equipo || normNombre(x.worker_name) === clave).length;
+      refTxt = "frente al período anterior (" + ref + ")";
+    }
+  } catch (e) {}
+  const dif = ref == null ? null : Math.round((n - ref) * 10) / 10;
   const marcas = {};
-  for (const r of filas) if (r.make) { const m = String(r.make).trim(); marcas[m] = (marcas[m] || 0) + 1; }
-  const dif = media == null ? null : Math.round((n - media) * 10) / 10;
-  /* La misma cuenta que los reportes: sin pausas (almuerzo, esperas). */
+  for (const x of filas) if (x.make) { const m = String(x.make).trim(); marcas[m] = (marcas[m] || 0) + 1; }
   const tp = Graficos.tiempos(filas);
   const ritmo = tp.tipico == null ? null : Math.round(tp.tipico);
   const pausasTxt = tp.pausas ? Graficos.duracion(tp.pausaMin) + " en " + tp.pausas + (tp.pausas === 1 ? " pausa" : " pausas") : "";
   const reps = repetidosDe(filas, (await historialRepetidos()) || resFilas);
+  const nNov = filas.filter(tieneNovedades).length;
+  const t0 = new Date(filas[0].client_at), t1 = new Date(filas[n - 1].client_at);
+  const kpis = [
+    { etiqueta: "Vehículos", valor: String(n),
+      nota: dif == null ? null : (dif >= 0 ? "+" : "") + num(dif, dia1 ? 1 : 0) + " " + refTxt,
+      tono: dif == null ? null : dif >= 0 ? "bien" : "mal" },
+    dia1
+      ? { etiqueta: "Primero y último", valor: hora(t0) + " – " + hora(t1),
+          nota: n > 1 && tp.activo ? Graficos.duracion(tp.activo) + " trabajando" + (pausasTxt ? ", " + pausasTxt : "") : null }
+      : { etiqueta: "Días trabajados", valor: String(dias.size), nota: num(n / dias.size, 1) + " autos por día" },
+    { etiqueta: "Tiempo por auto", valor: ritmo == null ? "—" : ritmo + " min",
+      nota: ritmo == null ? null : num(tp.autosHora, 1) + " autos por hora, sin contar break ni pausas" },
+    { etiqueta: "VIN repetidos", valor: String(reps.size), nota: reps.size ? "revisa los marcados en rojo" : "ninguno",
+      tono: reps.size ? "mal" : "bien" }
+  ];
+  if (nNov) kpis.push({ etiqueta: "Con novedades", valor: String(nNov), nota: "notas, sin libro, entre varios…" });
+  const graficos = [];
+  if (equipo) {
+    const porP = {};
+    for (const x of filas) { const k = String(x.worker_name || "Sin nombre").trim(); porP[k] = (porP[k] || 0) + 1; }
+    graficos.push({ tipo: "barras", titulo: "Por trabajador", datos: Object.entries(porP).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([etiqueta, valor]) => {
+      const t = Graficos.tiempos(filas.filter(x => String(x.worker_name || "Sin nombre").trim() === etiqueta));
+      return { etiqueta: etiqueta + (t.tipico != null ? " · " + Math.round(t.tipico) + " min" : ""), valor };
+    }) });
+  }
+  if (!dia1) {
+    const porD = {};
+    for (const x of filas) { const k = fechaLocal(new Date(x.client_at)); porD[k] = (porD[k] || 0) + 1; }
+    graficos.push({ tipo: "barras", titulo: "Por día", datos: Object.keys(porD).sort().map(k => ({
+      etiqueta: new Date(k + "T12:00").toLocaleDateString("es-AU", { weekday: "short", day: "2-digit", month: "2-digit" }), valor: porD[k] })) });
+  }
+  graficos.push({ tipo: "horas", titulo: "Autos por hora del día", datos: InformeDia.porHora(filas.map(x => x.client_at)) });
+  graficos.push({ tipo: "barras", titulo: "Marcas", datos: Object.entries(marcas).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([etiqueta, valor]) => ({ etiqueta, valor })) });
+  const supers = [...new Set(filas.map(x => String(x.supervisor_name || "").trim()).filter(Boolean))];
   InformeDia.abrir({
     idioma: "es",
     marca: { nombre: "Green & Clean", color: "#1f7a2e", logo: "logo-marca.png" },
-    titulo: "Resumen del día", persona: nombre, fecha: dia,
-    lugar: [...new Set(filas.map(r => r.supervisor_name).filter(Boolean))].length
-      ? "Supervisa " + [...new Set(filas.map(r => String(r.supervisor_name).trim()).filter(Boolean))].join(", ") : "",
-    kpis: [
-      { etiqueta: "Vehículos", valor: String(n),
-        nota: media == null ? null : (dif >= 0 ? "+" : "") + num(dif, 1) + " frente a su media (" + num(media, 1) + ")",
-        tono: dif == null ? null : dif >= 0 ? "bien" : "mal" },
-      { etiqueta: "Primero y último", valor: hora(t0) + " – " + hora(t1),
-        nota: n > 1 ? (tp.activo ? Graficos.duracion(tp.activo) + " trabajando" + (pausasTxt ? ", " + pausasTxt : "") : num(minutos / 60, 1) + " h entre el primero y el último") : null },
-      { etiqueta: "Tiempo por auto", valor: ritmo == null ? "—" : ritmo + " min",
-        nota: ritmo == null ? null : num(tp.autosHora, 1) + " autos por hora, sin contar break ni pausas" },
-      { etiqueta: "VIN repetidos", valor: String(reps.size), nota: reps.size ? "revisa los marcados en rojo" : "ninguno",
-        tono: reps.size ? "mal" : "bien" }
-    ],
-    alerta: reps.size ? reps.size + (reps.size === 1 ? " auto de este día tiene" : " autos de este día tienen") +
+    titulo: "Resumen " + TITULO_RESUMEN[resPeriodo], persona: nombre, fecha: fechaLocal(r.from),
+    fechaTexto: dia1 ? null : fmtRange(r),
+    lugar: supers.length ? "Supervisa " + supers.join(", ") : "",
+    kpis,
+    alerta: reps.size ? reps.size + (reps.size === 1 ? " auto tiene" : " autos tienen") +
       " los mismos seis últimos del VIN que otro registro. Revisa que no sea el mismo auto apuntado dos veces." : null,
-    frase: nombre + " registró " + n + " auto" + (n === 1 ? "" : "s") +
-      (n > 1 ? " entre las " + hora(t0) + " y las " + hora(t1) + (ritmo ? ", a " + ritmo + " minutos por auto" + (pausasTxt ? " sin contar " + pausasTxt : "") : "") : " a las " + hora(t0)) +
-      ".",
-    graficos: [
-      { tipo: "horas", titulo: "Autos por hora del día", datos: InformeDia.porHora(filas.map(r => r.client_at)) },
-      { tipo: "barras", titulo: "Marcas", datos: Object.entries(marcas).sort((a, b) => b[1] - a[1]).slice(0, 6)
-        .map(([etiqueta, valor]) => ({ etiqueta, valor })) }
-    ],
-    autos: filas.map(r => ({
-      vin: r.vin_full || (r.vin6 ? "…" + r.vin6 : "—"),
-      hora: hora(new Date(r.client_at)),
-      repetido: reps.has(String(r.id)) ? textoRepetido(reps.get(String(r.id))) : null,
-      novedad: tieneNovedades(r) ? textoNovedades(r) : null,
-      detalle: [r.make, r.model, r.color].filter(Boolean).join(" ") || (r.supervisor_name ? "Supervisor: " + r.supervisor_name : ""),
-      /* Primero el recorte guardado al escanear; si no está en este
-         teléfono, se saca de la foto guardada y se guarda para la próxima. */
-      recorte: async () => {
-        let rc = await InformeDia.leerRecorte(r.id);
-        if (rc || !r.tiene_foto) return rc;
-        const foto = await rpc("vin_log_foto", { p_id: r.id });
+    frase: nombre + (equipo ? " registró " : " registró ") + n + " auto" + (n === 1 ? "" : "s") +
+      (dia1 ? (n > 1 ? " entre las " + hora(t0) + " y las " + hora(t1) : " a las " + hora(t0))
+            : " en " + dias.size + (dias.size === 1 ? " día" : " días") + " (" + fmtRange(r) + ")") +
+      (ritmo ? ", a " + ritmo + " minutos por auto" + (pausasTxt && dia1 ? " sin contar " + pausasTxt : "") : "") + ".",
+    graficos,
+    /* Un período largo lleva cientos de autos: la hoja enseña números,
+       gráficos y las novedades auto por auto, sin la ficha de cada uno. El
+       listado completo está en el CSV de Reportes. */
+    sinLista: !dia1,
+    autos: filas.map(x => ({
+      vin: x.vin_full || (x.vin6 ? "…" + x.vin6 : "—"),
+      hora: (dia1 ? "" : fechaCorta(new Date(x.client_at)) + " ") + hora(new Date(x.client_at)) + (equipo && x.worker_name ? " · " + String(x.worker_name).trim() : ""),
+      repetido: reps.has(String(x.id)) ? textoRepetido(reps.get(String(x.id))) : null,
+      novedad: tieneNovedades(x) ? textoNovedades(x) : null,
+      detalle: [x.make, x.model, x.color].filter(Boolean).join(" ") || (x.supervisor_name ? "Supervisor: " + x.supervisor_name : ""),
+      recorte: !dia1 ? null : async () => {
+        let rc = await InformeDia.leerRecorte(x.id);
+        if (rc || !x.tiene_foto) return rc;
+        const foto = await rpc("vin_log_foto", { p_id: x.id });
         if (!foto) return null;
         rc = await LectorVIN.recortarVin(foto);
-        if (rc) InformeDia.guardarRecorte(r.id, rc);
+        if (rc) InformeDia.guardarRecorte(x.id, rc);
         return rc;
       }
     })),
@@ -2561,6 +2611,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btnResumen").onclick = abrirResumen;
   document.getElementById("btnResumenRep").onclick = abrirResumen;
   document.getElementById("res_dia").onchange = cargarGenteDelDia;
+  document.querySelectorAll("#res_periodo .seg").forEach(b => b.onclick = () => ponerPeriodoResumen(b.dataset.p));
   document.getElementById("res_cancel").onclick = () => document.getElementById("resScrim").classList.remove("open");
   document.getElementById("galInput").addEventListener("change", e => {
     const f = e.target.files[0]; e.target.value = "";

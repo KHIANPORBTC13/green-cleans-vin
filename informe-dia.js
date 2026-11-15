@@ -184,7 +184,7 @@
       fuente(g, 800, 46); g.fillStyle = '#fff'
       g.fillText(recortarTexto(g, d.persona || '', W - 120), M + 120, y + 134)
       fuente(g, 500, 24); g.fillStyle = 'rgba(255,255,255,.9)'
-      g.fillText(recortarTexto(g, [fechaLarga(d.fecha, d.idioma), d.lugar].filter(Boolean).join(' · '), W - 120), M + 120, y + 174)
+      g.fillText(recortarTexto(g, [(d.fechaTexto || fechaLarga(d.fecha, d.idioma)), d.lugar].filter(Boolean).join(' · '), W - 120), M + 120, y + 174)
     } })
 
     const kpis = (d.kpis || []).slice(0, 4)
@@ -279,12 +279,12 @@
       }
     }
 
-    const autos = d.autos || []
-    out.push({ alto: 110, dibujar (g, y) {
+    const autos = d.sinLista ? [] : (d.autos || [])
+    if (!d.sinLista) out.push({ alto: 110, dibujar (g, y) {
       g.fillStyle = C.tinta; fuente(g, 800, 30)
       g.fillText(L.vehiculos.replace('{n}', autos.length), M, y + 84)
     } })
-    if (!autos.length) {
+    if (!autos.length && !d.sinLista) {
       out.push({ alto: 90, dibujar (g, y) { g.fillStyle = C.suave; fuente(g, 500, 24); g.fillText(L.ninguno, M, y + 50) } })
     }
     /* Lo que comparten las dos clases de tarjeta: el fondo (rojo entero si
@@ -409,7 +409,7 @@
       if (primera) { cab.dibujar(g, 0); y = cab.alto }
       else {
         g.fillStyle = C.suave; fuente(g, 600, 21)
-        g.fillText(recortarTexto(g, (d.persona || '') + ' · ' + fechaLarga(d.fecha, d.idioma), ANCHO - 2 * M), M, 64)
+        g.fillText(recortarTexto(g, (d.persona || '') + ' · ' + (d.fechaTexto || fechaLarga(d.fecha, d.idioma)), ANCHO - 2 * M), M, 64)
         g.fillStyle = C.linea; g.fillRect(M, 84, ANCHO - 2 * M, 2)
         y = 96
       }
@@ -473,7 +473,7 @@
       FAM = getComputedStyle(document.body).fontFamily || FAM
       if (document.fonts && document.fonts.ready) await document.fonts.ready
     } catch (e) {}
-    const autos = d.autos || []
+    const autos = d.sinLista ? [] : (d.autos || [])
     const recortes = new Array(autos.length).fill(null)
     let hechos = 0
     /* Cada recorte tiene un tope de tiempo. Sacarlo de una foto guardada
