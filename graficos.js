@@ -114,6 +114,20 @@
        - lo demás es tiempo trabajando;
        - "tipico" es la mediana (un auto raro no la mueve) y "autosHora"
          sale del tiempo trabajando, no del reloj. */
+  /* La jornada de siempre: más o menos de 9 a 4, y un break sin pagar de
+     13:00 a 13:35. Las horas de entrada y salida varían, así que no se
+     recorta nada fuera de ese horario: sólo
+       - el break se descuenta de la espera que lo atraviesa (un auto que
+         empezó 12:50 y se registró 13:55 son 30 min de trabajo, no 65);
+       - el primer auto del día cuenta desde las 9:00, si se registró
+         después; si alguien llegó tarde esa espera sale larga y cae como
+         pausa, igual que cualquier otra. */
+  const JORNADA = { inicio: 9 * 60, breakDe: 13 * 60, breakA: 13 * 60 + 35 }
+  function minutosSinBreak (a, b) {
+    const d = new Date(a), x = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60
+    const g = (b - a) / 60000, y = x + g
+    return g - Math.max(0, Math.min(y, JORNADA.breakA) - Math.max(x, JORNADA.breakDe))
+  }
   function tiempos (filas) {
     const porPersonaDia = new Map()
     for (const r of filas) {
@@ -125,7 +139,9 @@
     const todos = []
     for (const l of porPersonaDia.values()) {
       l.sort((a, b) => a - b)
-      for (let i = 1; i < l.length; i++) { const g = (l[i] - l[i - 1]) / 60000; if (g > 0) todos.push(g) }
+      const ini = new Date(l[0]); ini.setHours(0, 0, 0, 0); ini.setMinutes(JORNADA.inicio)
+      if (l[0] > ini.getTime()) { const g = minutosSinBreak(ini.getTime(), l[0]); if (g > 0) todos.push(g) }
+      for (let i = 1; i < l.length; i++) { const g = minutosSinBreak(l[i - 1], l[i]); if (g > 0) todos.push(g) }
     }
     const vacio = { tipico: null, rapido: null, lento: null, activo: 0, pausas: 0, pausaMin: 0, autosHora: null, n: 0 }
     if (!todos.length) return vacio
@@ -203,7 +219,7 @@
       { k: 'Por día trabajado', v: a.dias ? num(a.porDia, 1) : '—', s: a.dias ? 'en ' + a.dias + (a.dias === 1 ? ' día' : ' días') : '',
         d: a.dias ? delta(a.porDia, p.dias ? p.porDia : null, false, x => num(x, 1)) : '' },
       { k: 'Tiempo por auto', v: a.ritmo == null ? '—' : Math.round(a.ritmo) + ' min',
-        s: a.ritmo == null ? 'hacen falta dos autos seguidos' : num(a.t.autosHora, 1) + ' autos por hora, sin contar pausas',
+        s: a.ritmo == null ? 'hacen falta dos autos seguidos' : num(a.t.autosHora, 1) + ' autos por hora, sin contar break ni pausas',
         d: a.ritmo == null ? '' : delta(a.ritmo, p.ritmo, true, x => Math.round(x) + ' min') }
     ]
     /* El cuarto: el mejor día del período. Si el período es un solo día no

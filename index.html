@@ -1823,7 +1823,7 @@ async function generarResumen(dia, clave, formato){
       { etiqueta: "Primero y último", valor: hora(t0) + " – " + hora(t1),
         nota: n > 1 ? (tp.activo ? Graficos.duracion(tp.activo) + " trabajando" + (pausasTxt ? ", " + pausasTxt : "") : num(minutos / 60, 1) + " h entre el primero y el último") : null },
       { etiqueta: "Tiempo por auto", valor: ritmo == null ? "—" : ritmo + " min",
-        nota: ritmo == null ? null : num(tp.autosHora, 1) + " autos por hora, sin contar pausas" },
+        nota: ritmo == null ? null : num(tp.autosHora, 1) + " autos por hora, sin contar break ni pausas" },
       { etiqueta: "VIN repetidos", valor: String(reps.size), nota: reps.size ? "revisa los marcados en rojo" : "ninguno",
         tono: reps.size ? "mal" : "bien" }
     ],
