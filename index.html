@@ -218,10 +218,22 @@ button.primary:active,button.secondary:active,.boton:active{filter:brightness(.9
 
 /* ---- Campos ---- */
 label.f{display:flex;flex-direction:column;gap:7px;font-size:14px;font-weight:600;color:var(--sec);margin:0 0 14px}
-input.inp,select.inp{width:100%;background:var(--celda);border:1px solid var(--sep);border-radius:10px;padding:13px 15px;
+input.inp,select.inp,textarea.inp{width:100%;background:var(--celda);border:1px solid var(--sep);border-radius:10px;padding:13px 15px;
   font-size:17px;color:var(--texto);-webkit-appearance:none;appearance:none;transition:border-color .15s}
-input.inp:focus,select.inp:focus{outline:none;border-color:var(--boton);box-shadow:0 0 0 3px var(--relleno2)}
-input.inp::placeholder{color:var(--ter)}
+input.inp:focus,select.inp:focus,textarea.inp:focus{outline:none;border-color:var(--boton);box-shadow:0 0 0 3px var(--relleno2)}
+input.inp::placeholder,textarea.inp::placeholder{color:var(--ter)}
+textarea.inp{display:block;min-height:76px;resize:vertical;font-family:inherit;line-height:22px}
+/* Novedades del auto: las de siempre a un toque y, debajo, texto libre. */
+.novedades{display:flex;flex-direction:column;gap:9px;font-size:14px;font-weight:600;color:var(--sec);margin:0 0 16px}
+.etiq{display:flex;flex-wrap:wrap;gap:8px}
+.etiq button{min-height:42px;padding:8px 14px;border-radius:21px;border:1px solid var(--sep);background:var(--celda);color:var(--texto);
+  font-size:15px;font-weight:600;line-height:20px;text-align:left}
+.etiq button[aria-pressed=true]{background:var(--boton);border-color:var(--boton);color:#fff}
+.etiq button[aria-pressed=true]::before{content:"✓ "}
+.fila .sub.nov{color:var(--tinte);font-weight:600}
+.nov-et{display:inline-block;font-size:12.5px;line-height:18px;font-weight:700;color:var(--tinte);background:var(--relleno2);
+  border-radius:7px;padding:0 7px;margin:2px 4px 2px 0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.reptable td.nov{min-width:180px;white-space:normal}
 /* En una fila, el campo va a la derecha y sin caja, como en Ajustes. */
 .fila input.inp,.fila select.inp{background:none;border:0;padding:0;text-align:right;color:var(--sec);border-radius:0;width:auto;flex:1;min-width:0;font-weight:500}
 .fila select.inp{flex:none;padding-right:18px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 16'%3E%3Cpath d='M2 6l3-3 3 3M2 10l3 3 3-3' fill='none' stroke='%23738a7c' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -669,6 +681,9 @@ main>section.entra{animation:entra .16s ease-out}
       <div class="grupo-cab"><span>Marcas</span></div>
       <div class="grupo viz" id="rep_marcas"></div>
 
+      <div class="grupo-cab" id="rep_novCab" hidden><span>Novedades</span><span id="rep_novN"></span></div>
+      <div class="grupo" id="rep_nov" hidden></div>
+
       <div class="grupo-cab"><span>Lo que dicen los números</span></div>
       <div class="grupo"><ul id="rep_insightsList"></ul></div>
 
@@ -698,10 +713,13 @@ main>section.entra{animation:entra .16s ease-out}
 
     <div class="grupo-cab"><span>Acceso</span></div>
     <div class="grupo">
-      <button class="fila accion" id="pin_cambiar" type="button"><span class="mas">Cambiar PIN</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <button class="fila peligro" id="pin_salir" type="button"><span class="mas">Salir de este teléfono</span></button>
+      <div class="fila"><span class="mas">Pedir PIN para entrar</span><span class="val" id="pin_estado">—</span></div>
+      <button class="fila accion" id="pin_activar" type="button" hidden><span class="mas">Activar PIN</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="fila accion" id="pin_cambiar" type="button" hidden><span class="mas">Cambiar PIN</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="fila accion" id="pin_quitar" type="button" hidden><span class="mas">Quitar el PIN</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="fila peligro" id="pin_salir" type="button" hidden><span class="mas">Salir de este teléfono</span></button>
     </div>
-    <p class="grupo-pie" id="pin_nota">El PIN es uno para todo el equipo. Al salir, este teléfono vuelve a pedirlo; los demás siguen dentro.</p>
+    <p class="grupo-pie" id="pin_nota"></p>
 
     <div class="grupo-cab"><span>Espacio</span></div>
     <div class="grupo">
@@ -753,6 +771,8 @@ main>section.entra{animation:entra .16s ease-out}
     <img id="cap_foto" alt="Foto del VIN">
     <label class="f">Trabajador<input class="inp" id="cap_worker" autocapitalize="words" enterkeyhint="done" placeholder="ej. Dani"></label>
     <label class="f">Supervisor<input class="inp" id="cap_supervisor" autocapitalize="words" enterkeyhint="done" placeholder="ej. Raúl"></label>
+    <div class="novedades"><span id="cap_novTit">Novedades (opcional)</span><div class="etiq" id="cap_etiq" role="group" aria-labelledby="cap_novTit"></div>
+      <textarea class="inp" id="cap_notas" rows="2" maxlength="1000" placeholder="Algo más que contar, ej. llegó con barro seco" aria-labelledby="cap_novTit"></textarea></div>
     <p class="hint">El lector intenta leerla por su cuenta; lo que no consiga queda en Por confirmar.</p>
     <button class="primary" id="cap_save" type="button">Guardar y escanear otro</button>
     <button class="secondary" id="cap_cancel" type="button">Cancelar</button>
@@ -797,6 +817,8 @@ main>section.entra{animation:entra .16s ease-out}
     <label class="f">Trabajador<input class="inp" id="rev_worker" autocapitalize="words" enterkeyhint="done" placeholder="Quién lavó el auto"></label>
     <label class="f">Supervisor<input class="inp" id="rev_supervisor" autocapitalize="words" enterkeyhint="done" placeholder="Quién sube esta foto"></label>
     <label class="f">Fecha y hora<input class="inp" type="datetime-local" id="rev_when"></label>
+    <div class="novedades"><span id="rev_novTit">Novedades (opcional)</span><div class="etiq" id="rev_etiq" role="group" aria-labelledby="rev_novTit"></div>
+      <textarea class="inp" id="rev_notas" rows="2" maxlength="1000" placeholder="Algo más que contar, ej. llegó con barro seco" aria-labelledby="rev_novTit"></textarea></div>
     <button class="primary" id="rev_save" type="button">Guardar</button>
     <button class="secondary danger" id="rev_delete" type="button" hidden>Eliminar registro</button>
     <button class="secondary" id="rev_cancel" type="button">Cancelar</button>
@@ -898,7 +920,12 @@ async function rpc(fn, body){
 }
 
 /* ===================== PIN de entrada ===================== */
-/* Un PIN del equipo, de 4 a 6 números, que cada teléfono escribe una vez.
+/* El PIN tiene un interruptor en la base y arranca apagado: el equipo
+   pidió entrar sin clave por ahora. Apagado, la app no pide nada. Se
+   enciende en Ajustes (Activar PIN: uno nuevo, dos veces) y se apaga con
+   el PIN puesto (Quitar el PIN). Encendido funciona como sigue.
+
+   Un PIN del equipo, de 4 a 6 números, que cada teléfono escribe una vez.
    El servidor lo comprueba y devuelve un token (una sesión) que se guarda
    en el teléfono; sin él la base contesta "Sin acceso" y se vuelve aquí.
 
@@ -912,15 +939,25 @@ async function rpc(fn, body){
    fuera a todo el equipo). */
 let pinSinActivar = false;
 const Pin = (() => {
-  let digitos = "", modo = "entrar", paso = 0, actual = "", nuevo = "", primerUso = false, ocupado = false, resolver = null, promesa = null, porExpulsion = false;
+  let digitos = "", modo = "entrar", paso = 0, actual = "", nuevo = "", ocupado = false, resolver = null, promesa = null, porExpulsion = false;
   const el = id => document.getElementById(id);
-  const PASOS = [["Cambiar PIN", "Escribe el PIN actual"], ["PIN nuevo", "Escribe el PIN nuevo"], ["PIN nuevo", "Escríbelo otra vez para comprobarlo"]];
+  const PASOS = {
+    cambiar: [["Cambiar PIN", "Escribe el PIN actual"], ["PIN nuevo", "Escribe el PIN nuevo"], ["PIN nuevo", "Escríbelo otra vez para comprobarlo"]],
+    activar: [["Activar PIN", "Escribe el PIN nuevo del equipo"], ["Activar PIN", "Escríbelo otra vez para comprobarlo"]],
+    quitar: [["Quitar el PIN", "Escribe el PIN actual"]]
+  };
+  const FINAL = { cambiar: "Guardar PIN", activar: "Activar PIN", quitar: "Quitar el PIN" };
+  const PIE = {
+    cambiar: "Los demás teléfonos siguen dentro con el PIN nuevo; no hace falta que vuelvan a entrar.",
+    activar: "Al activarlo, todos los demás teléfonos tendrán que escribirlo una vez.",
+    quitar: "Sin PIN, la app entra sin clave en todos los teléfonos."
+  };
   const sinFuncion = e => !!e && (e.status === 404 || e.codigo === "PGRST202");
   function pintar(){
     el("pin_puntos").querySelectorAll("i").forEach((p, i) => p.classList.toggle("on", i < digitos.length));
     const b = el("pin_entrar");
     b.disabled = ocupado || digitos.length < 4;
-    b.textContent = modo === "entrar" ? "Entrar" : (paso < 2 ? "Seguir" : "Guardar PIN");
+    b.textContent = modo === "entrar" ? "Entrar" : (paso < PASOS[modo].length - 1 ? "Seguir" : FINAL[modo]);
   }
   function aviso(txt, mal){ const a = el("pin_aviso"); a.textContent = txt || ""; a.classList.toggle("mal", !!mal); }
   function tiembla(){ const p = el("pin_puntos"); p.classList.remove("tiembla"); void p.offsetWidth; p.classList.add("tiembla"); }
@@ -931,22 +968,21 @@ const Pin = (() => {
   }
   function irAlPaso(n){
     paso = n; digitos = "";
-    el("pin_titulo").textContent = PASOS[n][0]; el("pin_texto").textContent = PASOS[n][1];
+    el("pin_titulo").textContent = PASOS[modo][n][0]; el("pin_texto").textContent = PASOS[modo][n][1];
     pintar();
   }
   function abrir(m){
     if (!el("pin").hidden && modo === "entrar" && m === "entrar" && promesa) return promesa;
     /* Si había otra petición esperando (cambiar el PIN), se da por cancelada. */
     if (resolver) { const r = resolver; resolver = promesa = null; r(false); }
-    modo = m; paso = 0; digitos = ""; actual = nuevo = ""; primerUso = false; ocupado = false;
+    modo = m; paso = 0; digitos = ""; actual = nuevo = ""; ocupado = false;
     el("pin_cancelar").classList.toggle("oculto", m === "entrar");
-    el("pin_pie").textContent = m === "entrar" ? "De 4 a 6 números. Se escribe una vez por teléfono."
-      : "Los demás teléfonos siguen dentro con el PIN nuevo; no hace falta que vuelvan a entrar.";
+    el("pin_pie").textContent = m === "entrar" ? "De 4 a 6 números. Se escribe una vez por teléfono." : PIE[m];
     if (m === "entrar") { el("pin_titulo").textContent = "Registro VIN"; el("pin_texto").textContent = "Escribe el PIN del equipo"; }
     else irAlPaso(0);
     aviso(""); pintar();
     el("pin").hidden = false; sincronizarAtras();
-    if (m === "entrar") avisarPrimerUso();
+    if (m === "entrar") comprobarSiHaceFalta();
     promesa = new Promise(r => { resolver = r; });
     return promesa;
   }
@@ -954,11 +990,11 @@ const Pin = (() => {
     el("pin").hidden = true; sincronizarAtras();
     const r = resolver; resolver = promesa = null; if (r) r(valor);
   }
-  async function avisarPrimerUso(){
+  /* Si mientras tanto alguien quitó el PIN, la pantalla sobra: se entra. */
+  async function comprobarSiHaceFalta(){
     try {
-      if ((await rpc("vin_log_hay_pin", {})) === false) {
-        primerUso = true;
-        el("pin_texto").textContent = "Todavía no hay PIN. El que escribas queda como el del equipo: compártelo sólo con quien registre autos.";
+      if ((await rpc("vin_log_hay_pin", {})) === false && modo === "entrar" && !el("pin").hidden) {
+        setToken(""); porExpulsion = false; cerrar(true);
       }
     } catch (e) {
       if (!sinFuncion(e) || modo !== "entrar") return;
@@ -975,7 +1011,6 @@ const Pin = (() => {
       const token = await rpc("vin_log_entrar", { p_pin: digitos, p_nombre: getSupervisorName().trim() || null });
       if (!token) throw new Error("El servidor no devolvió sesión");
       setToken(String(token)); pinSinActivar = false; ocupado = false; porExpulsion = false;
-      if (primerUso) toast("✓ Este PIN queda como el del equipo. Compártelo sólo con quien registre autos.");
       cerrar(true);
     } catch (e) {
       ocupado = false;
@@ -1002,9 +1037,36 @@ const Pin = (() => {
       aviso(/incorrecto/i.test(e.message) ? "El PIN actual no es correcto" : e.status ? e.message : "Sin conexión. Inténtalo de nuevo", true);
     }
   }
+  async function activar(){
+    if (paso === 0) { nuevo = digitos; irAlPaso(1); return; }
+    if (digitos !== nuevo) { tiembla(); irAlPaso(0); aviso("No coinciden. Escríbelo otra vez", true); return; }
+    ocupado = true; pintar(); aviso("Activando…");
+    try {
+      const token = await rpc("vin_log_pin_activar", { p_pin: nuevo, p_nombre: getSupervisorName().trim() || null });
+      if (!token) throw new Error("El servidor no devolvió sesión");
+      setToken(String(token)); ocupado = false; cerrar(true);
+      toast("✓ PIN activado. Compártelo sólo con quien registre autos.", 5000);
+    } catch (e) {
+      ocupado = false; if (modo !== "activar") { pintar(); return; }
+      tiembla(); irAlPaso(0);
+      aviso(e.status ? e.message : "Sin conexión. Inténtalo de nuevo", true);
+    }
+  }
+  async function quitar(){
+    ocupado = true; pintar(); aviso("Quitando…");
+    try {
+      await rpc("vin_log_pin_desactivar", { p_pin: digitos });
+      setToken(""); ocupado = false; cerrar(true);
+      toast("✓ PIN quitado. La app entra sin clave.");
+    } catch (e) {
+      ocupado = false; if (modo !== "quitar") { pintar(); return; }
+      digitos = ""; pintar(); tiembla();
+      aviso(/incorrecto/i.test(e.message) ? "El PIN no es correcto" : e.status ? e.message : "Sin conexión. Inténtalo de nuevo", true);
+    }
+  }
   function enviar(){
     if (ocupado || digitos.length < 4) return;
-    if (modo === "entrar") entrar(); else cambiar();
+    ({ entrar, cambiar, activar, quitar })[modo]();
   }
   /* Lo que estaba a la vista se vuelve a pedir con la sesión nueva. */
   function trasEntrar(){
@@ -1032,6 +1094,12 @@ const Pin = (() => {
     /* Pide el PIN y resuelve cuando este teléfono ya tiene sesión. */
     pedir: () => abrir("entrar"),
     cambiar: () => { if (!el("pin").hidden) return; abrir("cambiar"); },
+    activar: () => el("pin").hidden ? abrir("activar") : Promise.resolve(false),
+    quitar: () => el("pin").hidden ? abrir("quitar") : Promise.resolve(false),
+    /* ¿Hay que pedirlo? Sin señal o sin la función se entra: lo que se
+       registre va a la cola, y si el PIN estaba encendido la base lo dirá
+       al subir y saldrá esta pantalla. */
+    haceFalta: async () => { try { return (await rpc("vin_log_hay_pin", {})) === true; } catch (e) { return false; } },
     /* Salir borra también la sesión en la base: un token copiado de este
        teléfono deja de valer. Si no hay señal, se borra aquí igualmente. */
     salir: () => { rpc("vin_log_salir", {}).catch(() => {}).then(() => { setToken(""); porExpulsion = false; abrir("entrar").then(ok => { if (ok) trasEntrar(); }); }); },
@@ -1180,6 +1248,31 @@ async function vinesConocidos(){
 
 /* ===================== Utilidades ===================== */
 function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+/* ===================== Novedades ===================== */
+/* Lo que pasa con un auto y no es el chasis. Las de siempre van a un toque
+   y se guardan con su texto tal cual, para que reportes, CSV y resumen las
+   enseñen sin traducir; lo demás, en la nota libre. */
+const NOVEDADES = ["Sin libro de mantenimiento", "Sin sticker de VIN", "Trabajo difícil", "Entre 2 personas"];
+function montarNovedades(pref){
+  const caja = document.getElementById(pref + "_etiq");
+  caja.innerHTML = NOVEDADES.map(t => '<button type="button" aria-pressed="false">' + esc(t) + "</button>").join("");
+  caja.querySelectorAll("button").forEach(b => b.onclick = () => b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true")));
+}
+function ponerNovedades(pref, etiquetas, notas){
+  const marcadas = new Set(etiquetas || []);
+  document.querySelectorAll("#" + pref + "_etiq button").forEach(b => b.setAttribute("aria-pressed", String(marcadas.has(b.textContent))));
+  document.getElementById(pref + "_notas").value = notas || "";
+}
+function leerNovedades(pref){
+  return {
+    etiquetas: [...document.querySelectorAll("#" + pref + "_etiq button[aria-pressed=true]")].map(b => b.textContent),
+    notas: document.getElementById(pref + "_notas").value.trim()
+  };
+}
+const tieneNovedades = r => !!((r.etiquetas && r.etiquetas.length) || r.notas);
+/* En una línea: "Sin libro de mantenimiento, Entre 2 personas. Llegó con barro". */
+const textoNovedades = r => [(r.etiquetas || []).join(", "), r.notas || ""].filter(Boolean).join(". ");
 /* El aviso breve. Los mensajes del código empiezan con un signo (✓, ⚠︎,
    📶): aquí decide el color y se quita, para que en pantalla quede sólo
    la frase, como en los avisos del sistema. */
@@ -1402,6 +1495,7 @@ function abrirVistazo(dataUrl, recorte){
   document.getElementById("cap_foto").src = dataUrl;
   document.getElementById("cap_worker").value = getLastWorkerName() || "";
   document.getElementById("cap_supervisor").value = getSupervisorName() || "";
+  ponerNovedades("cap", null, "");
   document.getElementById("capScrim").classList.add("open");
 }
 function cerrarVistazo(){ document.getElementById("capScrim").classList.remove("open"); capFoto = null; }
@@ -1415,10 +1509,12 @@ async function guardarRapido(seguir){
   setLastWorkerName(worker); setSupervisorName(supervisor);
   const foto = capFoto.dataUrl;
   const recorte = capFoto.recorte;
+  const nov = leerNovedades("cap");
   const params = {
     p_vin_full: null, p_vin6: null, p_make: null, p_model: null, p_color: null,
     p_worker_name: worker, p_supervisor_name: supervisor,
     p_client_at: new Date().toISOString(), p_photo_data: null,
+    p_notas: nov.notas || null, p_etiquetas: nov.etiquetas.length ? nov.etiquetas : null,
   };
   const btn = document.getElementById("cap_save"); btn.disabled = true; btn.textContent = "Guardando…";
   let guardado = false;
@@ -1478,6 +1574,7 @@ function openReview(data){
   document.getElementById("rev_worker").value = data.worker != null ? data.worker : getLastWorkerName();
   document.getElementById("rev_supervisor").value = data.supervisor != null ? data.supervisor : getSupervisorName();
   document.getElementById("rev_when").value = toLocalInputValue(data.when ? new Date(data.when) : new Date());
+  ponerNovedades("rev", data.etiquetas, data.notas);
   document.getElementById("rev_title").textContent = editingId ? "Editar registro" : "Confirmar registro";
   document.getElementById("rev_delete").hidden = !editingId;
   let hint;
@@ -1582,12 +1679,14 @@ async function saveReview(){
     p_color: document.getElementById("rev_color").value.trim() || null,
     p_worker_name: worker, p_supervisor_name: supervisor,
   };
+  const nov = leerNovedades("rev");
   const whenLocal = document.getElementById("rev_when").value;
   const clientAt = whenLocal ? new Date(whenLocal).toISOString() : new Date().toISOString();
   const btn = document.getElementById("rev_save"); btn.disabled = true; btn.textContent = "Guardando…";
   if (editingId) {
     try {
-      await rpc("vin_log_update", { p_id: editingId, ...fields, p_client_at: clientAt });
+      /* Al editar se mandan siempre, vacías incluidas: así se puede quitar una. */
+      await rpc("vin_log_update", { p_id: editingId, ...fields, p_client_at: clientAt, p_notas: nov.notas, p_etiquetas: nov.etiquetas });
       toast("✓ Actualizado"); closeReview(); refreshOpenTabs();
     } catch (e) { toast("⚠︎ No se pudo actualizar. Revisa tu conexión e intenta de nuevo."); }
     finally { btn.disabled = false; btn.textContent = "Guardar"; }
@@ -1607,7 +1706,8 @@ async function saveReview(){
   const repetido = await buscarRepetido(fields.p_vin_full, fields.p_vin6, null);
   const params = { ...fields, p_client_at: clientAt, p_photo_data: await aligerarFoto(photo),
     p_confirmado: true,
-    p_estado: vinRevisado ? vinSemaforo(vinRevisado) : null };
+    p_estado: vinRevisado ? vinSemaforo(vinRevisado) : null,
+    p_notas: nov.notas || null, p_etiquetas: nov.etiquetas.length ? nov.etiquetas : null };
   try {
     const nuevo = await rpc("vin_log_insert", params);
     /* La foto del VIN, recortada, se queda en este teléfono para el resumen
@@ -1741,6 +1841,7 @@ async function generarResumen(dia, clave, formato){
       vin: r.vin_full || (r.vin6 ? "…" + r.vin6 : "—"),
       hora: hora(new Date(r.client_at)),
       repetido: reps.has(String(r.id)) ? textoRepetido(reps.get(String(r.id))) : null,
+      novedad: tieneNovedades(r) ? textoNovedades(r) : null,
       detalle: [r.make, r.model, r.color].filter(Boolean).join(" ") || (r.supervisor_name ? "Supervisor: " + r.supervisor_name : ""),
       /* Primero el recorte guardado al escanear; si no está en este
          teléfono, se saca de la foto guardada y se guarda para la próxima. */
@@ -1772,7 +1873,7 @@ async function loadToday(){
 }
 async function renderTodayList(rows){
   /* Lo que espera en la cola guarda su recorte con la clave provisional. */
-  const pend = (await getQueue()).map((q, i) => ({ id: "cola-" + i, _clave: claveCola(q), vin_full: q.p_vin_full, vin6: q.p_vin6, make: q.p_make, model: q.p_model, worker_name: q.p_worker_name, client_at: q.p_client_at, _pending: true }));
+  const pend = (await getQueue()).map((q, i) => ({ id: "cola-" + i, _clave: claveCola(q), vin_full: q.p_vin_full, vin6: q.p_vin6, make: q.p_make, model: q.p_model, worker_name: q.p_worker_name, client_at: q.p_client_at, notas: q.p_notas, etiquetas: q.p_etiquetas, _pending: true }));
   const list = pend.concat(rows);
   /* Los repetidos salen de la misma descarga que la lista: ya está fresca. */
   const reps = repetidosDe(list, Datos.enMemoria());
@@ -1849,13 +1950,14 @@ function rowHTML(r, repetido){
   return '<div class="fila vrow con-mini' + (r._pending ? " pending" : "") + (repetido ? " repetido" : "") + '"' + idAttr + '>' +
     miniHTML(r._pending ? r._clave : r.id) +
     '<span class="mas"><span class="vin6">' + esc(r.vin6 || "—") + '</span>' +
-      '<span class="sub">' + sub + '</span></span>' +
+      '<span class="sub">' + sub + '</span>' +
+      (tieneNovedades(r) ? '<span class="sub nov">' + esc(textoNovedades(r)) + '</span>' : "") + '</span>' +
     '<span class="val">' + time + '</span>' + (r._pending ? "" : CHEV) + '</div>';
 }
 async function openEditFromId(id, source){
   const row = source.find(r => String(r.id) === String(id));
   if (!row) return;
-  openReview({ id: row.id, photo: null, vinFull: row.vin_full || "", vin6: row.vin6 || "", make: row.make || "", model: row.model || "", color: row.color || "", worker: row.worker_name || "", supervisor: row.supervisor_name || "", when: row.client_at, skipHint: true });
+  openReview({ id: row.id, photo: null, vinFull: row.vin_full || "", vin6: row.vin6 || "", make: row.make || "", model: row.model || "", color: row.color || "", worker: row.worker_name || "", supervisor: row.supervisor_name || "", when: row.client_at, skipHint: true, notas: row.notas || "", etiquetas: row.etiquetas || [] });
   /* La ficha se abre ya y la foto entra despues: la lista dejo de traerlas
      para no descargar todas las del periodo, asi que esta se pide sola y
      mientras tanto no se hace esperar a nadie. */
@@ -1984,12 +2086,14 @@ function renderReport(){
   Graficos.jornada(document.getElementById("rep_jornada"), { filas: repRows });
   Graficos.marcas(document.getElementById("rep_marcas"), { filas: repRows });
   renderReportInsights(total, repMarcas.size, cubetas);
+  renderNovedades();
 
   const box = document.getElementById("rep_table");
   if (!total) { box.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">Sin registros en este período.</span></div>'; return; }
-  box.innerHTML = '<table class="reptable"><thead><tr><th>Fecha</th><th>Últimos 6</th><th>VIN</th><th>Marca</th><th>Modelo</th><th>Color</th><th>Trabajador</th><th>Supervisor</th><th></th></tr></thead><tbody>' +
+  box.innerHTML = '<table class="reptable"><thead><tr><th>Fecha</th><th>Últimos 6</th><th>VIN</th><th>Marca</th><th>Modelo</th><th>Color</th><th>Trabajador</th><th>Supervisor</th><th>Novedades</th><th></th></tr></thead><tbody>' +
     repRows.map(r => { const rp = repMarcas.get(String(r.id)); return '<tr data-id="' + esc(r.id) + '"' + (rp ? ' class="repetido"' : '') + '><td>' + new Date(r.client_at).toLocaleString("es-AU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) +
-      '</td><td><b>' + esc(r.vin6 || "—") + '</b>' + (rp ? '<br>' + ETIQ_REP + '<br><small>' + esc(textoRepetido(rp)) + '</small>' : '') + '</td><td>' + esc(r.vin_full || "—") + '</td><td>' + esc(r.make || "—") + '</td><td>' + esc(r.model || "—") + '</td><td>' + esc(r.color || "—") + '</td><td>' + esc(r.worker_name) + '</td><td>' + esc(r.supervisor_name || "—") + '</td><td>' +
+      '</td><td><b>' + esc(r.vin6 || "—") + '</b>' + (rp ? '<br>' + ETIQ_REP + '<br><small>' + esc(textoRepetido(rp)) + '</small>' : '') + '</td><td>' + esc(r.vin_full || "—") + '</td><td>' + esc(r.make || "—") + '</td><td>' + esc(r.model || "—") + '</td><td>' + esc(r.color || "—") + '</td><td>' + esc(r.worker_name) + '</td><td>' + esc(r.supervisor_name || "—") + '</td><td class="nov">' +
+      (r.etiquetas || []).map(t => '<span class="nov-et">' + esc(t) + '</span>').join("") + (r.notas ? (r.etiquetas && r.etiquetas.length ? "<br>" : "") + esc(r.notas) : "") + '</td><td>' +
       (r.tiene_foto ? '<a href="#" class="photolink" data-id="' + esc(r.id) + '">Ver foto</a>' : "") + '</td></tr>'; }).join("") + '</tbody></table>';
   /* La foto se pide al tocarla, no antes. Venia dentro de la lista, asi que
      abrir el informe de un mes descargaba todas las fotos del periodo para
@@ -2004,6 +2108,23 @@ function renderReport(){
     a.textContent = "Ver foto";
   });
   box.querySelectorAll("tr[data-id]").forEach(tr => tr.onclick = () => openEditFromId(tr.dataset.id, repRows));
+}
+/* Los autos con novedades, juntos y arriba de la tabla: es lo que el jefe
+   tiene que leer uno por uno. Arriba, cuántos de cada. */
+function renderNovedades(){
+  const con = repRows.filter(tieneNovedades);
+  const cab = document.getElementById("rep_novCab"), box = document.getElementById("rep_nov");
+  cab.hidden = box.hidden = !con.length;
+  if (!con.length) { box.innerHTML = ""; return; }
+  document.getElementById("rep_novN").textContent = con.length + (con.length === 1 ? " auto" : " autos");
+  const cuenta = new Map();
+  for (const r of con) for (const t of r.etiquetas || []) cuenta.set(t, (cuenta.get(t) || 0) + 1);
+  const resumen = [...cuenta.entries()].sort((a, b) => b[1] - a[1]).map(([t, n]) => esc(t) + " <b>" + n + "</b>").join(" · ");
+  box.innerHTML = (resumen ? '<div class="fila"><span class="mas" style="font-weight:500">' + resumen + "</span></div>" : "") +
+    con.map(r => '<div class="fila vrow" data-id="' + esc(r.id) + '" role="button" tabindex="0"><span class="mas"><span class="vin6">' + esc(r.vin6 || "—") + "</span>" +
+      '<span class="sub">' + esc([r.worker_name, new Date(r.client_at).toLocaleString("es-AU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })].filter(Boolean).join(" · ")) + "</span>" +
+      '<span class="sub nov" style="white-space:normal">' + esc(textoNovedades(r)) + "</span></span>" + CHEV + "</div>").join("");
+  box.querySelectorAll("[data-id]").forEach(f => f.onclick = () => openEditFromId(f.dataset.id, repRows));
 }
 /* Lo que dicen los números, en frases: lo que el jefe contaría si mirara
    los gráficos con calma. */
@@ -2044,14 +2165,16 @@ function renderReportInsights(total, repetidos, cubetas){
     const flojos = gente.filter(g => g.n >= 3).map(g => ({ g, antes: (repPrev || []).filter(r => String(r.worker_name || "").trim().toLowerCase() === g.nombre.toLowerCase()).length }))
       .filter(x => x.antes >= 5 && x.g.n < x.antes * 0.7 && !quedan);
     for (const x of flojos.slice(0, 2)) bullets.push(x.g.nombre + " bajó de " + x.antes + " a " + x.g.n + " autos frente al período anterior.");
+    const conNov = repRows.filter(tieneNovedades).length;
+    if (conNov) bullets.push(conNov + (conNov === 1 ? " auto tiene novedades" : " autos tienen novedades") + " (sin libro, sin sticker, trabajo difícil…): están en Novedades, arriba.");
   }
   list.innerHTML = (alerta ? '<li class="mal">' + esc(alerta) + "</li>" : "") + bullets.map(b => "<li>" + esc(b) + "</li>").join("");
 }
 function exportReportCSV(){
-  const rows = [["fecha_hora", "vin_ultimos6", "vin", "marca", "modelo", "color", "trabajador", "supervisor", "alerta"]];
+  const rows = [["fecha_hora", "vin_ultimos6", "vin", "marca", "modelo", "color", "trabajador", "supervisor", "alerta", "novedades", "notas"]];
   repRows.forEach(r => { const rp = repMarcas.get(String(r.id));
     rows.push([new Date(r.client_at).toLocaleString("es-AU"), r.vin6 || "", r.vin_full || "", r.make || "", r.model || "", r.color || "", r.worker_name, r.supervisor_name || "",
-      rp ? "VIN REPETIDO: " + textoRepetido(rp) : ""]); });
+      rp ? "VIN REPETIDO: " + textoRepetido(rp) : "", (r.etiquetas || []).join("; "), r.notas || ""]); });
   const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
@@ -2310,14 +2433,18 @@ function opciones(sel, valores, sufijo){
   });
 }
 
-/* Las filas del PIN en Ajustes: mientras la base no tenga el PIN activado
-   se dice ahí mismo qué falta, en vez de dejar botones que no hacen nada. */
-function pintarAcceso(){
-  document.getElementById("pin_cambiar").disabled = pinSinActivar;
-  document.getElementById("pin_salir").disabled = pinSinActivar;
-  document.getElementById("pin_nota").textContent = pinSinActivar
-    ? "Falta activar el PIN en la base: pega la migración vin_log_pin_de_entrada en el SQL Editor de Supabase. Hasta entonces la app entra sin clave."
-    : "El PIN es uno para todo el equipo. Al salir, este teléfono vuelve a pedirlo; los demás siguen dentro.";
+/* Las filas del PIN en Ajustes: con el PIN apagado sólo sale "Activar";
+   encendido, cambiarlo, quitarlo y salir. */
+async function pintarAcceso(){
+  const $ = id => document.getElementById(id);
+  let on = null;
+  try { on = (await rpc("vin_log_hay_pin", {})) === true; } catch (e) {}
+  $("pin_estado").textContent = on == null ? "—" : on ? "Sí" : "No";
+  $("pin_activar").hidden = on !== false;
+  ["pin_cambiar", "pin_quitar", "pin_salir"].forEach(id => { $(id).hidden = on !== true; });
+  $("pin_nota").textContent = on == null ? "Sin conexión: no se puede ver si el PIN está activado."
+    : on ? "El PIN es uno para todo el equipo. Al salir, este teléfono vuelve a pedirlo; los demás siguen dentro."
+    : "Ahora la app entra sin clave. Si algún día hace falta, activa un PIN y todos los teléfonos lo pedirán una vez.";
 }
 async function loadEspacio(){
   pintarAcceso();
@@ -2405,11 +2532,17 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("rev_vin6").addEventListener("input", revisarRepetidoEnFicha);
   document.getElementById("rev_vinFull").addEventListener("input", revisarRepetidoEnFicha);
   document.getElementById("rev_delete").onclick = deleteEntry;
+  montarNovedades("rev"); montarNovedades("cap");
   document.getElementById("rev_cancel").onclick = closeReview;
   document.getElementById("photoScrim_close").onclick = closePhotoLightbox;
   document.getElementById("set_supervisor").value = getSupervisorName();
   document.getElementById("set_supervisorSave").onclick = () => { setSupervisorName(document.getElementById("set_supervisor").value.trim()); pintarSaludo(); toast("✓ Guardado"); };
   document.getElementById("pin_cambiar").onclick = () => Pin.cambiar();
+  document.getElementById("pin_activar").onclick = async () => {
+    if (!(await preguntar("Activar PIN", "Todos los teléfonos del equipo tendrán que escribirlo una vez para entrar. Apúntalo: sin él nadie entra.", "Seguir"))) return;
+    if (await Pin.activar()) pintarAcceso();
+  };
+  document.getElementById("pin_quitar").onclick = async () => { if (await Pin.quitar()) pintarAcceso(); };
   document.getElementById("pin_salir").onclick = async () => {
     if (!(await preguntar("Salir de este teléfono", "Este teléfono volverá a pedir el PIN del equipo. Los demás siguen dentro.", "Salir"))) return;
     Pin.salir();
@@ -2533,7 +2666,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("rep_pdf").onclick = () => window.print();
   /* Sin sesión en este teléfono no se pide nada a la base: primero el PIN. */
   const arrancar = () => { loadToday(); renderQueueBadge(); flushQueue(); };
-  if (getToken()) arrancar(); else Pin.pedir().then(arrancar);
+  if (getToken()) arrancar(); else Pin.haceFalta().then(f => f ? Pin.pedir().then(arrancar) : arrancar());
 });
 </script>
 </body>

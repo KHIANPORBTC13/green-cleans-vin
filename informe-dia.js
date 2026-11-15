@@ -25,6 +25,10 @@
    VIN repetido: datos.alerta (un texto) pone un aviso rojo arriba, y
    auto.repetido (true o el texto de con cuál coincide) pinta esa tarjeta
    en rojo con "VIN REPETIDO".
+
+   Novedades: auto.novedad (un texto: "Sin libro de mantenimiento. Costó
+   mucho") lo junta en un recuadro antes de los autos, con el número y la
+   hora de cada uno, y deja una marca en su tarjeta.
    ============================================================ */
 ;(function () {
   'use strict'
@@ -222,6 +226,22 @@
       } })
     }
 
+    /* Las novedades, juntas: lo que el jefe tiene que leer auto por auto
+       (sin libro, sin sticker, trabajo difícil, hecho entre dos). */
+    const conNov = (d.autos || []).map((a, i) => ({ a, n: i + 1 })).filter(x => x.a.novedad)
+    if (conNov.length) {
+      const g0 = document.createElement('canvas').getContext('2d'); fuente(g0, 500, 23)
+      const items = conNov.map(({ a, n }) => lineas(g0, '#' + n + (a.hora ? ' · ' + a.hora : '') + ' — ' + a.novedad, W - 64))
+      const alto = 50 + items.reduce((t, ls) => t + ls.length * 32 + 12, 0) + 24
+      out.push({ alto: 36 + alto + 10, dibujar (g, y) {
+        rect(g, M, y + 36, W, alto, 18, '#eaf5ec')
+        g.fillStyle = color; fuente(g, 800, 26); g.fillText(L.novedades.replace('{n}', conNov.length), M + 32, y + 36 + 46)
+        let yy = y + 36 + 46 + 40
+        g.fillStyle = C.tinta; fuente(g, 500, 23)
+        for (const ls of items) { ls.forEach(l => { g.fillText(l, M + 32, yy); yy += 32 }); yy += 12 }
+      } })
+    }
+
     for (const gr of d.graficos || []) {
       if (!gr.datos || !gr.datos.length) continue
       if (gr.tipo === 'horas') {
@@ -284,7 +304,9 @@
         tx = x + 46
       }
       g.fillStyle = C.suave; fuente(g, 700, 20)
-      g.fillText('#' + n + (a.hora ? ' · ' + a.hora : ''), tx, yb)
+      const etq = '#' + n + (a.hora ? ' · ' + a.hora : '')
+      g.fillText(etq, tx, yb)
+      if (a.novedad) { const ew = g.measureText(etq).width; g.fillStyle = color; fuente(g, 800, 19); g.fillText(' · ' + L.conNovedad, tx + ew, yb) }
       if (a.repetido) {
         g.fillStyle = C.rojo; fuente(g, 800, 19); g.textAlign = 'right'
         g.fillText(L.repetido, x + w - 20, yb); g.textAlign = 'left'
@@ -485,14 +507,14 @@
   /* ---------------- Pantalla ---------------- */
   const TEXTOS = {
     es: {
-      titulo: 'Resumen del día', repetido: 'VIN REPETIDO', vehiculos: 'Vehículos del día ({n})', ninguno: 'Ningún vehículo registrado este día.',
+      titulo: 'Resumen del día', repetido: 'VIN REPETIDO', novedades: 'Novedades ({n})', conNovedad: 'NOVEDAD', vehiculos: 'Vehículos del día ({n})', ninguno: 'Ningún vehículo registrado este día.',
       pagina: 'Página {i} de {n}', preparando: 'Preparando el resumen…',
       fotos: 'Preparando las fotos del VIN {i} de {n}…', compartir: 'Compartir', descargar: 'Descargar',
       enFoto: 'en foto', enPdf: 'en PDF', cerrar: 'Cerrar', error: 'No se pudo preparar el resumen.',
       bajado: 'Guardado en Descargas'
     },
     en: {
-      titulo: 'Daily summary', repetido: 'REPEATED VIN', vehiculos: 'Vehicles of the day ({n})', ninguno: 'No vehicles recorded this day.',
+      titulo: 'Daily summary', repetido: 'REPEATED VIN', novedades: 'Notes ({n})', conNovedad: 'NOTE', vehiculos: 'Vehicles of the day ({n})', ninguno: 'No vehicles recorded this day.',
       pagina: 'Page {i} of {n}', preparando: 'Preparing the summary…',
       fotos: 'Preparing the VIN photos {i} of {n}…', compartir: 'Share', descargar: 'Download',
       enFoto: 'as photo', enPdf: 'as PDF', cerrar: 'Close', error: 'The summary could not be prepared.',
