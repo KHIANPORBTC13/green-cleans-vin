@@ -1866,9 +1866,13 @@ async function generarResumen(clave, formato){
     } else {
       const d = new Date(r.from); d.setDate(d.getDate() - 1);
       const ant = periodRange(resPeriodo, d);
-      const hist = await Datos.lista(ant.from, ant.to);
+      /* Si el período aún no terminó, se compara con el mismo tramo del
+         anterior: medio mes contra un mes entero salía siempre en rojo. */
+      const enCurso = r.to > new Date();
+      const hasta = enCurso ? new Date(Math.min(ant.to, ant.from.getTime() + (Date.now() - r.from.getTime()))) : ant.to;
+      const hist = await Datos.lista(ant.from, hasta);
       ref = hist.filter(x => equipo || normNombre(x.worker_name) === clave).length;
-      refTxt = "frente al período anterior (" + ref + ")";
+      refTxt = (enCurso ? "frente a los mismos días del período anterior (" : "frente al período anterior (") + ref + ")";
     }
   } catch (e) {}
   const dif = ref == null ? null : Math.round((n - ref) * 10) / 10;
