@@ -231,6 +231,10 @@ textarea.inp{display:block;min-height:76px;resize:vertical;font-family:inherit;l
 .rep-fotos img{display:block;width:100%;height:96px;object-fit:contain;background:#dfe6e2}
 .rep-fotos figcaption{font-size:11.5px;line-height:15px;padding:5px 7px;color:var(--texto);word-break:break-word}
 .rep-fotos .sinf{display:flex;align-items:center;justify-content:center;height:96px;font-size:12px;color:var(--sec)}
+.hist{display:flex;flex-direction:column;gap:8px;font-size:13.5px;line-height:18px;color:var(--sec)}
+.hist b{color:var(--texto)}
+.hist .h-borrar b{color:var(--rojo)}
+.sub.edit{color:var(--sec);font-style:italic}
 .caja-tit{font-size:15.5px;font-weight:700;color:var(--texto)}
 .etiq.seg button{min-width:58px}
 .novedades{display:flex;flex-direction:column;gap:9px;font-size:14px;font-weight:600;color:var(--sec);margin:0 0 16px}
@@ -696,6 +700,9 @@ main>section.entra{animation:entra .16s ease-out}
       <div class="grupo-cab" id="rep_otrasCab" hidden><span>Otras secciones</span><span id="rep_otrasN"></span></div>
       <div class="grupo" id="rep_otras" hidden></div>
 
+      <div class="grupo-cab" id="rep_cambiosCab" hidden><span>Ediciones y borrados</span><span id="rep_cambiosN"></span></div>
+      <div class="grupo" id="rep_cambios" hidden></div>
+
       <div class="grupo-cab" id="rep_novCab" hidden><span>Novedades</span><span id="rep_novN"></span></div>
       <div class="grupo" id="rep_nov" hidden></div>
 
@@ -721,9 +728,15 @@ main>section.entra{animation:entra .16s ease-out}
     <div class="grupo-cab"><span>Este teléfono</span></div>
     <div class="grupo">
       <label class="fila"><span>Tu nombre</span><input class="inp" id="set_supervisor" placeholder="ej. Raúl" autocomplete="name" autocapitalize="words" enterkeyhint="done"></label>
-      <button class="fila accion" id="set_supervisorSave" type="button">Guardar nombre</button>
+      <div class="fila" style="flex-direction:column;align-items:stretch;gap:10px"><span id="set_rolTit">Tu rol</span>
+        <div class="etiq seg" id="set_rol" role="radiogroup" aria-labelledby="set_rolTit">
+          <button type="button" role="radio" aria-checked="false" data-r="trabajador">Trabajador</button>
+          <button type="button" role="radio" aria-checked="false" data-r="supervisor">Supervisor</button>
+          <button type="button" role="radio" aria-checked="false" data-r="jefe">Jefe</button>
+        </div></div>
+      <button class="fila accion" id="set_supervisorSave" type="button">Guardar perfil</button>
     </div>
-    <p class="grupo-pie">Sale como supervisor en lo que registras. Los registros se sincronizan solos entre los teléfonos del equipo; sin señal se guardan aquí y se suben al volver.</p>
+    <p class="grupo-pie" id="set_perfilPie">Tu nombre y tu rol se guardan sólo en este teléfono. Los registros, en cambio, se comparten solos entre los teléfonos del equipo; sin señal se guardan aquí y se suben al volver.</p>
 
     <div class="grupo">
       <button class="fila" id="set_instalar" type="button"><span class="mas">Tenerla como app en el teléfono</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -857,6 +870,10 @@ main>section.entra{animation:entra .16s ease-out}
     </div>
     <label class="f">Supervisor<input class="inp" id="rev_supervisor" autocapitalize="words" enterkeyhint="done" placeholder="Quién sube esta foto"></label>
     <label class="f">Fecha y hora<input class="inp" type="datetime-local" id="rev_when"></label>
+    <div class="caja-extra" id="rev_histCaja" hidden>
+      <span class="caja-tit">Historial de cambios</span>
+      <div class="hist" id="rev_hist"></div>
+    </div>
     <button class="primary" id="rev_save" type="button">Guardar</button>
     <button class="secondary danger" id="rev_delete" type="button" hidden>Eliminar registro</button>
     <button class="secondary" id="rev_cancel" type="button">Cancelar</button>
@@ -925,6 +942,8 @@ const CLOUD = {
 };
 const LSKEY_SUPERVISOR = "vinlog_supervisor_name";
 const LSKEY_LASTWORKER = "vinlog_last_worker_name";
+const LSKEY_LASTSUPER = "vinlog_last_supervisor_name";
+const LSKEY_ROL = "vinlog_rol";
 const LSKEY_QUEUE = "vinlog_pending_queue_v1";
 const LSKEY_TOKEN = "vinlog_token";
 
@@ -1388,6 +1407,58 @@ let tT; function toast(m, ms){
 }
 function getSupervisorName(){ try { return localStorage.getItem(LSKEY_SUPERVISOR) || ""; } catch (e) { return ""; } }
 function setSupervisorName(n){ try { localStorage.setItem(LSKEY_SUPERVISOR, n); } catch (e) {} }
+/* El perfil de este teléfono: el nombre (la clave de siempre, para no
+   perder el que ya estaba puesto) y el rol. Un trabajador sale ya como
+   trabajador al registrar; un supervisor o el jefe, como supervisor. Sin
+   rol elegido se porta como antes, como supervisor. */
+const ROLES = { trabajador: "Trabajador", supervisor: "Supervisor", jefe: "Jefe" };
+function getRol(){ try { const r = localStorage.getItem(LSKEY_ROL); return ROLES[r] ? r : ""; } catch (e) { return ""; } }
+function setRol(r){ try { localStorage.setItem(LSKEY_ROL, r); } catch (e) {} }
+const soyTrabajador = () => getRol() === "trabajador";
+function getLastSuper(){ try { return localStorage.getItem(LSKEY_LASTSUPER) || ""; } catch (e) { return ""; } }
+function setLastSuper(n){ try { localStorage.setItem(LSKEY_LASTSUPER, n); } catch (e) {} }
+const nombreTrabajadorPorDefecto = () => soyTrabajador() ? (getSupervisorName() || getLastWorkerName()) : getLastWorkerName();
+const nombreSupervisorPorDefecto = () => soyTrabajador() ? getLastSuper() : getSupervisorName();
+/* Al guardar un registro: lo escrito queda para la próxima vez, pero el
+   nombre del perfil sólo lo cambia quien supervisa. */
+function recordarNombres(worker, supervisor){
+  setLastWorkerName(worker); setLastSuper(supervisor);
+  if (!soyTrabajador()) setSupervisorName(supervisor);
+}
+/* Quien edita o borra tiene que tener su nombre puesto: queda apuntado. */
+function autorCambio(){
+  const quien = (getSupervisorName() || "").trim();
+  if (!quien) { toast("⚠︎ Para editar o borrar, pon primero tu nombre y tu rol en Ajustes: cada cambio queda apuntado con tu nombre.", 4500); return null; }
+  return { p_quien: quien, p_rol: getRol() || null };
+}
+const CAMPOS = { vin_full: "VIN", vin6: "últimos 6", make: "marca", model: "modelo", color: "color", worker_name: "trabajador",
+  supervisor_name: "supervisor", client_at: "fecha y hora", notas: "notas", etiquetas: "novedades", confirmado: "confirmado", vin_estado: "lectura", deleted: "borrado" };
+const ACCION = { editar: "Editado", borrar: "Borrado", confirmar: "Confirmado", lector: "Leído por el lector automático" };
+const fechaHoraCorta = d => new Date(d).toLocaleString("es-AU", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+function valorCampo(k, v){
+  if (v == null || v === "" || (Array.isArray(v) && !v.length)) return "vacío";
+  if (k === "client_at") return fechaHoraCorta(v);
+  if (Array.isArray(v)) return v.join(", ");
+  if (typeof v === "boolean") return v ? "sí" : "no";
+  return String(v);
+}
+/* "marca: Toyota → Mazda; color: vacío → Blanco". */
+function textoCambio(c){
+  if (c.accion === "borrar") return "";
+  return (c.campos || []).filter(k => CAMPOS[k]).map(k => CAMPOS[k] + ": " + valorCampo(k, c.antes && c.antes[k]) + " → " + valorCampo(k, c.despues && c.despues[k])).join("; ");
+}
+const quienRol = c => c.quien + (c.rol && ROLES[c.rol] ? " (" + ROLES[c.rol] + ")" : "");
+async function pintarHistorial(id){
+  const caja = document.getElementById("rev_histCaja"), box = document.getElementById("rev_hist");
+  caja.hidden = true; box.innerHTML = "";
+  if (!id) return;
+  let h = [];
+  try { h = await rpc("vin_log_historial", { p_id: id }); } catch (e) { return; }
+  if (editingId !== id || !Array.isArray(h) || !h.length) return;
+  box.innerHTML = h.map(c => '<div class="h-' + esc(c.accion) + '"><b>' + esc(ACCION[c.accion] || c.accion) + " por " + esc(quienRol(c)) + "</b> · " + esc(fechaHoraCorta(c.cuando)) +
+    (textoCambio(c) ? "<br>" + esc(textoCambio(c)) : "") + "</div>").join("");
+  caja.hidden = false;
+}
 function getLastWorkerName(){ try { return localStorage.getItem(LSKEY_LASTWORKER) || ""; } catch (e) { return ""; } }
 function setLastWorkerName(n){ try { localStorage.setItem(LSKEY_LASTWORKER, n); } catch (e) {} }
 function toLocalInputValue(d){ const p = n => String(n).padStart(2, "0"); return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":" + p(d.getMinutes()); }
@@ -1596,8 +1667,8 @@ let capFoto = null;
 function abrirVistazo(dataUrl, recorte){
   capFoto = { dataUrl, recorte: recorte || null };
   document.getElementById("cap_foto").src = dataUrl;
-  document.getElementById("cap_worker").value = getLastWorkerName() || "";
-  document.getElementById("cap_supervisor").value = getSupervisorName() || "";
+  document.getElementById("cap_worker").value = nombreTrabajadorPorDefecto() || "";
+  document.getElementById("cap_supervisor").value = nombreSupervisorPorDefecto() || "";
   ponerNovedades("cap", null, "");
   document.getElementById("capScrim").classList.add("open");
 }
@@ -1609,7 +1680,7 @@ async function guardarRapido(seguir){
   const supervisor = document.getElementById("cap_supervisor").value.trim();
   if (!worker) { toast("⚠︎ Falta el nombre del trabajador"); return; }
   if (!supervisor) { toast("⚠︎ Falta el nombre del supervisor"); return; }
-  setLastWorkerName(worker); setSupervisorName(supervisor);
+  recordarNombres(worker, supervisor);
   const foto = capFoto.dataUrl;
   const recorte = capFoto.recorte;
   const nov = leerNovedades("cap");
@@ -1674,8 +1745,8 @@ function openReview(data){
   document.getElementById("rev_make").value = data.make || "";
   document.getElementById("rev_model").value = data.model || "";
   document.getElementById("rev_color").value = data.color || "";
-  document.getElementById("rev_worker").value = data.worker != null ? data.worker : getLastWorkerName();
-  document.getElementById("rev_supervisor").value = data.supervisor != null ? data.supervisor : getSupervisorName();
+  document.getElementById("rev_worker").value = data.worker != null ? data.worker : nombreTrabajadorPorDefecto();
+  document.getElementById("rev_supervisor").value = data.supervisor != null ? data.supervisor : nombreSupervisorPorDefecto();
   document.getElementById("rev_when").value = toLocalInputValue(data.when ? new Date(data.when) : new Date());
   ponerNovedades("rev", data.etiquetas, data.notas);
   document.getElementById("rev_title").textContent = editingId ? "Editar registro" : "Confirmar registro";
@@ -1697,6 +1768,7 @@ function openReview(data){
   document.getElementById("rev_ocrHint").textContent = hint;
   const sc = document.getElementById("reviewScrim"); sc.classList.add("open");
   revisarRepetidoEnFicha();
+  pintarHistorial(editingId);
 }
 /* En la ficha, el aviso sale en cuanto hay seis caracteres, antes de
    guardar: así se ve el repetido con la foto delante. */
@@ -1773,8 +1845,9 @@ async function saveReview(){
   const supervisor = document.getElementById("rev_supervisor").value.trim();
   if (!worker) { toast("⚠︎ Falta el nombre del trabajador"); return; }
   if (!supervisor) { toast("⚠︎ Falta el nombre del supervisor"); return; }
-  setLastWorkerName(worker);
-  setSupervisorName(supervisor);
+  /* Editar un registro viejo no cambia el perfil de este teléfono: el
+     nombre de quien edita es el del perfil, no el que dice la ficha. */
+  if (!editingId) recordarNombres(worker, supervisor);
   const fields = {
     p_vin_full: document.getElementById("rev_vinFull").value.trim().toUpperCase() || null,
     p_vin6: document.getElementById("rev_vin6").value.trim().toUpperCase() || null,
@@ -1791,10 +1864,12 @@ async function saveReview(){
   const clientAt = whenLocal ? new Date(whenLocal).toISOString() : new Date().toISOString();
   const btn = document.getElementById("rev_save"); btn.disabled = true; btn.textContent = "Guardando…";
   if (editingId) {
+    const autor = autorCambio();
+    if (!autor) { btn.disabled = false; btn.textContent = "Guardar"; return; }
     try {
       /* Al editar se mandan siempre, vacías incluidas: así se puede quitar una. */
-      await rpc("vin_log_update", { p_id: editingId, ...fields, p_client_at: clientAt, p_notas: nov.notas, p_etiquetas: nov.etiquetas });
-      toast("✓ Actualizado"); closeReview(); refreshOpenTabs();
+      await rpc("vin_log_update", { p_id: editingId, ...fields, p_client_at: clientAt, p_notas: nov.notas, p_etiquetas: nov.etiquetas, ...autor });
+      toast("✓ Actualizado — queda apuntado a nombre de " + autor.p_quien); closeReview(); refreshOpenTabs();
     } catch (e) { toast("⚠︎ No se pudo actualizar. Revisa tu conexión e intenta de nuevo."); }
     finally { btn.disabled = false; btn.textContent = "Guardar"; }
     return;
@@ -1837,14 +1912,15 @@ async function saveReview(){
 }
 async function deleteEntry(){
   if (!editingId) return;
-  if (!confirm("¿Eliminar este registro? No se puede deshacer.")) return;
+  const autor = autorCambio(); if (!autor) return;
+  if (!confirm("¿Eliminar este registro? Quedará apuntado que lo borró " + autor.p_quien + ", con la ficha completa.")) return;
   const btn = document.getElementById("rev_delete"); const originalHtml = btn.innerHTML;
   btn.disabled = true; btn.textContent = "Eliminando…";
   try {
     const borrado = editingId;
-    await rpc("vin_log_delete", { p_id: borrado });
+    await rpc("vin_log_delete", { p_id: borrado, ...autor });
     todayRows = todayRows.filter(r => String(r.id) !== String(borrado)); renderTodayList(todayRows);
-    toast("✓ Eliminado"); closeReview(); refreshOpenTabs();
+    toast("✓ Eliminado — queda apuntado a nombre de " + autor.p_quien); closeReview(); refreshOpenTabs();
   } catch (e) { toast("⚠︎ No se pudo eliminar. Revisa tu conexión."); }
   finally { btn.disabled = false; btn.innerHTML = originalHtml; }
 }
@@ -2089,7 +2165,10 @@ function pintarSaludo(){
   document.getElementById("saludo").textContent = (h < 12 ? "Buenos días" : h < 20 ? "Buenas tardes" : "Buenas noches") + (nombre ? ", " + nombre : "");
   const f = new Date().toLocaleDateString("es-AU", { weekday: "long", day: "numeric", month: "long" });
   document.getElementById("saludoFecha").textContent = f.charAt(0).toUpperCase() + f.slice(1);
-  document.getElementById("heroQuien").textContent = nombre ? "Supervisa " + getSupervisorName().trim() : "Pon tu nombre en Ajustes";
+  const rol = getRol();
+  document.getElementById("heroQuien").textContent = !nombre ? "Pon tu nombre en Ajustes"
+    : rol === "trabajador" ? getSupervisorName().trim() + " · Trabajador"
+    : rol === "jefe" ? getSupervisorName().trim() + " · Jefe" : "Supervisa " + getSupervisorName().trim();
 }
 /* La píldora de la barra va hasta la pestaña elegida, deslizándose. */
 function moverLente(){
@@ -2113,7 +2192,8 @@ function rowHTML(r, repetido){
     miniHTML(r._pending ? r._clave : r.id) +
     '<span class="mas"><span class="vin6">' + esc(sec ? SECCIONES[sec].corto : (r.vin6 || "—")) + '</span>' +
       '<span class="sub">' + sub + '</span>' +
-      (tieneNovedades(r) ? '<span class="sub nov">' + esc(textoNovedades(r)) + '</span>' : "") + '</span>' +
+      (tieneNovedades(r) ? '<span class="sub nov">' + esc(textoNovedades(r)) + '</span>' : "") +
+      (r.editado_por ? '<span class="sub edit">Editado por ' + esc(r.editado_por) + " · " + esc(fechaHoraCorta(r.editado_at)) + "</span>" : "") + '</span>' +
     '<span class="val">' + time + '</span>' + (r._pending ? "" : CHEV) + '</div>';
 }
 async function openEditFromId(id, source){
@@ -2252,14 +2332,15 @@ function renderReport(){
   Graficos.jornada(document.getElementById("rep_jornada"), { filas: repNorm });
   Graficos.marcas(document.getElementById("rep_marcas"), { filas: repNorm });
   renderReportInsights(total, repMarcas.size, cubetas);
-  renderNovedades(); renderOtras(); prepararFotosReporte();
+  renderNovedades(); renderOtras(); prepararFotosReporte(); renderCambios(range);
 
   const box = document.getElementById("rep_table");
   if (!repRows.length) { box.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">Sin registros en este período.</span></div>'; return; }
-  box.innerHTML = '<table class="reptable"><thead><tr><th>Fecha</th><th>Últimos 6</th><th>VIN</th><th>Marca</th><th>Modelo</th><th>Color</th><th>Trabajador</th><th>Supervisor</th><th>Sección</th><th>Novedades</th><th></th></tr></thead><tbody>' +
+  box.innerHTML = '<table class="reptable"><thead><tr><th>Fecha</th><th>Últimos 6</th><th>VIN</th><th>Marca</th><th>Modelo</th><th>Color</th><th>Trabajador</th><th>Supervisor</th><th>Sección</th><th>Novedades</th><th>Editado</th><th></th></tr></thead><tbody>' +
     repRows.map(r => { const rp = repMarcas.get(String(r.id)); return '<tr data-id="' + esc(r.id) + '"' + (rp ? ' class="repetido"' : '') + '><td>' + new Date(r.client_at).toLocaleString("es-AU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) +
       '</td><td><b>' + esc(r.vin6 || "—") + '</b>' + (rp ? '<br>' + ETIQ_REP + '<br><small>' + esc(textoRepetido(rp)) + '</small>' : '') + '</td><td>' + esc(r.vin_full || "—") + '</td><td>' + esc(r.make || "—") + '</td><td>' + esc(r.model || "—") + '</td><td>' + esc(r.color || "—") + '</td><td>' + esc(r.worker_name) + '</td><td>' + esc(r.supervisor_name || "—") + '</td><td>' + (seccionDe(r) ? '<span class="nov-et">' + esc(SECCIONES[seccionDe(r)].corto) + '</span>' : "Normal") + '</td><td class="nov">' +
       etiquetasVisibles(r).map(t => '<span class="nov-et">' + esc(t) + '</span>').join("") + (r.notas ? (etiquetasVisibles(r).length ? "<br>" : "") + esc(r.notas) : "") + '</td><td>' +
+      (r.editado_por ? esc(r.editado_por) + "<br><small>" + esc(fechaHoraCorta(r.editado_at)) + "</small>" : "—") + '</td><td>' +
       (r.tiene_foto ? '<a href="#" class="photolink" data-id="' + esc(r.id) + '">Ver foto</a>' : "") + '</td></tr>'; }).join("") + '</tbody></table>';
   /* La foto se pide al tocarla, no antes. Venia dentro de la lista, asi que
      abrir el informe de un mes descargaba todas las fotos del periodo para
@@ -2347,6 +2428,31 @@ async function imprimirReporte(){
   } finally { txt.textContent = antes; btn.disabled = false; }
   window.print();
 }
+/* Ediciones y borrados del período: quién, cuándo y qué cambió. Lo
+   borrado sólo se ve aquí, con la ficha como estaba. */
+let cambiosPeticion = 0, repCambios = [];
+async function renderCambios(range){
+  const mia = ++cambiosPeticion;
+  const cab = document.getElementById("rep_cambiosCab"), box = document.getElementById("rep_cambios");
+  let l = [];
+  try { l = await rpc("vin_log_cambios_periodo", { p_from: range.from.toISOString(), p_to: range.to.toISOString() }); } catch (e) { l = []; }
+  if (mia !== cambiosPeticion) return;
+  repCambios = Array.isArray(l) ? l : [];
+  cab.hidden = box.hidden = !repCambios.length;
+  if (!repCambios.length) { box.innerHTML = ""; return; }
+  const nb = repCambios.filter(c => c.accion === "borrar").length, ne = repCambios.length - nb;
+  document.getElementById("rep_cambiosN").textContent = [ne ? ne + (ne === 1 ? " edición" : " ediciones") : "", nb ? nb + (nb === 1 ? " borrado" : " borrados") : ""].filter(Boolean).join(" · ");
+  box.innerHTML = repCambios.map(c => {
+    const a = c.despues || {};
+    const auto = seccionDe(a) ? SECCIONES[seccionDe(a)].corto : (a.vin_full || (a.vin6 ? "…" + a.vin6 : "Sin VIN"));
+    const detalle = c.accion === "borrar"
+      ? "Ficha borrada: " + [a.vin_full || a.vin6, a.make, a.model, a.color, a.worker_name ? "trabajador " + a.worker_name : "", a.client_at ? "registrado " + fechaHoraCorta(a.client_at) : ""].filter(Boolean).join(", ")
+      : textoCambio(c);
+    return '<div class="fila' + (c.accion === "borrar" ? " repetido" : "") + '"><span class="mas"><span class="vin6">' + esc(auto) + "</span>" +
+      '<span class="sub"><b>' + esc(ACCION[c.accion] || c.accion) + " por " + esc(quienRol(c)) + "</b> · " + esc(fechaHoraCorta(c.cuando)) + "</span>" +
+      (detalle ? '<span class="sub" style="white-space:normal">' + esc(detalle) + "</span>" : "") + "</span></div>";
+  }).join("");
+}
 function renderNovedades(){
   const con = repRows.filter(tieneNovedades);
   const cab = document.getElementById("rep_novCab"), box = document.getElementById("rep_nov");
@@ -2409,10 +2515,13 @@ function renderReportInsights(total, repetidos, cubetas){
   list.innerHTML = (alerta ? '<li class="mal">' + esc(alerta) + "</li>" : "") + bullets.map(b => "<li>" + esc(b) + "</li>").join("");
 }
 function exportReportCSV(){
-  const rows = [["fecha_hora", "vin_ultimos6", "vin", "marca", "modelo", "color", "trabajador", "supervisor", "alerta", "novedades", "notas", "seccion"]];
+  const rows = [["fecha_hora", "vin_ultimos6", "vin", "marca", "modelo", "color", "trabajador", "supervisor", "alerta", "novedades", "notas", "seccion", "editado_por", "editado_cuando"]];
   repRows.forEach(r => { const rp = repMarcas.get(String(r.id));
     rows.push([new Date(r.client_at).toLocaleString("es-AU"), r.vin6 || "", r.vin_full || "", r.make || "", r.model || "", r.color || "", r.worker_name, r.supervisor_name || "",
-      rp ? "VIN REPETIDO: " + textoRepetido(rp) : "", etiquetasVisibles(r).join("; "), r.notas || "", seccionDe(r) ? SECCIONES[seccionDe(r)].corto : "Normal"]); });
+      rp ? "VIN REPETIDO: " + textoRepetido(rp) : "", etiquetasVisibles(r).join("; "), r.notas || "", seccionDe(r) ? SECCIONES[seccionDe(r)].corto : "Normal", r.editado_por || "", r.editado_at ? new Date(r.editado_at).toLocaleString("es-AU") : ""]); });
+  for (const c of repCambios.filter(c => c.accion === "borrar")) { const a = c.despues || {};
+    rows.push([a.client_at ? new Date(a.client_at).toLocaleString("es-AU") : "", a.vin6 || "", a.vin_full || "", a.make || "", a.model || "", a.color || "", a.worker_name || "", a.supervisor_name || "",
+      "BORRADO por " + quienRol(c) + " el " + new Date(c.cuando).toLocaleString("es-AU"), etiquetasVisibles(a).join("; "), a.notas || "", seccionDe(a) ? SECCIONES[seccionDe(a)].corto : "Normal", c.quien, new Date(c.cuando).toLocaleString("es-AU")]); }
   const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
@@ -2783,7 +2892,17 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("rev_cancel").onclick = closeReview;
   document.getElementById("photoScrim_close").onclick = closePhotoLightbox;
   document.getElementById("set_supervisor").value = getSupervisorName();
-  document.getElementById("set_supervisorSave").onclick = () => { setSupervisorName(document.getElementById("set_supervisor").value.trim()); pintarSaludo(); toast("✓ Guardado"); };
+  const marcarRol = r => document.querySelectorAll("#set_rol button").forEach(b => b.setAttribute("aria-checked", String(b.dataset.r === r)));
+  marcarRol(getRol());
+  document.querySelectorAll("#set_rol button").forEach(b => b.onclick = () => marcarRol(b.dataset.r));
+  document.getElementById("set_supervisorSave").onclick = () => {
+    const nombre = document.getElementById("set_supervisor").value.trim();
+    const sel = document.querySelector("#set_rol button[aria-checked=true]");
+    if (!nombre) { toast("⚠︎ Escribe tu nombre"); return; }
+    if (!sel) { toast("⚠︎ Elige tu rol"); return; }
+    setSupervisorName(nombre); setRol(sel.dataset.r);
+    pintarSaludo(); toast("✓ Perfil guardado: " + nombre + ", " + ROLES[sel.dataset.r]);
+  };
   document.getElementById("pin_cambiar").onclick = () => Pin.cambiar();
   document.getElementById("pin_activar").onclick = async () => {
     if (!(await preguntar("Activar PIN", "Todos los teléfonos del equipo tendrán que escribirlo una vez para entrar. Apúntalo: sin él nadie entra.", "Seguir"))) return;
@@ -2857,7 +2976,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const vin6 = document.getElementById("conf_vin6").value.trim().toUpperCase();
     const repetido = vinFull || vin6 ? await buscarRepetido(vinFull, vin6, confId) : null;
     try {
-      await rpc("vin_log_confirmar", { p_id: confId, p_vin_full: vinFull || null, p_vin6: vin6 || null });
+      await rpc("vin_log_confirmar", { p_id: confId, p_vin_full: vinFull || null, p_vin6: vin6 || null, p_quien: (getSupervisorName() || "").trim() || null, p_rol: getRol() || null });
       if (repetido) avisarRepetido(repetido, "Confirmado"); else toast("✓ Confirmado"); cerrarConfirmacion(); loadPendientes(); loadToday();
     } catch (e) { toast("⚠︎ No se pudo confirmar"); }
   };
