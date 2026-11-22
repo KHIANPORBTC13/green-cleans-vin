@@ -982,12 +982,19 @@ const LSKEY_TOKEN = "vinlog_token";
 let tokenMem = "";
 const getToken = () => { try { return tokenMem || localStorage.getItem(LSKEY_TOKEN) || ""; } catch (e) { return tokenMem; } };
 const setToken = t => { tokenMem = t || ""; try { if (t) localStorage.setItem(LSKEY_TOKEN, t); else localStorage.removeItem(LSKEY_TOKEN); } catch (e) {} };
-async function rpc(fn, body){
+async function rpc(fn, body, opc){
   const headers = { "Content-Type": "application/json", "apikey": CLOUD.key, "Authorization": "Bearer " + CLOUD.key };
   const token = getToken();
   if (token) headers["x-vin-token"] = token;
-  const r = await fetch(CLOUD.url + "/rest/v1/rpc/" + fn, { method: "POST", headers, body: JSON.stringify(body) });
-  const t = await r.text();
+  /* opc.espera: con señal mala una subida puede quedarse colgada sin dar
+     error nunca; pasado ese tiempo se corta y cuenta como "sin señal". */
+  const ctl = opc && opc.espera && window.AbortController ? new AbortController() : null;
+  const reloj = ctl ? setTimeout(() => ctl.abort(), opc.espera) : null;
+  let r, t;
+  try {
+    r = await fetch(CLOUD.url + "/rest/v1/rpc/" + fn, { method: "POST", headers, body: JSON.stringify(body), signal: ctl ? ctl.signal : undefined });
+    t = await r.text();
+  } finally { if (reloj) clearTimeout(reloj); }
   if (!r.ok) {
     /* El servidor cuenta qué pasó en el cuerpo (message y code): se guarda
        en el error para que quien llama distinga "PIN incorrecto" de "no
@@ -1720,6 +1727,11 @@ function estadoLote(){
   b.disabled = hechos < n || lote.guardando;
   b.textContent = "Guardar los " + n + " autos";
 }
+/* La foto de respaldo de cada auto, aligerada, sacada del archivo justo al
+   guardarlo (no antes, para no tener todas en memoria a la vez). */
+async function fotoDeArchivo(f){
+  try { return await aligerarFoto(await leerArchivo(f), 1280, 0.78); } catch (e) { return null; }
+}
 async function abrirLote(archivos){
   if (archivos.length > LOTE_MAX) { toast("⚠︎ Se toman las primeras " + LOTE_MAX + " fotos"); archivos = archivos.slice(0, LOTE_MAX); }
   const id = Date.now();
@@ -1751,17 +1763,25 @@ async function abrirLote(archivos){
   estadoLote();
   /* Primero las miniaturas (rápido) y después la lectura, una a una: el
      lector usa todo el teléfono y en paralelo iría más lento. */
-  for (let i = 0; i < lote.items.length; i++) {
-    try { lote.items[i].foto = await aligerarFoto(await leerArchivo(lote.items[i].archivo), 1600, 0.85); } catch (e) {}
-    const im = document.querySelector('#lote_lista [data-i="' + i + '"] img'); if (im && lote.items[i].foto) im.src = lote.items[i].foto;
-  }
+  /* Miniaturas directo del archivo: no se copia la foto entera en memoria
+     (cuatro fotos de 12 MP como texto tumbaban la página en el S23). */
+  lote.items.forEach((it, i) => {
+    const im = document.querySelector('#lote_lista [data-i="' + i + '"] img');
+    try { it.miniatura = URL.createObjectURL(it.archivo); if (im) im.src = it.miniatura; } catch (e) {}
+  });
   const conocidos = await vinesConocidos().catch(() => null);
   for (let i = 0; i < lote.items.length; i++) {
     if (!lote || lote.id !== id) return;
     const it = lote.items[i]; if (it.quitado) continue;
     it.estado = "leyendo"; pintarFilaLote(i); estadoLote();
     let r = null;
-    try { r = it.foto ? await LectorVIN.leerFotoEntera(it.foto, conocidos ? { conocidos } : undefined) : null; } catch (e) { r = null; }
+    /* La foto original, a 2400 px, igual que cuando se abre una sola foto
+       de la galería: más resolución lee mucho mejor que la copia aligerada. */
+    try {
+      r = await Promise.race([
+        LectorVIN.leerFotoEntera(it.archivo, { lado: 2400, conocidos: conocidos || undefined }),
+        new Promise(ok => setTimeout(() => ok(null), 60000))]);
+    } catch (e) { r = null; }
     if (!lote || lote.id !== id) return;
     if (!it.editado) it.vin = r && r.vin ? r.vin : "";
     it.recorte = r && r.recorte || null;
@@ -1785,6 +1805,7 @@ async function repetidoEnLote(i, v){
 }
 function cerrarLote(){
   if (lote && lote.guardando) return;
+  if (lote) lote.items.forEach(it => { try { if (it.miniatura) URL.revokeObjectURL(it.miniatura); } catch (e) {} });
   lote = null; document.getElementById("loteScrim").classList.remove("open");
   document.getElementById("lote_lista").innerHTML = "";
 }
@@ -1799,8 +1820,9 @@ async function guardarLote(){
   recordarNombres(worker, supervisor);
   lote.guardando = true;
   const b = document.getElementById("lote_save"); b.disabled = true;
-  const items = lote.items.map((it, i) => ({ it, i })).filter(x => !x.it.quitado && x.it.foto);
+  const items = lote.items.map((it, i) => ({ it, i })).filter(x => !x.it.quitado && !x.it.guardado);
   let ok = 0, cola = 0, mal = 0;
+  try {
   for (const { it, i } of items) {
     b.textContent = "Guardando " + (ok + cola + mal + 1) + " de " + items.length + "…";
     const v = (document.querySelector('#lote_lista [data-i="' + i + '"] input.vin') || {}).value || it.vin || "";
@@ -1812,19 +1834,22 @@ async function guardarLote(){
       p_vin_full: completo, p_vin6: vin ? vin6of(vin) : null, p_make: null, p_model: null, p_color: null,
       p_worker_name: worker, p_supervisor_name: supervisor,
       p_client_at: new Date(dia + "T" + hora).toISOString(),
-      p_photo_data: await aligerarFoto(it.foto),
+      p_photo_data: await fotoDeArchivo(it.archivo),
       p_confirmado: !!completo, p_estado: completo ? vinSemaforo(completo) : (vin ? "ambar" : "rojo"),
       p_notas: null, p_etiquetas: null };
     try {
-      const nuevo = await rpc("vin_log_insert", params);
+      const nuevo = await rpc("vin_log_insert", params, { espera: 30000 });
       if (nuevo && it.recorte) InformeDia.guardarRecorte(nuevo, it.recorte);
-      ok++;
+      it.guardado = true; ok++;
     } catch (e) {
-      if (valeEncolar(e) && await queueOffline(params)) { if (it.recorte) InformeDia.guardarRecorte(claveCola(params), it.recorte); cola++; }
+      /* El mismo registro mandado dos veces no se duplica en el servidor,
+         así que encolar tras un corte por tiempo es seguro. */
+      if (valeEncolar(e) && await queueOffline(params)) { if (it.recorte) InformeDia.guardarRecorte(claveCola(params), it.recorte); it.guardado = true; cola++; }
       else mal++;
     }
   }
-  lote.guardando = false;
+  } catch (e) { mal++; }
+  finally { lote.guardando = false; }
   const quedan = mal;
   toast((mal ? "⚠︎ " : cola ? "📶 " : "✓ ") + ok + " guardados" + (cola ? ", " + cola + " en el teléfono hasta tener señal" : "") + (mal ? ", " + mal + " no se pudieron guardar" : "") + ".", 4500);
   if (!quedan) cerrarLote(); else { b.disabled = false; estadoLote(); }

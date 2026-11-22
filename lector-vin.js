@@ -1492,14 +1492,34 @@
   /* Sin pantalla: buscar y leer. Lo usa la app de Registro VIN para las
      fotos que se guardaron deprisa sin leer. */
   async function leerFotoEntera (fuente, opc) {
+    opc = opc || {}
     const im = await cargarImagen(fuente)
-    const base = aLienzo(im, 2000)
+    const base = aLienzo(im, opc.lado || 2000)
+    if (fuente && !fuente.getContext && typeof fuente !== 'string') try { URL.revokeObjectURL(im.src) } catch (e) {}
     const sitio = await localizar(base)
-    if (!sitio) return { vin: null, leido: '' }
-    const girada = enderezar(girarCuartos(base, sitio.cuartos), sitio.enderezado || 0)
-    const r = await leer(girada, sitio.caja, opc)
-    return Object.assign(r, { cuartos: sitio.cuartos, caja: sitio.caja,
-      recorte: recortarYAmpliar(girada, cajaAjustada(sitio.caja), 560).toDataURL('image/jpeg', 0.82) })
+    let r = null, girada = base, caja = null, cuartos = 0
+    if (sitio) {
+      girada = enderezar(girarCuartos(base, sitio.cuartos), sitio.enderezado || 0)
+      caja = sitio.caja; cuartos = sitio.cuartos
+      try { r = await leer(girada, caja, opc) } catch (e) { r = null }
+    }
+    /* Si no la encontró, o la encontró pero no sacó nada, se lee el centro
+       de la foto, como hace el editor con una foto de la galería: así sale
+       por lo menos un aproximado. */
+    if (!opc.sinCentro && (!r || !r.vin)) {
+      const centro = { x: 0.08, y: 0.38, w: 0.84, h: 0.24 }
+      try {
+        const r2 = await leer(base, centro, opc)
+        if (r2 && r2.vin && (!r || !r.vin || r2.vin.length > r.vin.length)) { r = r2; girada = base; caja = centro; cuartos = 0 }
+      } catch (e) {}
+    }
+    if (!r || !r.vin) return { vin: null, leido: '' }
+    /* Con los VIN ya registrados se corrige la confusión típica (B/8, S/5). */
+    const conocidos = typeof opc.conocidos === 'function' ? await opc.conocidos() : opc.conocidos
+    const em = conocidos ? emparejar(r.vin, conocidos) : null
+    if (em && em.vin) r = Object.assign({}, r, { vin: em.vin, emparejado: em })
+    return Object.assign(r, { cuartos, caja,
+      recorte: recortarYAmpliar(girada, cajaAjustada(caja), 560).toDataURL('image/jpeg', 0.82) })
   }
 
   /* Para la foto del resumen, el recuadro pegado al renglón del VIN.
