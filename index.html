@@ -1730,7 +1730,34 @@ function estadoLote(){
 /* La foto de respaldo de cada auto, aligerada, sacada del archivo justo al
    guardarlo (no antes, para no tener todas en memoria a la vez). */
 async function fotoDeArchivo(f){
-  try { return await aligerarFoto(await leerArchivo(f), 1280, 0.78); } catch (e) { return null; }
+  const c = await achicarArchivo(f, 1280, true);
+  if (!c) return null;
+  try { return c.toDataURL("image/jpeg", 0.78); } catch (e) { return null; } finally { c.width = c.height = 0; }
+}
+/* Un archivo de la galería, ya pequeño, en un lienzo. Se decodifica
+   directamente al tamaño pedido: abrir la foto entera de 12 MP (48 MB en
+   memoria cada una) varias veces seguidas cerraba la página en el S23.
+   ajustar: que el lado mayor no pase de "lado" (si no, es el ancho). */
+async function achicarArchivo(f, lado, ajustar){
+  let bm = null;
+  try {
+    if (window.createImageBitmap) bm = await createImageBitmap(f, { resizeWidth: lado, resizeQuality: "high" });
+  } catch (e) { bm = null; }
+  try {
+    if (!bm) {
+      const url = URL.createObjectURL(f);
+      try {
+        bm = await new Promise((ok, mal) => { const im = new Image(); im.onload = () => ok(im); im.onerror = mal; im.src = url; });
+      } finally { setTimeout(() => URL.revokeObjectURL(url), 0); }
+    }
+    const w0 = bm.width, h0 = bm.height;
+    const e = Math.min(1, ajustar ? lado / Math.max(w0, h0) : lado / w0);
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(w0 * e)); c.height = Math.max(1, Math.round(h0 * e));
+    const g = c.getContext("2d"); g.imageSmoothingQuality = "high"; g.drawImage(bm, 0, 0, c.width, c.height);
+    return c;
+  } catch (e) { return null; }
+  finally { try { if (bm && bm.close) bm.close(); } catch (e) {} }
 }
 async function abrirLote(archivos){
   if (archivos.length > LOTE_MAX) { toast("⚠︎ Se toman las primeras " + LOTE_MAX + " fotos"); archivos = archivos.slice(0, LOTE_MAX); }
@@ -1765,10 +1792,12 @@ async function abrirLote(archivos){
      lector usa todo el teléfono y en paralelo iría más lento. */
   /* Miniaturas directo del archivo: no se copia la foto entera en memoria
      (cuatro fotos de 12 MP como texto tumbaban la página en el S23). */
-  lote.items.forEach((it, i) => {
+  for (let i = 0; i < lote.items.length; i++) {
+    if (!lote || lote.id !== id) return;
+    const it = lote.items[i], c = await achicarArchivo(it.archivo, 160, true);
     const im = document.querySelector('#lote_lista [data-i="' + i + '"] img');
-    try { it.miniatura = URL.createObjectURL(it.archivo); if (im) im.src = it.miniatura; } catch (e) {}
-  });
+    if (c) { try { if (im) im.src = c.toDataURL("image/jpeg", 0.7); } catch (e) {} c.width = c.height = 0; }
+  }
   const conocidos = await vinesConocidos().catch(() => null);
   for (let i = 0; i < lote.items.length; i++) {
     if (!lote || lote.id !== id) return;
@@ -1777,11 +1806,16 @@ async function abrirLote(archivos){
     let r = null;
     /* La foto original, a 2400 px, igual que cuando se abre una sola foto
        de la galería: más resolución lee mucho mejor que la copia aligerada. */
+    let lienzo = null;
     try {
-      r = await Promise.race([
-        LectorVIN.leerFotoEntera(it.archivo, { lado: 2400, conocidos: conocidos || undefined }),
+      lienzo = await achicarArchivo(it.archivo, 1800);
+      if (lienzo) r = await Promise.race([
+        LectorVIN.leerFotoEntera(lienzo, { lado: 2400, conocidos: conocidos || undefined }),
         new Promise(ok => setTimeout(() => ok(null), 60000))]);
     } catch (e) { r = null; }
+    if (lienzo) lienzo.width = lienzo.height = 0;
+    /* Un respiro entre foto y foto para que el teléfono libere memoria. */
+    await new Promise(ok => setTimeout(ok, 250));
     if (!lote || lote.id !== id) return;
     if (!it.editado) it.vin = r && r.vin ? r.vin : "";
     it.recorte = r && r.recorte || null;
@@ -1805,7 +1839,6 @@ async function repetidoEnLote(i, v){
 }
 function cerrarLote(){
   if (lote && lote.guardando) return;
-  if (lote) lote.items.forEach(it => { try { if (it.miniatura) URL.revokeObjectURL(it.miniatura); } catch (e) {} });
   lote = null; document.getElementById("loteScrim").classList.remove("open");
   document.getElementById("lote_lista").innerHTML = "";
 }
