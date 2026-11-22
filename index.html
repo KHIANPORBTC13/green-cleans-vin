@@ -235,6 +235,17 @@ textarea.inp{display:block;min-height:76px;resize:vertical;font-family:inherit;l
 .hist b{color:var(--texto)}
 .hist .h-borrar b{color:var(--rojo)}
 .sub.edit{color:var(--sec);font-style:italic}
+.lote{display:flex;flex-direction:column;gap:10px;margin:0 0 16px}
+.lote-f{display:grid;grid-template-columns:72px 1fr;gap:10px;align-items:start;padding:10px;border:1.5px solid var(--sep);border-radius:14px}
+.lote-f.rep{border-color:var(--rojo)}
+.lote-f img{width:72px;height:72px;object-fit:cover;border-radius:10px;background:#dfe6e2}
+.lote-f .datos{display:flex;flex-direction:column;gap:6px;min-width:0}
+.lote-f .fila2{display:flex;gap:6px;align-items:center}
+.lote-f input.vin{font-family:var(--mono);letter-spacing:0;font-size:13px;min-height:44px;padding:8px 6px;flex:1;min-width:0}
+.lote-f input.hora{width:96px;min-height:44px;padding:8px;flex:none}
+.lote-f .est{font-size:13px;line-height:17px;color:var(--sec)}
+.lote-f .est.rojo{color:var(--rojo)}
+.lote-f .quitar{border:0;background:none;color:var(--rojo);font-weight:700;font-size:14px;min-height:44px;padding:0 6px;flex:none}
 .caja-tit{font-size:15.5px;font-weight:700;color:var(--texto)}
 .etiq.seg button{min-width:58px}
 .novedades{display:flex;flex-direction:column;gap:9px;font-size:14px;font-weight:600;color:var(--sec);margin:0 0 16px}
@@ -627,7 +638,7 @@ main>section.entra{animation:entra .16s ease-out}
 
     <!-- Los atajos en círculos: lo que se usa a diario, a un toque. -->
     <div class="rapidos">
-      <label class="rapido" for="galInput"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-gallery"/></svg></span></span>Foto de galería</label>
+      <label class="rapido" for="galInput"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-gallery"/></svg></span></span>Fotos de galería</label>
       <!-- Aparte de la cámara que lee letras: si el auto trae el VIN en código de
            barras (etiqueta de la puerta o del parabrisas), se lee entero y sin errores. -->
       <button class="rapido" id="btnBarras" type="button"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-barcode"/></svg></span></span>Código de barras</button>
@@ -649,7 +660,7 @@ main>section.entra{animation:entra .16s ease-out}
       <button class="cifra ancha" type="button" id="cifraCola" hidden>
         <span class="mas"><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-sync"/></svg><b>Sin subir todavía</b></span><span class="n" id="nCola">0</span></button>
     </div>
-    <input type="file" id="galInput" accept="image/*" hidden>
+    <input type="file" id="galInput" accept="image/*" multiple hidden>
     <input type="file" id="otraInput" accept="image/*" capture="environment" hidden>
     <div id="ocrStatus" class="hint"></div>
     <div class="grupo-cab"><span>Hoy</span><span><span id="todayCount">0 autos</span></span></div>
@@ -839,6 +850,21 @@ main>section.entra{animation:entra .16s ease-out}
     <p class="hint" id="ask_text"></p>
     <button class="primary" id="ask_ok" type="button">Continuar</button>
     <button class="secondary" id="ask_cancel" type="button">Cancelar</button>
+  </div>
+</div>
+
+<!-- Varias fotos de la galería a la vez: se leen todas seguidas y se
+     guardan juntas, como los autos de una jornada. -->
+<div class="scrim" id="loteScrim">
+  <div class="sheet">
+    <h3 id="lote_tit">Varias fotos</h3>
+    <p class="hint" id="lote_estado"></p>
+    <label class="f">Trabajador<input class="inp" id="lote_worker" autocapitalize="words" enterkeyhint="done" placeholder="Quién lavó los autos"></label>
+    <label class="f">Supervisor<input class="inp" id="lote_supervisor" autocapitalize="words" enterkeyhint="done" placeholder="Quién sube estas fotos"></label>
+    <label class="f">Día de la jornada<input class="inp" type="date" id="lote_dia"></label>
+    <div class="lote" id="lote_lista"></div>
+    <button class="primary" id="lote_save" type="button" disabled>Guardar</button>
+    <button class="secondary" id="lote_cancel" type="button">Cancelar</button>
   </div>
 </div>
 
@@ -1648,6 +1674,161 @@ async function abrirLector(opc){
   const completo = r.vin.length === 17 ? r.vin : "";
   openReview({ photo: r.foto, vinFull: completo, vin6: vin6of(r.vin), make: "", model: "",
     semaforo: completo ? r.semaforo : null, emparejado: r.emparejado, recorte: r.recorte });
+}
+
+/* ===================== Varias fotos a la vez =====================
+   De la galería se eligen varias fotos (hasta 40) y se leen todas seguidas,
+   sin pantallas en medio: el VIN de cada una sale en su fila, se puede
+   corregir, y con un botón se guardan todas como los autos de una jornada.
+   La hora de cada auto es la de la foto, si es de ese día; si no, se
+   reparten a partir de las 9:00 en el orden en que se eligieron. Una foto
+   sin VIN leído se guarda igual y queda en "Por confirmar". */
+const LOTE_MAX = 40;
+let lote = null;
+const leerArchivo = f => new Promise((ok, mal) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = mal; fr.readAsDataURL(f); });
+const horaDe = d => String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+function ponerHorasLote(){
+  if (!lote) return;
+  const dia = document.getElementById("lote_dia").value;
+  lote.items.forEach((it, i) => {
+    const d = new Date(it.modificado);
+    const propia = !isNaN(d) && fechaLocal(d) === dia;
+    const h = propia ? horaDe(d) : horaDe(new Date(new Date(dia + "T09:00").getTime() + i * 30 * 60000));
+    const inp = document.querySelector('#lote_lista [data-i="' + i + '"] input.hora'); if (inp) inp.value = h;
+  });
+}
+function pintarFilaLote(i){
+  const it = lote.items[i], el = document.querySelector('#lote_lista [data-i="' + i + '"]'); if (!el) return;
+  el.classList.toggle("rep", !!it.repetido);
+  const est = el.querySelector(".est"), inp = el.querySelector("input.vin");
+  if (it.estado === "leyendo") { est.className = "est"; est.textContent = "Leyendo el VIN…"; return; }
+  if (it.estado === "espera") { est.className = "est"; est.textContent = "En espera"; return; }
+  if (document.activeElement !== inp) inp.value = it.vin || "";
+  const v = inp.value.trim().toUpperCase();
+  est.className = "est" + (!v || it.repetido ? " rojo" : "");
+  est.textContent = it.repetido ? "VIN REPETIDO: " + it.repetido
+    : !v ? "No se pudo leer: escríbelo o se guarda en Por confirmar"
+    : v.length === 17 ? (SEMAFORO[vinSemaforo(v)] || "") : "Incompleto: se guarda en Por confirmar";
+}
+function estadoLote(){
+  const n = lote.items.length, hechos = lote.items.filter(x => x.estado === "listo").length;
+  const leidos = lote.items.filter(x => x.estado === "listo" && x.vin && x.vin.length === 17).length;
+  document.getElementById("lote_estado").textContent = hechos < n
+    ? "Leyendo " + (hechos + 1) + " de " + n + "… puedes ir revisando los que ya salieron."
+    : leidos + " de " + n + " con el VIN leído. Revisa y corrige si hace falta; luego guarda todos.";
+  const b = document.getElementById("lote_save");
+  b.disabled = hechos < n || lote.guardando;
+  b.textContent = "Guardar los " + n + " autos";
+}
+async function abrirLote(archivos){
+  if (archivos.length > LOTE_MAX) { toast("⚠︎ Se toman las primeras " + LOTE_MAX + " fotos"); archivos = archivos.slice(0, LOTE_MAX); }
+  const id = Date.now();
+  lote = { id, guardando: false, items: archivos.map(f => ({ archivo: f, modificado: f.lastModified, estado: "espera", vin: "", foto: null, recorte: null, repetido: null })) };
+  document.getElementById("lote_tit").textContent = archivos.length + " fotos de la galería";
+  document.getElementById("lote_worker").value = nombreTrabajadorPorDefecto() || "";
+  document.getElementById("lote_supervisor").value = nombreSupervisorPorDefecto() || "";
+  /* El día: el de la mayoría de las fotos; si no se sabe, hoy. */
+  const dias = {}; for (const f of archivos) { const d = new Date(f.lastModified); if (!isNaN(d)) { const k = fechaLocal(d); dias[k] = (dias[k] || 0) + 1; } }
+  const diaFotos = Object.entries(dias).sort((a, b) => b[1] - a[1])[0];
+  const hoy = fechaLocal(new Date());
+  const inpDia = document.getElementById("lote_dia"); inpDia.max = hoy; inpDia.value = diaFotos && diaFotos[0] <= hoy ? diaFotos[0] : hoy;
+  inpDia.onchange = ponerHorasLote;
+  const caja = document.getElementById("lote_lista");
+  caja.innerHTML = lote.items.map((it, i) => '<div class="lote-f" data-i="' + i + '"><img alt="Foto ' + (i + 1) + '"><div class="datos">' +
+    '<div class="fila2"><input class="inp vin" maxlength="17" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="VIN" aria-label="VIN de la foto ' + (i + 1) + '">' +
+    '<button class="quitar" type="button" aria-label="Quitar la foto ' + (i + 1) + '">Quitar</button></div>' +
+    '<div class="fila2"><input class="inp hora" type="time" aria-label="Hora del auto ' + (i + 1) + '"><span class="est">En espera</span></div></div></div>').join("");
+  caja.querySelectorAll(".lote-f").forEach(el => {
+    const i = +el.dataset.i;
+    el.querySelector("input.vin").addEventListener("input", async e => {
+      const v = e.target.value.trim().toUpperCase(); lote.items[i].vin = v; lote.items[i].editado = true;
+      lote.items[i].repetido = v.length >= 6 ? (await repetidoEnLote(i, v)) : null; pintarFilaLote(i);
+    });
+    el.querySelector(".quitar").onclick = () => { if (lote.guardando) return; lote.items[i].quitado = true; el.remove(); lote.items[i].estado = "listo"; estadoLote(); const n = lote.items.filter(x => !x.quitado).length; document.getElementById("lote_save").textContent = "Guardar los " + n + " autos"; if (!n) cerrarLote(); };
+  });
+  ponerHorasLote();
+  document.getElementById("loteScrim").classList.add("open");
+  estadoLote();
+  /* Primero las miniaturas (rápido) y después la lectura, una a una: el
+     lector usa todo el teléfono y en paralelo iría más lento. */
+  for (let i = 0; i < lote.items.length; i++) {
+    try { lote.items[i].foto = await aligerarFoto(await leerArchivo(lote.items[i].archivo), 1600, 0.85); } catch (e) {}
+    const im = document.querySelector('#lote_lista [data-i="' + i + '"] img'); if (im && lote.items[i].foto) im.src = lote.items[i].foto;
+  }
+  const conocidos = await vinesConocidos().catch(() => null);
+  for (let i = 0; i < lote.items.length; i++) {
+    if (!lote || lote.id !== id) return;
+    const it = lote.items[i]; if (it.quitado) continue;
+    it.estado = "leyendo"; pintarFilaLote(i); estadoLote();
+    let r = null;
+    try { r = it.foto ? await LectorVIN.leerFotoEntera(it.foto, conocidos ? { conocidos } : undefined) : null; } catch (e) { r = null; }
+    if (!lote || lote.id !== id) return;
+    if (!it.editado) it.vin = r && r.vin ? r.vin : "";
+    it.recorte = r && r.recorte || null;
+    it.repetido = it.vin && it.vin.length >= 6 ? await repetidoEnLote(i, it.vin) : null;
+    it.estado = "listo"; pintarFilaLote(i);
+    /* La foto que ya se leyó antes con el mismo VIN también queda marcada. */
+    if (it.vin && it.vin.length >= 6) lote.items.forEach((x, k) => {
+      if (k !== i && !x.quitado && x.estado === "listo" && x.vin && vin6of(x.vin) === vin6of(it.vin)) {
+        x.repetido = "los últimos seis, " + vin6of(it.vin) + ", son iguales a los de otra foto de esta tanda."; pintarFilaLote(k);
+      }
+    });
+    estadoLote();
+  }
+}
+/* Repetido contra lo ya registrado y contra las otras fotos del lote. */
+async function repetidoEnLote(i, v){
+  const seis = vin6of(v);
+  const otras = lote.items.filter((x, k) => k !== i && !x.quitado && x.vin && vin6of(x.vin) === seis);
+  if (otras.length) return "los últimos seis, " + seis + ", son iguales a los de otra foto de esta tanda.";
+  try { return await buscarRepetido(v.length === 17 ? v : null, seis, null); } catch (e) { return null; }
+}
+function cerrarLote(){
+  if (lote && lote.guardando) return;
+  lote = null; document.getElementById("loteScrim").classList.remove("open");
+  document.getElementById("lote_lista").innerHTML = "";
+}
+async function guardarLote(){
+  if (!lote || lote.guardando) return;
+  const worker = document.getElementById("lote_worker").value.trim();
+  const supervisor = document.getElementById("lote_supervisor").value.trim();
+  const dia = document.getElementById("lote_dia").value;
+  if (!worker) { toast("⚠︎ Falta el nombre del trabajador"); return; }
+  if (!supervisor) { toast("⚠︎ Falta el nombre del supervisor"); return; }
+  if (!dia) { toast("⚠︎ Falta el día"); return; }
+  recordarNombres(worker, supervisor);
+  lote.guardando = true;
+  const b = document.getElementById("lote_save"); b.disabled = true;
+  const items = lote.items.map((it, i) => ({ it, i })).filter(x => !x.it.quitado && x.it.foto);
+  let ok = 0, cola = 0, mal = 0;
+  for (const { it, i } of items) {
+    b.textContent = "Guardando " + (ok + cola + mal + 1) + " de " + items.length + "…";
+    const v = (document.querySelector('#lote_lista [data-i="' + i + '"] input.vin') || {}).value || it.vin || "";
+    const vin = v.trim().toUpperCase();
+    const hora = (document.querySelector('#lote_lista [data-i="' + i + '"] input.hora') || {}).value || "09:00";
+    const completo = vin.length === 17 ? vin : null;
+    /* Leído entero y revisado aquí: entra confirmado. Lo demás, a Por confirmar. */
+    const params = {
+      p_vin_full: completo, p_vin6: vin ? vin6of(vin) : null, p_make: null, p_model: null, p_color: null,
+      p_worker_name: worker, p_supervisor_name: supervisor,
+      p_client_at: new Date(dia + "T" + hora).toISOString(),
+      p_photo_data: await aligerarFoto(it.foto),
+      p_confirmado: !!completo, p_estado: completo ? vinSemaforo(completo) : (vin ? "ambar" : "rojo"),
+      p_notas: null, p_etiquetas: null };
+    try {
+      const nuevo = await rpc("vin_log_insert", params);
+      if (nuevo && it.recorte) InformeDia.guardarRecorte(nuevo, it.recorte);
+      ok++;
+    } catch (e) {
+      if (valeEncolar(e) && await queueOffline(params)) { if (it.recorte) InformeDia.guardarRecorte(claveCola(params), it.recorte); cola++; }
+      else mal++;
+    }
+  }
+  lote.guardando = false;
+  const quedan = mal;
+  toast((mal ? "⚠︎ " : cola ? "📶 " : "✓ ") + ok + " guardados" + (cola ? ", " + cola + " en el teléfono hasta tener señal" : "") + (mal ? ", " + mal + " no se pudieron guardar" : "") + ".", 4500);
+  if (!quedan) cerrarLote(); else { b.disabled = false; estadoLote(); }
+  loadToday(); renderPendientesBadge(); renderQueueBadge();
 }
 
 /* El código de barras es una opción aparte de la cámara que lee letras: un
@@ -2878,9 +3059,12 @@ document.addEventListener("DOMContentLoaded", () => {
     fr.readAsDataURL(f);
   });
   document.getElementById("galInput").addEventListener("change", e => {
-    const f = e.target.files[0]; e.target.value = "";
-    if (f) abrirLector({ archivo: f });
+    const fs = [...e.target.files]; e.target.value = "";
+    if (fs.length > 1) abrirLote(fs);
+    else if (fs[0]) abrirLector({ archivo: fs[0] });
   });
+  document.getElementById("lote_save").onclick = guardarLote;
+  document.getElementById("lote_cancel").onclick = cerrarLote;
   /* El lector tarda unos segundos en arrancar la primera vez: se arranca ya,
      mientras se mira la lista, para que al pulsar Escanear este listo. */
   setTimeout(() => LectorVIN.precargar(), 1200);
@@ -2919,6 +3103,7 @@ document.addEventListener("DOMContentLoaded", () => {
      pregunta, que tiene que responder "no" a quien la esta esperando. */
   const CERRADORES = {
     capScrim: () => cerrarVistazo(),
+    loteScrim: () => cerrarLote(),
     confScrim: () => cerrarConfirmacion(),
     askScrim: () => document.getElementById("ask_cancel").click(),
     reviewScrim: () => closeReview(),
