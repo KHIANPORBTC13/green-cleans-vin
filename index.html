@@ -226,6 +226,9 @@ textarea.inp{display:block;min-height:76px;resize:vertical;font-family:inherit;l
 /* Novedades del auto: las de siempre a un toque y, debajo, texto libre. */
 .caja-extra{display:flex;flex-direction:column;gap:10px;padding:14px;margin:0 0 16px;border:1.5px solid var(--sep);border-radius:14px}
 .sheet.otra .solo-vin{display:none}
+/* "¿Qué parte del auto?" sobre el detalle de auto venta, para no confundirlo con los tipos. */
+.etiq.seg[id$="_detalle"]{margin-top:12px}
+.etiq.seg[id$="_detalle"]::before{content:"¿Qué parte del auto?";flex-basis:100%;font-size:15px;font-weight:700;color:var(--texto)}
 .rep-fotos{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;padding:10px}
 .rep-fotos figure{margin:0;break-inside:avoid;border:1px solid var(--sep);border-radius:10px;overflow:hidden;background:var(--relleno2)}
 .rep-fotos img{display:block;width:100%;height:96px;object-fit:contain;background:#dfe6e2}
@@ -645,9 +648,9 @@ main>section.entra{animation:entra .16s ease-out}
       <!-- Al acabar el día, la hoja de cada trabajador: sus autos con la
            foto del VIN y los números del día, para mandarla por WhatsApp. -->
       <button class="rapido" id="btnResumen" type="button"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-report"/></svg></span></span>Resúmenes</button>
-      <!-- Autos de otra sección (de venta, Car4us): foto general del auto
-           y los datos escritos; se cuentan aparte de los autos normales. -->
-      <button class="rapido" id="btnOtra" type="button"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-vehicle"/></svg></span></span>Otra sección</button>
+      <!-- Cualquier trabajo (auto foto, auto venta, lavado): se elige el
+           tipo y luego leer el VIN, una foto del auto o sin foto. -->
+      <button class="rapido" id="btnOtra" type="button"><span class="aro"><span><svg class="gcico" viewBox="0 0 24 24"><use href="#ico-vehicle"/></svg></span></span>Registrar trabajo</button>
     </div>
 
     <!-- Dos chips a media pantalla: lo que falta por confirmar y los
@@ -708,7 +711,7 @@ main>section.entra{animation:entra .16s ease-out}
       <div class="grupo-cab"><span>Marcas</span></div>
       <div class="grupo viz" id="rep_marcas"></div>
 
-      <div class="grupo-cab" id="rep_otrasCab" hidden><span>Otras secciones</span><span id="rep_otrasN"></span></div>
+      <div class="grupo-cab" id="rep_otrasCab" hidden><span>Otros trabajos</span><span id="rep_otrasN"></span></div>
       <div class="grupo" id="rep_otras" hidden></div>
 
       <div class="grupo-cab" id="rep_cambiosCab" hidden><span>Ediciones y borrados</span><span id="rep_cambiosN"></span></div>
@@ -855,6 +858,21 @@ main>section.entra{animation:entra .16s ease-out}
 
 <!-- Varias fotos de la galería a la vez: se leen todas seguidas y se
      guardan juntas, como los autos de una jornada. -->
+<div class="scrim" id="tipoScrim">
+  <div class="sheet">
+    <h3>Registrar trabajo</h3>
+    <div class="caja-extra">
+      <span class="caja-tit" id="tipo_tit">¿Qué trabajo hiciste?</span>
+      <div class="etiq seg" id="tipo_seccion" role="radiogroup" aria-labelledby="tipo_tit"></div>
+      <div class="etiq seg" id="tipo_detalle" role="radiogroup" aria-label="Qué parte del auto venta" hidden></div>
+    </div>
+    <p class="hint">¿Cómo lo registras? El VIN y la foto son opcionales.</p>
+    <button class="primary" id="tipo_vin" type="button">Leer VIN</button>
+    <button class="secondary" id="tipo_foto" type="button">Foto del auto</button>
+    <button class="secondary" id="tipo_sin" type="button">Sin foto</button>
+  </div>
+</div>
+
 <div class="scrim" id="loteScrim">
   <div class="sheet">
     <h3 id="lote_tit">Varias fotos</h3>
@@ -862,6 +880,11 @@ main>section.entra{animation:entra .16s ease-out}
     <label class="f">Trabajador<input class="inp" id="lote_worker" autocapitalize="words" enterkeyhint="done" placeholder="Quién lavó los autos"></label>
     <label class="f">Supervisor<input class="inp" id="lote_supervisor" autocapitalize="words" enterkeyhint="done" placeholder="Quién sube estas fotos"></label>
     <label class="f">Día de la jornada<input class="inp" type="date" id="lote_dia"></label>
+    <div class="caja-extra">
+      <span class="caja-tit" id="lote_tipoTit">¿Qué trabajo fue?</span>
+      <div class="etiq seg" id="lote_seccion" role="radiogroup" aria-labelledby="lote_tipoTit"></div>
+      <div class="etiq seg" id="lote_detalle" role="radiogroup" aria-label="Qué parte del auto venta" hidden></div>
+    </div>
     <div class="lote" id="lote_lista"></div>
     <button class="primary" id="lote_save" type="button" disabled>Guardar</button>
     <button class="secondary" id="lote_cancel" type="button">Cancelar</button>
@@ -877,6 +900,7 @@ main>section.entra{animation:entra .16s ease-out}
     <div class="caja-extra">
       <span class="caja-tit" id="rev_secTit">¿Qué trabajo es?</span>
       <div class="etiq seg" id="rev_seccion" role="radiogroup" aria-labelledby="rev_secTit"></div>
+      <div class="etiq seg" id="rev_detalle" role="radiogroup" aria-label="Qué parte del auto venta" hidden></div>
     </div>
     <label class="f solo-vin">Últimos 6 del VIN (opcional)<input class="inp" id="rev_vin6" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" maxlength="8" autocapitalize="characters"></label>
     <label class="f solo-vin">VIN completo (opcional)<input class="inp" id="rev_vinFull" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" autocapitalize="characters"></label>
@@ -1359,40 +1383,86 @@ function marcarEquipo(pref, n){
   document.querySelectorAll("#" + pref + "_equipo button").forEach(b => b.setAttribute("aria-checked", String(b.dataset.n === n)));
   const con = document.getElementById(pref + "_con"); con.hidden = n === "1"; if (n === "1") con.value = "";
 }
-/* Autos de otra sección de la empresa (de venta, Car4us). Se trabajan
-   igual, pero no cuentan como auto normal sino como servicio aparte, y no
-   llevan VIN: una foto general del auto y los datos escritos. La sección
-   va como etiqueta, así viaja por donde ya viajan las demás. */
-const SECCIONES = {
-  venta: { tag: "Sección: Autos de venta", corto: "Auto de venta", uno: "auto de venta", varios: "autos de venta" },
-  car4us: { tag: "Sección: Car4us", corto: "Car4us", uno: "auto Car4us", varios: "autos Car4us" }
+/* Tipos de trabajo. La app registra todo el trabajo del día, no sólo autos
+   con VIN: auto foto (el principal, con el lector), auto venta (exterior,
+   interior o los dos) y lavado exterior agua. Car4us queda sólo para los
+   registros viejos. El tipo viene de la base (tipo_trabajo); un registro
+   de antes, o una base sin la columna todavía, lo dice con su etiqueta. */
+const TIPOS = {
+  foto: { corto: "Auto foto", uno: "auto foto", varios: "autos foto" },
+  venta: { corto: "Auto venta", uno: "auto venta", varios: "autos venta", tag: "Sección: Autos de venta" },
+  lavado: { corto: "Lavado exterior agua", uno: "lavado exterior agua", varios: "lavados exterior agua" },
+  car4us: { corto: "Car4us", uno: "auto Car4us", varios: "autos Car4us", tag: "Sección: Car4us", viejo: true }
 };
-const seccionDe = r => { const l = (r && r.etiquetas) || []; for (const k in SECCIONES) if (l.includes(SECCIONES[k].tag)) return k; return null; };
-const esNormal = r => !seccionDe(r);
+const DETALLES = { exterior: "Exterior", interior: "Interior", ambos: "Interior y exterior" };
+const SECCIONES = TIPOS;
+function tipoDe(r){
+  if (!r) return "foto";
+  if (TIPOS[r.tipo_trabajo]) return r.tipo_trabajo;
+  if (TIPOS[r.p_tipo]) return r.p_tipo;
+  const l = r.etiquetas || r.p_etiquetas || [];
+  for (const k in TIPOS) if (TIPOS[k].tag && l.includes(TIPOS[k].tag)) return k;
+  return "foto";
+}
+const detalleDe = r => tipoDe(r) === "venta" ? ((r.tipo_detalle || r.p_tipo_detalle) in DETALLES ? (r.tipo_detalle || r.p_tipo_detalle) : null) : null;
+const nombreTipo = r => TIPOS[tipoDe(r)].corto + (detalleDe(r) ? " · " + DETALLES[detalleDe(r)] : "");
+const seccionDe = r => tipoDe(r) === "foto" ? null : tipoDe(r);
+const esNormal = r => tipoDe(r) === "foto";
 const etiquetasVisibles = r => ((r && r.etiquetas) || []).filter(t => !/^Sección: /.test(t));
-/* "1 auto de venta + 2 autos Car4us", o "" si no hay ninguno. */
+/* "3 autos venta (1 exterior, 2 interior y exterior) + 2 lavados exterior agua", o "". */
 function textoOtras(filas){
   const partes = [];
-  for (const k in SECCIONES) { const c = filas.filter(r => seccionDe(r) === k).length; if (c) partes.push(c + " " + (c === 1 ? SECCIONES[k].uno : SECCIONES[k].varios)); }
+  for (const k in TIPOS) {
+    if (k === "foto") continue;
+    const de = filas.filter(r => tipoDe(r) === k), c = de.length; if (!c) continue;
+    let t = c + " " + (c === 1 ? TIPOS[k].uno : TIPOS[k].varios);
+    if (k === "venta") {
+      const d = Object.keys(DETALLES).map(x => [x, de.filter(r => detalleDe(r) === x).length]).filter(x => x[1]);
+      if (d.length) t += " (" + d.map(([x, n]) => n + " " + DETALLES[x].toLowerCase()).join(", ") + ")";
+    }
+    partes.push(t);
+  }
   return partes.join(" + ");
 }
-/* "4 autos + 1 auto de venta". */
+/* "4 autos foto + 1 auto venta (1 exterior)". */
 function textoCuenta(filas){
   const n = filas.filter(esNormal).length, o = textoOtras(filas);
-  return n + (n === 1 ? " auto" : " autos") + (o ? " + " + o : "");
+  if (!n && o) return o;
+  return n + (n === 1 ? " auto foto" : " autos foto") + (o ? " + " + o : "");
 }
-function marcarSeccion(pref, k){
+/* El selector de tipo (ficha, "Registrar trabajo" y la tanda): un botón por
+   tipo y, si es auto venta, qué parte del auto. */
+function montarTipos(pref){
+  const sec = document.getElementById(pref + "_seccion"); if (!sec) return;
+  sec.innerHTML = Object.keys(TIPOS).map(k => '<button type="button" role="radio" aria-checked="false" data-s="' + k + '"' + (TIPOS[k].viejo ? " hidden" : "") + ">" + esc(TIPOS[k].corto) + "</button>").join("");
+  sec.querySelectorAll("button").forEach(b => b.onclick = () => marcarSeccion(pref, b.dataset.s));
+  const det = document.getElementById(pref + "_detalle");
+  if (det) {
+    det.innerHTML = Object.keys(DETALLES).map(k => '<button type="button" role="radio" aria-checked="false" data-d="' + k + '">' + esc(DETALLES[k]) + "</button>").join("");
+    det.querySelectorAll("button").forEach(b => b.onclick = () => det.querySelectorAll("button").forEach(x => x.setAttribute("aria-checked", String(x === b))));
+  }
+  marcarSeccion(pref, "foto");
+}
+function leerTipo(pref){
+  const b = document.querySelector("#" + pref + "_seccion button[aria-checked=true]");
+  const tipo = b && TIPOS[b.dataset.s] ? b.dataset.s : "foto";
+  const d = document.querySelector("#" + pref + "_detalle button[aria-checked=true]");
+  return { tipo, detalle: tipo === "venta" && d ? d.dataset.d : null };
+}
+/* Auto venta sin decir qué parte: se pide antes de guardar. */
+function faltaDetalle(t){ if (t.tipo === "venta" && !t.detalle) { toast("⚠︎ Elige si el auto venta fue exterior, interior o los dos"); return true; } return false; }
+function marcarSeccion(pref, k, detalle){
   const caja = document.getElementById(pref + "_seccion"); if (!caja) return;
-  caja.querySelectorAll("button").forEach(b => b.setAttribute("aria-checked", String(b.dataset.s === (k || ""))));
-  caja.closest(".sheet").classList.toggle("otra", !!k);
+  k = TIPOS[k] ? k : "foto";
+  caja.querySelectorAll("button").forEach(b => { b.setAttribute("aria-checked", String(b.dataset.s === k)); if (TIPOS[b.dataset.s].viejo) b.hidden = b.dataset.s !== k; });
+  const det = document.getElementById(pref + "_detalle");
+  if (det) {
+    det.hidden = k !== "venta";
+    if (arguments.length > 2 || k !== "venta") det.querySelectorAll("button").forEach(b => b.setAttribute("aria-checked", String(b.dataset.d === detalle)));
+  }
 }
 function montarNovedades(pref){
-  const sec = document.getElementById(pref + "_seccion");
-  if (sec) {
-    sec.innerHTML = '<button type="button" role="radio" aria-checked="true" data-s="">Auto normal</button>' +
-      Object.keys(SECCIONES).map(k => '<button type="button" role="radio" aria-checked="false" data-s="' + k + '">' + esc(SECCIONES[k].corto) + "</button>").join("");
-    sec.querySelectorAll("button").forEach(b => b.onclick = () => marcarSeccion(pref, b.dataset.s));
-  }
+  montarTipos(pref);
   const caja = document.getElementById(pref + "_etiq");
   caja.innerHTML = NOVEDADES.map(t => '<button type="button" aria-pressed="false">' + esc(t) + "</button>").join("");
   caja.querySelectorAll("button").forEach(b => b.onclick = () => b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true")));
@@ -1407,7 +1477,6 @@ function ponerNovedades(pref, etiquetas, notas){
   document.querySelectorAll("#" + pref + "_etiq button").forEach(b => b.setAttribute("aria-pressed", String(marcadas.has(b.textContent))));
   const e = l.find(x => /^Entre \d/.test(x)); const m = e && e.match(/^Entre (\d)/);
   marcarEquipo(pref, m ? String(Math.min(4, +m[1])) : "1");
-  marcarSeccion(pref, seccionDe({ etiquetas: l }));
   const con = l.find(x => /^Con: /.test(x));
   if (con) document.getElementById(pref + "_con").value = con.slice(5);
   document.getElementById(pref + "_notas").value = notas || "";
@@ -1421,8 +1490,6 @@ function leerNovedades(pref){
     const con = document.getElementById(pref + "_con").value.trim();
     if (con) etiquetas.push("Con: " + con);
   }
-  const sec = document.querySelector("#" + pref + "_seccion button[aria-checked=true]");
-  if (sec && sec.dataset.s) etiquetas.unshift(SECCIONES[sec.dataset.s].tag);
   return { etiquetas, notas: document.getElementById(pref + "_notas").value.trim() };
 }
 const tieneNovedades = r => !!(etiquetasVisibles(r).length || r.notas);
@@ -1674,9 +1741,15 @@ let pendingReview = null, editingId = null;
    devuelve el VIN ya revisado por la persona y la foto. Con VIN, a la ficha
    de siempre, con todo rellenado; sin VIN ("Guardar sólo la foto"), al
    guardado rapido, y el lector lo intenta despues por su cuenta. */
+/* El tipo elegido en "Registrar trabajo" para lo que salga del lector. Cada
+   apertura del lector lo pone de nuevo: la cámara, la galería y el código
+   de barras de siempre registran Auto foto. */
+let tipoSiguiente = null;
 async function abrirLector(opc){
+  opc = Object.assign({}, opc);
+  tipoSiguiente = opc.tipo || null; delete opc.tipo;
   const r = await LectorVIN.abrir(Object.assign({ permitirSoloFoto: true, conocidos: vinesConocidos }, opc));
-  if (!r) return;
+  if (!r) { tipoSiguiente = null; return; }
   if (r.soloFoto || !r.vin) { abrirVistazo(r.foto, r.recorte); return; }
   const completo = r.vin.length === 17 ? r.vin : "";
   openReview({ photo: r.foto, vinFull: completo, vin6: vin6of(r.vin), make: "", model: "",
@@ -1764,6 +1837,7 @@ async function abrirLote(archivos){
   const id = Date.now();
   lote = { id, guardando: false, items: archivos.map(f => ({ archivo: f, modificado: f.lastModified, estado: "espera", vin: "", foto: null, recorte: null, repetido: null })) };
   document.getElementById("lote_tit").textContent = archivos.length + " fotos de la galería";
+  marcarSeccion("lote", "foto", null);
   document.getElementById("lote_worker").value = nombreTrabajadorPorDefecto() || "";
   document.getElementById("lote_supervisor").value = nombreSupervisorPorDefecto() || "";
   /* El día: el de la mayoría de las fotos; si no se sabe, hoy. */
@@ -1850,6 +1924,8 @@ async function guardarLote(){
   if (!worker) { toast("⚠︎ Falta el nombre del trabajador"); return; }
   if (!supervisor) { toast("⚠︎ Falta el nombre del supervisor"); return; }
   if (!dia) { toast("⚠︎ Falta el día"); return; }
+  const tl = leerTipo("lote");
+  if (faltaDetalle(tl)) return;
   recordarNombres(worker, supervisor);
   lote.guardando = true;
   const b = document.getElementById("lote_save"); b.disabled = true;
@@ -1868,8 +1944,11 @@ async function guardarLote(){
       p_worker_name: worker, p_supervisor_name: supervisor,
       p_client_at: new Date(dia + "T" + hora).toISOString(),
       p_photo_data: await fotoDeArchivo(it.archivo),
-      p_confirmado: !!completo, p_estado: completo ? vinSemaforo(completo) : (vin ? "ambar" : "rojo"),
-      p_notas: null, p_etiquetas: null };
+      /* Un auto foto sin VIN completo va a Por confirmar; los demás
+         trabajos no necesitan VIN. */
+      p_confirmado: !!completo || tl.tipo !== "foto",
+      p_estado: completo ? vinSemaforo(completo) : tl.tipo !== "foto" ? null : (vin ? "ambar" : "rojo"),
+      p_notas: null, p_etiquetas: null, p_tipo: tl.tipo, p_tipo_detalle: tl.detalle };
     try {
       const nuevo = await rpc("vin_log_insert", params, { espera: 30000 });
       if (nuevo && it.recorte) InformeDia.guardarRecorte(nuevo, it.recorte);
@@ -1893,6 +1972,7 @@ async function guardarLote(){
    código no se "lee mal", sale entero o no sale. Termina en la misma ficha
    de siempre, con el VIN puesto y la foto del momento como respaldo. */
 async function abrirBarras(){
+  tipoSiguiente = null;
   const r = await LectorVIN.escanearBarras();
   if (!r) return;
   openReview({ photo: r.foto, vinFull: r.vin, vin6: vin6of(r.vin), make: "", model: "",
@@ -1904,7 +1984,7 @@ let capFoto = null;
    VIN que sale en el resumen del día, así que viaja con la foto hasta que
    el registro tiene su id. */
 function abrirVistazo(dataUrl, recorte){
-  capFoto = { dataUrl, recorte: recorte || null };
+  capFoto = { dataUrl, recorte: recorte || null, tipo: tipoSiguiente };
   document.getElementById("cap_foto").src = dataUrl;
   document.getElementById("cap_worker").value = nombreTrabajadorPorDefecto() || "";
   document.getElementById("cap_supervisor").value = nombreSupervisorPorDefecto() || "";
@@ -1928,7 +2008,9 @@ async function guardarRapido(seguir){
     p_worker_name: worker, p_supervisor_name: supervisor,
     p_client_at: new Date().toISOString(), p_photo_data: null,
     p_notas: nov.notas || null, p_etiquetas: nov.etiquetas.length ? nov.etiquetas : null,
+    p_tipo: capFoto.tipo ? capFoto.tipo.tipo : "foto", p_tipo_detalle: capFoto.tipo ? capFoto.tipo.detalle : null,
   };
+  const tipoTanda = capFoto.tipo;
   const btn = document.getElementById("cap_save"); btn.disabled = true; btn.textContent = "Guardando…";
   let guardado = false;
   try {
@@ -1953,7 +2035,7 @@ async function guardarRapido(seguir){
     }
   } finally {
     btn.disabled = false; btn.textContent = "Guardar y escanear otro";
-    if (seguir && guardado) abrirLector({ fuente: "camara" });
+    if (seguir && guardado) abrirLector({ fuente: "camara", tipo: tipoTanda });
   }
 }
 
@@ -1987,7 +2069,12 @@ function openReview(data){
   document.getElementById("rev_worker").value = data.worker != null ? data.worker : nombreTrabajadorPorDefecto();
   document.getElementById("rev_supervisor").value = data.supervisor != null ? data.supervisor : nombreSupervisorPorDefecto();
   document.getElementById("rev_when").value = toLocalInputValue(data.when ? new Date(data.when) : new Date());
+  document.getElementById("rev_when").dataset.inicial = document.getElementById("rev_when").value;
   ponerNovedades("rev", data.etiquetas, data.notas);
+  const tSel = data.tipo ? { tipo: data.tipo, detalle: data.detalle || null }
+    : data.id ? { tipo: tipoDe(data), detalle: detalleDe(data) }
+    : (tipoSiguiente || { tipo: "foto", detalle: null });
+  marcarSeccion("rev", tSel.tipo, tSel.detalle);
   document.getElementById("rev_title").textContent = editingId ? "Editar registro" : "Confirmar registro";
   document.getElementById("rev_delete").hidden = !editingId;
   let hint;
@@ -2003,7 +2090,8 @@ function openReview(data){
   } else {
     hint = "⚠︎ No se detectó texto legible. El VIN es opcional: puedes guardar igual con la foto de respaldo y completarlo después.";
   }
-  if (!data.skipHint && seccionDe({ etiquetas: data.etiquetas })) hint = "Auto de otra sección: no lleva VIN y se cuenta aparte de los autos normales. Elige la sección y escribe marca, modelo y color.";
+  if (!data.skipHint && !data.vinFull && !data.vin6 && tSel.tipo !== "foto") hint = TIPOS[tSel.tipo].corto + ": el VIN y la foto son opcionales. Revisa el tipo de trabajo y guarda.";
+  if (!data.skipHint && !data.photo && !data.vinFull && !data.vin6) hint = "Registro sin foto: basta con el tipo de trabajo, el trabajador y la hora.";
   document.getElementById("rev_ocrHint").textContent = hint;
   const sc = document.getElementById("reviewScrim"); sc.classList.add("open");
   revisarRepetidoEnFicha();
@@ -2021,7 +2109,7 @@ async function revisarRepetidoEnFicha(){
   caja.hidden = !otros;
   if (otros) caja.innerHTML = "<b>VIN REPETIDO</b>Los últimos seis, " + esc(claveVin(fila)) + ", ya están registrados. " + esc(textoRepetido(otros)) + ".";
 }
-function closeReview(){ document.getElementById("reviewScrim").classList.remove("open"); pendingReview = null; editingId = null; }
+function closeReview(){ document.getElementById("reviewScrim").classList.remove("open"); pendingReview = null; editingId = null; tipoSiguiente = null; }
 // Chrome bloquea la navegacion a data: URLs abiertas con window.open (medida anti-phishing) --
 // una foto se guarda como data URL, asi que abrirla en pestaña nueva quedaba en blanco sin error
 // visible. Se muestra en un visor dentro de la misma pagina en vez de navegar a la URL.
@@ -2096,11 +2184,16 @@ async function saveReview(){
     p_worker_name: worker, p_supervisor_name: supervisor,
   };
   const nov = leerNovedades("rev");
-  const otra = seccionDe({ etiquetas: nov.etiquetas });
-  /* De otra sección no hay VIN: lo que hubiera en los campos escondidos no se guarda. */
-  if (otra) { fields.p_vin_full = null; fields.p_vin6 = null; }
+  const tsel = leerTipo("rev");
+  if (faltaDetalle(tsel)) return;
+  fields.p_tipo = tsel.tipo; fields.p_tipo_detalle = tsel.detalle;
+  const otra = tsel.tipo !== "foto";
   const whenLocal = document.getElementById("rev_when").value;
-  const clientAt = whenLocal ? new Date(whenLocal).toISOString() : new Date().toISOString();
+  /* Si no se tocó la hora de un registro nuevo, la de ahora con segundos:
+     dos lavados seguidos en el mismo minuto son dos trabajos, no el mismo
+     mandado dos veces. */
+  const horaSinTocar = !editingId && whenLocal === document.getElementById("rev_when").dataset.inicial;
+  const clientAt = whenLocal && !horaSinTocar ? new Date(whenLocal).toISOString() : new Date().toISOString();
   const btn = document.getElementById("rev_save"); btn.disabled = true; btn.textContent = "Guardando…";
   if (editingId) {
     const autor = autorCambio();
@@ -2113,21 +2206,15 @@ async function saveReview(){
     finally { btn.disabled = false; btn.textContent = "Guardar"; }
     return;
   }
+  /* La foto es opcional: basta con registrar el trabajo. */
   const photo = pendingReview ? pendingReview.photo : null;
-  /* Sin foto no se registra. La foto es el respaldo de que el auto se hizo;
-     un registro sin ella no demuestra nada, y en las pruebas aparecio uno
-     guardado asi sin que nadie se diera cuenta. */
-  if (!photo) {
-    toast("⚠︎ Falta la foto. Vuelve a hacerla: es el respaldo del auto.");
-    btn.disabled = false; btn.textContent = "Guardar"; return;
-  }
   /* Esto ya lo acaba de revisar una persona, asi que entra confirmado y con
      su semaforo: mandarlo otra vez a "Por confirmar" seria trabajo inventado. */
   /* La foto general del auto, en chico, es su miniatura y su respaldo en los resúmenes. */
-  if (otra && pendingReview && !pendingReview.recorte) pendingReview.recorte = await aligerarFoto(photo, 640, 0.72);
+  if (otra && photo && pendingReview && !pendingReview.recorte) pendingReview.recorte = await aligerarFoto(photo, 640, 0.72);
   const vinRevisado = fields.p_vin_full;
   const repetido = await buscarRepetido(fields.p_vin_full, fields.p_vin6, null);
-  const params = { ...fields, p_client_at: clientAt, p_photo_data: await aligerarFoto(photo),
+  const params = { ...fields, p_client_at: clientAt, p_photo_data: photo ? await aligerarFoto(photo) : null,
     p_confirmado: true,
     p_estado: vinRevisado ? vinSemaforo(vinRevisado) : null,
     p_notas: nov.notas || null, p_etiquetas: nov.etiquetas.length ? nov.etiquetas : null };
@@ -2276,7 +2363,7 @@ async function generarResumen(clave, formato){
     { etiqueta: "VIN repetidos", valor: String(reps.size), nota: reps.size ? "revisa los marcados en rojo" : "ninguno",
       tono: reps.size ? "mal" : "bien" }
   ];
-  if (otras.length) kpis.splice(1, 0, { etiqueta: "Otras secciones", valor: "+" + otras.length, nota: textoOtras(otras) + ", aparte de los autos normales" });
+  if (otras.length) kpis.splice(1, 0, { etiqueta: "Otros trabajos", valor: "+" + otras.length, nota: textoOtras(otras) + ", aparte de los autos foto" });
   if (nNov) kpis.push({ etiqueta: "Con novedades", valor: String(nNov), nota: "notas, sin libro, entre varios…" });
   const graficos = [];
   if (equipo) {
@@ -2285,7 +2372,7 @@ async function generarResumen(clave, formato){
     if (otras.length) {
       const porO = {};
       for (const x of otras) { const k = String(x.worker_name || "Sin nombre").trim(); (porO[k] = porO[k] || []).push(x); }
-      graficos.push({ tipo: "barras", titulo: "Otras secciones, por trabajador", datos: Object.entries(porO).sort((a, b) => b[1].length - a[1].length).slice(0, 12)
+      graficos.push({ tipo: "barras", titulo: "Otros trabajos, por trabajador", datos: Object.entries(porO).sort((a, b) => b[1].length - a[1].length).slice(0, 12)
         .map(([k, l]) => ({ etiqueta: k + " · " + textoOtras(l), valor: l.length })) });
     }
     graficos.push({ tipo: "barras", titulo: "Por trabajador", datos: Object.entries(porP).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([etiqueta, valor]) => {
@@ -2321,7 +2408,7 @@ async function generarResumen(clave, formato){
        guardada tal cual, que es mucho más rápido con cientos de autos. */
     tituloLista: "Registros y fotos de respaldo ({n})",
     autos: todas.map(x => ({
-      vin: seccionDe(x) ? SECCIONES[seccionDe(x)].corto : (x.vin_full || (x.vin6 ? "…" + x.vin6 : "—")),
+      vin: seccionDe(x) ? nombreTipo(x) : (x.vin_full || (x.vin6 ? "…" + x.vin6 : "—")),
       hora: (dia1 ? "" : fechaCorta(new Date(x.client_at)) + " ") + hora(new Date(x.client_at)) + (equipo && x.worker_name ? " · " + String(x.worker_name).trim() : ""),
       repetido: reps.has(String(x.id)) ? textoRepetido(reps.get(String(x.id))) : null,
       novedad: tieneNovedades(x) ? textoNovedades(x) : null,
@@ -2346,7 +2433,7 @@ async function loadToday(){
 }
 async function renderTodayList(rows){
   /* Lo que espera en la cola guarda su recorte con la clave provisional. */
-  const pend = (await getQueue()).map((q, i) => ({ id: "cola-" + i, _clave: claveCola(q), vin_full: q.p_vin_full, vin6: q.p_vin6, make: q.p_make, model: q.p_model, worker_name: q.p_worker_name, client_at: q.p_client_at, notas: q.p_notas, etiquetas: q.p_etiquetas, _pending: true }));
+  const pend = (await getQueue()).map((q, i) => ({ id: "cola-" + i, _clave: claveCola(q), vin_full: q.p_vin_full, vin6: q.p_vin6, make: q.p_make, model: q.p_model, worker_name: q.p_worker_name, client_at: q.p_client_at, notas: q.p_notas, etiquetas: q.p_etiquetas, tipo_trabajo: q.p_tipo, tipo_detalle: q.p_tipo_detalle, _pending: true }));
   const list = pend.concat(rows);
   /* Los repetidos salen de la misma descarga que la lista: ya está fresca. */
   const reps = repetidosDe(list, Datos.enMemoria());
@@ -2383,7 +2470,7 @@ function pintarHoy(todos, reps){
   const list = todos.filter(esNormal), otras = textoOtras(todos);
   const n = list.length;
   document.getElementById("heroCount").textContent = n;
-  document.getElementById("heroUnidad").textContent = n === 1 ? "auto hoy" : "autos hoy";
+  document.getElementById("heroUnidad").textContent = n === 1 ? "auto foto hoy" : "autos foto hoy";
   const horas = list.map(r => new Date(r.client_at)).filter(d => !isNaN(d)).sort((a, b) => a - b);
   const hora = d => d.toLocaleTimeString("es-AU", { hour: "2-digit", minute: "2-digit", hour12: false });
   let sub = "Escanea el primero del día.";
@@ -2429,7 +2516,7 @@ function rowHTML(r, repetido){
   const sec = seccionDe(r);
   return '<div class="fila vrow con-mini' + (r._pending ? " pending" : "") + (repetido ? " repetido" : "") + '"' + idAttr + '>' +
     miniHTML(r._pending ? r._clave : r.id) +
-    '<span class="mas"><span class="vin6">' + esc(sec ? SECCIONES[sec].corto : (r.vin6 || "—")) + '</span>' +
+    '<span class="mas"><span class="vin6">' + esc(sec ? nombreTipo(r) + (r.vin6 ? " · " + r.vin6 : "") : (r.vin6 || "—")) + '</span>' +
       '<span class="sub">' + sub + '</span>' +
       (tieneNovedades(r) ? '<span class="sub nov">' + esc(textoNovedades(r)) + '</span>' : "") +
       (r.editado_por ? '<span class="sub edit">Editado por ' + esc(r.editado_por) + " · " + esc(fechaHoraCorta(r.editado_at)) + "</span>" : "") + '</span>' +
@@ -2438,7 +2525,7 @@ function rowHTML(r, repetido){
 async function openEditFromId(id, source){
   const row = source.find(r => String(r.id) === String(id));
   if (!row) return;
-  openReview({ id: row.id, photo: null, vinFull: row.vin_full || "", vin6: row.vin6 || "", make: row.make || "", model: row.model || "", color: row.color || "", worker: row.worker_name || "", supervisor: row.supervisor_name || "", when: row.client_at, skipHint: true, notas: row.notas || "", etiquetas: row.etiquetas || [] });
+  openReview({ id: row.id, tipo_trabajo: row.tipo_trabajo, tipo_detalle: row.tipo_detalle, photo: null, vinFull: row.vin_full || "", vin6: row.vin6 || "", make: row.make || "", model: row.model || "", color: row.color || "", worker: row.worker_name || "", supervisor: row.supervisor_name || "", when: row.client_at, skipHint: true, notas: row.notas || "", etiquetas: row.etiquetas || [] });
   /* La ficha se abre ya y la foto entra despues: la lista dejo de traerlas
      para no descargar todas las del periodo, asi que esta se pide sola y
      mientras tanto no se hace esperar a nadie. */
@@ -2575,9 +2662,9 @@ function renderReport(){
 
   const box = document.getElementById("rep_table");
   if (!repRows.length) { box.innerHTML = '<div class="fila"><span class="mas" style="color:var(--sec)">Sin registros en este período.</span></div>'; return; }
-  box.innerHTML = '<table class="reptable"><thead><tr><th>Fecha</th><th>Últimos 6</th><th>VIN</th><th>Marca</th><th>Modelo</th><th>Color</th><th>Trabajador</th><th>Supervisor</th><th>Sección</th><th>Novedades</th><th>Editado</th><th></th></tr></thead><tbody>' +
+  box.innerHTML = '<table class="reptable"><thead><tr><th>Fecha</th><th>Últimos 6</th><th>VIN</th><th>Marca</th><th>Modelo</th><th>Color</th><th>Trabajador</th><th>Supervisor</th><th>Tipo</th><th>Novedades</th><th>Editado</th><th></th></tr></thead><tbody>' +
     repRows.map(r => { const rp = repMarcas.get(String(r.id)); return '<tr data-id="' + esc(r.id) + '"' + (rp ? ' class="repetido"' : '') + '><td>' + new Date(r.client_at).toLocaleString("es-AU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) +
-      '</td><td><b>' + esc(r.vin6 || "—") + '</b>' + (rp ? '<br>' + ETIQ_REP + '<br><small>' + esc(textoRepetido(rp)) + '</small>' : '') + '</td><td>' + esc(r.vin_full || "—") + '</td><td>' + esc(r.make || "—") + '</td><td>' + esc(r.model || "—") + '</td><td>' + esc(r.color || "—") + '</td><td>' + esc(r.worker_name) + '</td><td>' + esc(r.supervisor_name || "—") + '</td><td>' + (seccionDe(r) ? '<span class="nov-et">' + esc(SECCIONES[seccionDe(r)].corto) + '</span>' : "Normal") + '</td><td class="nov">' +
+      '</td><td><b>' + esc(r.vin6 || "—") + '</b>' + (rp ? '<br>' + ETIQ_REP + '<br><small>' + esc(textoRepetido(rp)) + '</small>' : '') + '</td><td>' + esc(r.vin_full || "—") + '</td><td>' + esc(r.make || "—") + '</td><td>' + esc(r.model || "—") + '</td><td>' + esc(r.color || "—") + '</td><td>' + esc(r.worker_name) + '</td><td>' + esc(r.supervisor_name || "—") + '</td><td>' + (seccionDe(r) ? '<span class="nov-et">' + esc(nombreTipo(r)) + '</span>' : "Auto foto") + '</td><td class="nov">' +
       etiquetasVisibles(r).map(t => '<span class="nov-et">' + esc(t) + '</span>').join("") + (r.notas ? (etiquetasVisibles(r).length ? "<br>" : "") + esc(r.notas) : "") + '</td><td>' +
       (r.editado_por ? esc(r.editado_por) + "<br><small>" + esc(fechaHoraCorta(r.editado_at)) + "</small>" : "—") + '</td><td>' +
       (r.tiene_foto ? '<a href="#" class="photolink" data-id="' + esc(r.id) + '">Ver foto</a>' : "") + '</td></tr>'; }).join("") + '</tbody></table>';
@@ -2642,7 +2729,7 @@ async function cargarFotosReporte(alAvanzar){
   const mia = ++fotosPeticion;
   const con = repRows.filter(r => r.tiene_foto).sort((a, b) => new Date(a.client_at) - new Date(b.client_at));
   const box = document.getElementById("rep_fotos");
-  const pie = r => esc([seccionDe(r) ? SECCIONES[seccionDe(r)].corto : (r.vin_full || (r.vin6 ? "…" + r.vin6 : "Sin VIN")), r.worker_name,
+  const pie = r => esc([seccionDe(r) ? nombreTipo(r) : (r.vin_full || (r.vin6 ? "…" + r.vin6 : "Sin VIN")), r.worker_name,
     new Date(r.client_at).toLocaleString("es-AU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })].filter(Boolean).join(" · "));
   box.innerHTML = con.map(r => '<figure data-f="' + esc(r.id) + '"><div class="sinf">Cargando…</div><figcaption>' + pie(r) + "</figcaption></figure>").join("");
   let hechas = 0;
@@ -2683,7 +2770,7 @@ async function renderCambios(range){
   document.getElementById("rep_cambiosN").textContent = [ne ? ne + (ne === 1 ? " edición" : " ediciones") : "", nb ? nb + (nb === 1 ? " borrado" : " borrados") : ""].filter(Boolean).join(" · ");
   box.innerHTML = repCambios.map(c => {
     const a = c.despues || {};
-    const auto = seccionDe(a) ? SECCIONES[seccionDe(a)].corto : (a.vin_full || (a.vin6 ? "…" + a.vin6 : "Sin VIN"));
+    const auto = seccionDe(a) ? nombreTipo(a) : (a.vin_full || (a.vin6 ? "…" + a.vin6 : "Sin VIN"));
     const detalle = c.accion === "borrar"
       ? "Ficha borrada: " + [a.vin_full || a.vin6, a.make, a.model, a.color, a.worker_name ? "trabajador " + a.worker_name : "", a.client_at ? "registrado " + fechaHoraCorta(a.client_at) : ""].filter(Boolean).join(", ")
       : textoCambio(c);
@@ -2702,7 +2789,7 @@ function renderNovedades(){
   for (const r of con) for (const t of etiquetasVisibles(r)) cuenta.set(t, (cuenta.get(t) || 0) + 1);
   const resumen = [...cuenta.entries()].sort((a, b) => b[1] - a[1]).map(([t, n]) => esc(t) + " <b>" + n + "</b>").join(" · ");
   box.innerHTML = (resumen ? '<div class="fila"><span class="mas" style="font-weight:500">' + resumen + "</span></div>" : "") +
-    con.map(r => '<div class="fila vrow" data-id="' + esc(r.id) + '" role="button" tabindex="0"><span class="mas"><span class="vin6">' + esc(seccionDe(r) ? SECCIONES[seccionDe(r)].corto : (r.vin6 || "—")) + "</span>" +
+    con.map(r => '<div class="fila vrow" data-id="' + esc(r.id) + '" role="button" tabindex="0"><span class="mas"><span class="vin6">' + esc(seccionDe(r) ? nombreTipo(r) : (r.vin6 || "—")) + "</span>" +
       '<span class="sub">' + esc([r.worker_name, new Date(r.client_at).toLocaleString("es-AU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })].filter(Boolean).join(" · ")) + "</span>" +
       '<span class="sub nov" style="white-space:normal">' + esc(textoNovedades(r)) + "</span></span>" + CHEV + "</div>").join("");
   box.querySelectorAll("[data-id]").forEach(f => f.onclick = () => openEditFromId(f.dataset.id, repRows));
@@ -2715,7 +2802,7 @@ function renderReportInsights(total, repetidos, cubetas){
   const alerta = repetidos ? "VIN REPETIDO en " + repetidos + (repetidos === 1 ? " registro" : " registros") +
     " de este período: revisa que no sea el mismo auto apuntado dos veces. Están en rojo en la lista de abajo." : null;
   if (!total) {
-    bullets.push(repRows.length ? "Sin autos normales en este período; sólo de otras secciones: " + textoOtras(repRows) + "." : "Sin registros en este período todavía.");
+    bullets.push(repRows.length ? "Sin autos foto en este período; sólo otros trabajos: " + textoOtras(repRows) + "." : "Sin registros en este período todavía.");
   } else {
     const porPersona = new Map();
     for (const r of repNorm) { const k = String(r.worker_name || "").trim(); if (k) porPersona.set(k, (porPersona.get(k) || []).concat([r])); }
@@ -2747,20 +2834,20 @@ function renderReportInsights(total, repetidos, cubetas){
       .filter(x => x.antes >= 5 && x.g.n < x.antes * 0.7 && !quedan);
     for (const x of flojos.slice(0, 2)) bullets.push(x.g.nombre + " bajó de " + x.antes + " a " + x.g.n + " autos frente al período anterior.");
     const otras = textoOtras(repRows);
-    if (otras) bullets.push("Además, en otras secciones: " + otras + ". No cuentan como auto normal; el detalle por trabajador está en Otras secciones.");
+    if (otras) bullets.push("Además, otros trabajos: " + otras + ". Se cuentan aparte de los autos foto; el detalle por trabajador está en Otros trabajos.");
     const conNov = repRows.filter(tieneNovedades).length;
     if (conNov) bullets.push(conNov + (conNov === 1 ? " auto tiene novedades" : " autos tienen novedades") + " (sin libro, sin sticker, trabajo difícil…): están en Novedades, arriba.");
   }
   list.innerHTML = (alerta ? '<li class="mal">' + esc(alerta) + "</li>" : "") + bullets.map(b => "<li>" + esc(b) + "</li>").join("");
 }
 function exportReportCSV(){
-  const rows = [["fecha_hora", "vin_ultimos6", "vin", "marca", "modelo", "color", "trabajador", "supervisor", "alerta", "novedades", "notas", "seccion", "editado_por", "editado_cuando"]];
+  const rows = [["fecha_hora", "vin_ultimos6", "vin", "marca", "modelo", "color", "trabajador", "supervisor", "alerta", "novedades", "notas", "tipo", "editado_por", "editado_cuando"]];
   repRows.forEach(r => { const rp = repMarcas.get(String(r.id));
     rows.push([new Date(r.client_at).toLocaleString("es-AU"), r.vin6 || "", r.vin_full || "", r.make || "", r.model || "", r.color || "", r.worker_name, r.supervisor_name || "",
-      rp ? "VIN REPETIDO: " + textoRepetido(rp) : "", etiquetasVisibles(r).join("; "), r.notas || "", seccionDe(r) ? SECCIONES[seccionDe(r)].corto : "Normal", r.editado_por || "", r.editado_at ? new Date(r.editado_at).toLocaleString("es-AU") : ""]); });
+      rp ? "VIN REPETIDO: " + textoRepetido(rp) : "", etiquetasVisibles(r).join("; "), r.notas || "", seccionDe(r) ? nombreTipo(r) : "Auto foto", r.editado_por || "", r.editado_at ? new Date(r.editado_at).toLocaleString("es-AU") : ""]); });
   for (const c of repCambios.filter(c => c.accion === "borrar")) { const a = c.despues || {};
     rows.push([a.client_at ? new Date(a.client_at).toLocaleString("es-AU") : "", a.vin6 || "", a.vin_full || "", a.make || "", a.model || "", a.color || "", a.worker_name || "", a.supervisor_name || "",
-      "BORRADO por " + quienRol(c) + " el " + new Date(c.cuando).toLocaleString("es-AU"), etiquetasVisibles(a).join("; "), a.notas || "", seccionDe(a) ? SECCIONES[seccionDe(a)].corto : "Normal", c.quien, new Date(c.cuando).toLocaleString("es-AU")]); }
+      "BORRADO por " + quienRol(c) + " el " + new Date(c.cuando).toLocaleString("es-AU"), etiquetasVisibles(a).join("; "), a.notas || "", seccionDe(a) ? nombreTipo(a) : "Auto foto", c.quien, new Date(c.cuando).toLocaleString("es-AU")]); }
   const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
@@ -3108,12 +3195,21 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("res_dia").onchange = cargarGenteDelDia;
   document.querySelectorAll("#res_periodo .seg").forEach(b => b.onclick = () => ponerPeriodoResumen(b.dataset.p));
   document.getElementById("res_cancel").onclick = () => document.getElementById("resScrim").classList.remove("open");
-  document.getElementById("btnOtra").onclick = () => document.getElementById("otraInput").click();
+  /* Registrar trabajo: primero qué trabajo, luego cómo. */
+  montarTipos("tipo"); montarTipos("lote");
+  let tipoFoto = null;
+  const cerrarTipo = () => document.getElementById("tipoScrim").classList.remove("open");
+  const tipoElegido = () => { const t = leerTipo("tipo"); return faltaDetalle(t) ? null : t; };
+  document.getElementById("btnOtra").onclick = () => { marcarSeccion("tipo", "foto", null); document.getElementById("tipoScrim").classList.add("open"); };
+  document.getElementById("tipo_vin").onclick = () => { const t = tipoElegido(); if (!t) return; cerrarTipo(); abrirLector({ fuente: "camara", tipo: t }); };
+  document.getElementById("tipo_foto").onclick = () => { const t = tipoElegido(); if (!t) return; tipoFoto = t; cerrarTipo(); document.getElementById("otraInput").click(); };
+  document.getElementById("tipo_sin").onclick = () => { const t = tipoElegido(); if (!t) return; cerrarTipo(); openReview({ photo: null, vinFull: "", vin6: "", tipo: t.tipo, detalle: t.detalle }); };
   document.getElementById("otraInput").addEventListener("change", e => {
     const f = e.target.files[0]; e.target.value = "";
+    const t = tipoFoto || { tipo: "foto", detalle: null }; tipoFoto = null;
     if (!f) return;
     const fr = new FileReader();
-    fr.onload = async () => openReview({ photo: await aligerarFoto(fr.result, 1600, 0.85), vinFull: "", vin6: "", etiquetas: [SECCIONES.venta.tag] });
+    fr.onload = async () => openReview({ photo: await aligerarFoto(fr.result, 1600, 0.85), vinFull: "", vin6: "", tipo: t.tipo, detalle: t.detalle });
     fr.readAsDataURL(f);
   });
   document.getElementById("galInput").addEventListener("change", e => {
@@ -3162,6 +3258,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const CERRADORES = {
     capScrim: () => cerrarVistazo(),
     loteScrim: () => cerrarLote(),
+    tipoScrim: () => document.getElementById("tipoScrim").classList.remove("open"),
     confScrim: () => cerrarConfirmacion(),
     askScrim: () => document.getElementById("ask_cancel").click(),
     reviewScrim: () => closeReview(),
